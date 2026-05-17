@@ -503,13 +503,13 @@ button:disabled{
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbwvZGRAOxBLNIQ52mlED6ZlsOkpAd2PicOvmlZFBTKptXR5lnC_n87w-awDvowmktI8/exec";
+// Landing 100% Supabase: no usa Apps Script.
 
 const SUPABASE_URL = "https://pjvvyvfcwjoocjqvdror.supabase.co";
 const SUPABASE_KEY = "sb_publishable_NYqRoKptTgcL90VAVF2kqA_Gl06mEUF";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-console.log("Supabase conectado ✅");
+console.log("Landing 100% Supabase conectada ✅ · sin Apps Script");
 
 const WHATSAPP_POR_PC = {
   P1: "5492235181171",
@@ -544,6 +544,17 @@ function normalizarPC(valor) {
 
 const PC = normalizarPC(params.get("pc") || "P1");
 
+function pcCandidatos(pc){
+  const raw = String(pc || "P1").trim().toUpperCase();
+  const out = [raw];
+
+  // Compatibilidad: si la landing usa P1 pero en Supabase cargaste PC1, prueba ambas.
+  if(/^P\d+$/.test(raw)) out.push("PC" + raw.replace("P", ""));
+  if(/^PC\d+$/.test(raw)) out.push("P" + raw.replace("PC", ""));
+
+  return [...new Set(out)];
+}
+
 const LS_USER = "bet300_user_" + PC;
 const LS_SOLICITUD = "solicitud_actual_" + PC;
 
@@ -560,26 +571,52 @@ window.onload = async () => {
   await cargarBilletera();
 };
 
-async function api(params) {
-  const url = API_URL + "?" + new URLSearchParams(params).toString();
-  const res = await fetch(url);
-  const text = await res.text();
+// ======================================================
+// Helpers Supabase
+// ======================================================
 
-  try {
-    return JSON.parse(text);
-  } catch (e) {
-    console.error(text);
-    return { ok: false, error: "Respuesta inválida de API" };
+async function supabaseInsertSeguro(tabla, payloads){
+  for(const payload of payloads){
+    const { data, error } = await supabaseClient
+      .from(tabla)
+      .insert(payload)
+      .select()
+      .single();
+
+    if(!error){
+      return { ok:true, data };
+    }
+
+    console.warn("Intento fallido en " + tabla, error.message, payload);
   }
+
+  return { ok:false, error:"No se pudo guardar en " + tabla };
 }
 
+async function registrarContactoSupabase(usuario, nombre, telefono){
+  // La tabla usuarios ya existe en tu proyecto. Como no todas las bases tienen las mismas columnas,
+  // probamos payloads compatibles sin romper la landing si una variante no existe.
+  const base = {
+    usuario,
+    telefono,
+    pc_codigo: PC
+  };
 
-async function apiPostNoCors(data){
-  await fetch(API_URL, {
-    method: "POST",
-    mode: "no-cors",
-    body: JSON.stringify(data)
-  });
+  const intentos = [
+    { ...base, nombre_completo: nombre },
+    { ...base, nombre },
+    { usuario, nombre_completo: nombre, telefono },
+    { usuario, nombre, telefono }
+  ];
+
+  const r = await supabaseInsertSeguro("usuarios", intentos);
+
+  // Si la tabla usuarios tiene otra estructura, no bloqueamos al usuario.
+  // Lo importante para el panel operativo es que la solicitud y el chat se creen en Supabase.
+  if(!r.ok){
+    console.warn("No se pudo registrar contacto en usuarios. Se continúa igual:", r.error);
+  }
+
   return { ok:true };
 }
 
@@ -688,13 +725,7 @@ async function continuarRegistro() {
   document.getElementById("btnContinuar").disabled = true;
   document.getElementById("btnContinuar").innerText = "Guardando...";
 
-  const r = await api({
-    action: "registrarcontacto",
-    pc: PC,
-    usuarioJugador: usuario,
-    nombreCompleto: nombre,
-    telefono
-  });
+  const r = await registrarContactoSupabase(usuario, nombre, telefono);
 
   document.getElementById("btnContinuar").disabled = false;
   document.getElementById("btnContinuar").innerText = "Continuar";
@@ -716,40 +747,49 @@ function mostrarRegistroMsg(texto, ok) {
 }
 
 async function cargarBilletera() {
-  const r = await api({ action: "getbilleteras", pc: PC });
+  const pcs = pcCandidatos(PC);
 
-  if (!r.ok || !r.billeteras || r.billeteras.length === 0) {
+  const { data, error } = await supabaseClient
+    .from("billeteras")
+    .select("*")
+    .in("pc_codigo", pcs)
+    .eq("activa", true)
+    .order("seleccionada_manual", { ascending:false })
+    .order("prioridad", { ascending:false })
+    .order("orden", { ascending:true })
+    .order("id", { ascending:true });
+
+  if (error) {
+    console.error("Error cargando billetera Supabase:", error);
     document.getElementById("cvuBox").innerText = "No disponible";
-    document.getElementById("titularBox").innerText = "Consultar por WhatsApp";
+    document.getElementById("titularBox").innerText = "Consultar por chat";
+    document.getElementById("bancoBox").innerText = "Consultar";
     billeteraActiva = null;
     return;
   }
 
-  const billeteras = r.billeteras.filter(b =>
-    String(b.ACTIVA || "").toUpperCase() === "SI"
-  );
+  const disponibles = (data || []).filter(b => String(b.estado || "activa").toLowerCase() !== "caida");
 
-  if (billeteras.length === 0) {
+  if (!disponibles.length) {
     document.getElementById("cvuBox").innerText = "No disponible";
-    document.getElementById("titularBox").innerText = "Consultar por WhatsApp";
+    document.getElementById("titularBox").innerText = "Consultar por chat";
+    document.getElementById("bancoBox").innerText = "Consultar";
     billeteraActiva = null;
     return;
   }
 
   billeteraActiva =
-    billeteras.find(b => String(b.SELECCIONADA_MANUAL || "").toUpperCase() === "SI") ||
-    billeteras[0];
+    disponibles.find(b => b.seleccionada_manual === true) ||
+    disponibles[0];
 
   document.getElementById("cvuBox").innerText =
-    billeteraActiva.CVU_CBU || billeteraActiva.ALIAS || "Consultar";
+    billeteraActiva.alias || billeteraActiva.cbu || "Consultar";
 
   document.getElementById("titularBox").innerText =
-    billeteraActiva.TITULAR || billeteraActiva.NOMBRE_VISIBLE || "Consultar";
+    billeteraActiva.titular || billeteraActiva.nombre_visible || "Consultar";
 
   document.getElementById("bancoBox").innerText =
-    String(billeteraActiva.TIPO || "").includes("MP")
-      ? "Mercado Pago"
-      : billeteraActiva.TIPO || "Billetera";
+    billeteraActiva.banco || "Billetera";
 }
 
 function copiarCvu() {
@@ -1027,8 +1067,9 @@ async function crearSolicitudSupabase(monto, tipo="CARGA"){
     chat_id: chatSessionId || null
   };
 
-  if(!esRetiro){
-    payload.billetera_nombre = billeteraActiva?.NOMBRE_VISIBLE || billeteraActiva?.BILLETERA_NOMBRE || "";
+  if(!esRetiro && billeteraActiva){
+    payload.billetera_nombre = billeteraActiva.nombre_visible || "";
+    payload.billetera_id = billeteraActiva.id || null;
   }
 
   const { data, error } = await supabaseClient
