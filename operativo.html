@@ -361,16 +361,8 @@ function formatearHoraChat(fechaRaw){
 
 function esPendiente(s){const e=normalizar(s.ESTADO);return e.includes("PENDIENTE")||e==="NUEVA"||e==="NUEVO"||e==="EN_REVISION"}
 function esRealizada(s){
-  const e = normalizar(s.ESTADO);
-  return [
-    "APROBADA_MANUAL",
-    "APROBADA_MANUAL_OK",
-    "EN_PROCESO_WORKER",
-    "ACREDITADA",
-    "PAGADA",
-    "APROBADA",
-    "REQUIERE_MANUAL"
-  ].includes(e);
+  const e=normalizar(s.ESTADO);
+  return ["APROBADA_MANUAL","APROBADA_MANUAL_OK","EN_PROCESO_WORKER","ACREDITADA","PAGADA","APROBADA","REQUIERE_MANUAL"].includes(e)
 }
 function estadoBadge(e){const x=normalizar(e);if(esRealizada({ESTADO:e}))return`<span class="badge badge-ok">${e}</span>`;if(["RECHAZADA","ERROR"].includes(x))return`<span class="badge badge-danger">${e}</span>`;return`<span class="badge badge-pending">${e||"-"}</span>`}
 function escapeHtml(text){return String(text||"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
@@ -410,9 +402,12 @@ function mapSolicitudSupabase(s){
     BILLETERA_NOMBRE: s.billetera_nombre || "",
     ID_BILLETERA: s.billetera_id || "",
     CHAT_ID: s.chat_id || "",
-    OPERADOR: s.operador_usuario || s.aprobada_por || ""
+    OPERADOR: s.operador_usuario || s.aprobada_por || "",
+    UPDATED_AT: s.updated_at || s.update_at || "",
+    TURNO: turnoDeFecha(s.created_at)
   };
 }
+
 async function cargarSolicitudesSupabase(){
   const { data, error } = await supabaseClient
     .from("solicitudes")
@@ -430,6 +425,8 @@ async function cargarSolicitudesSupabase(){
     solicitudes:(data || []).map(mapSolicitudSupabase)
   };
 }
+
+
 function workerBadge(s){
   const estado = normalizar(s.ESTADO_WORKER || "SIN_WORKER");
 
@@ -453,7 +450,7 @@ function workerBadge(s){
 }
 
 async function crearWorkerJobSolicitud(id){
-  const operadorNombre = operador.usuario || operador.nombre || "operador";
+  const operadorNombre = operador?.usuario || operador?.nombre || "operador";
 
   const { data, error } = await supabaseClient.rpc(
     "crear_worker_job_desde_solicitud",
@@ -465,16 +462,10 @@ async function crearWorkerJobSolicitud(id){
 
   if(error){
     console.error("Error creando worker job:", error);
-    return {
-      ok:false,
-      error:error.message || "No se pudo crear el trabajo del worker."
-    };
+    return { ok:false, error:error.message || "No se pudo crear el trabajo del worker." };
   }
 
-  return {
-    ok:true,
-    job_id:data
-  };
+  return { ok:true, job_id:data };
 }
 
 async function cargarWorkerLogs(jobId){
@@ -535,6 +526,7 @@ async function reintentarWorker(jobId){
   toast("Worker enviado a reintento","green");
   await refrescarTodo(false);
 }
+
 async function actualizarSolicitudSupabase(id, cambios){
   const { data, error } = await supabaseClient
     .from("solicitudes")
@@ -1076,7 +1068,7 @@ function tablaSolicitudesHTML(lista){
           <button class="mini-btn red" onclick="abrirRechazarSolicitud('${id}')">Rechazar</button>
         `:`
           ${tieneJob ? `<button class="mini-btn blue" onclick="abrirWorkerLogs('${s.WORKER_JOB_ID}')">Logs</button>` : ""}
-          ${estadoWorker==="REQUIERE_MANUAL" || estadoWorker==="ERROR" || estadoWorker==="REINTENTAR"
+          ${estadoWorker==="REQUIERE_MANUAL" || estadoWorker==="ERROR" || estadoWorker==="ERROR_WORKER" || estadoWorker==="REINTENTAR"
             ? `<button class="mini-btn green" onclick="reintentarWorker('${s.WORKER_JOB_ID}')">Reintentar</button>`
             : ""
           }
@@ -1147,7 +1139,7 @@ function abrirAprobarSolicitud(id){
     </div>
   `,async()=>{
 
-    const operadorNombre = operador.usuario || operador.nombre || "";
+    const operadorNombre = operador?.usuario || operador?.nombre || "";
 
     const r = await actualizarSolicitudSupabase(id, {
       estado:"APROBADA_MANUAL",
@@ -1198,7 +1190,7 @@ function abrirCerrarRetiro(id){
     </div>
   `,async()=>{
 
-    const operadorNombre = operador.usuario || operador.nombre || "";
+    const operadorNombre = operador?.usuario || operador?.nombre || "";
 
     const r = await actualizarSolicitudSupabase(id, {
       estado:"APROBADA_MANUAL",
