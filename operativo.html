@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>NODO · OPERATIVO RPC V10</title>
+<title>NODO · OPERATIVO RPC V11</title>
 
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
@@ -179,7 +179,7 @@ table{width:100%;border-collapse:collapse}th,td{padding:11px;border-bottom:1px s
   <div class="login-card">
     <img src="logo-nodo.png" class="logo" alt="NODO">
     <h2 style="margin-bottom:6px">PANEL OPERATIVO LITE</h2>
-    <div class="small" style="margin-bottom:16px">Versión V10 · Chat RPC corregido</div>
+    <div class="small" style="margin-bottom:16px">Versión V11 · Chat envío corregido</div>
     <label>Usuario</label>
     <input id="loginUsuario" autocomplete="username">
     <label>Clave</label>
@@ -365,7 +365,7 @@ let operador=null, pcOperativa=null, panelSessionToken="";
 const LS_OPERADOR="nodo_operador_lite";
 const LS_PC="nodo_pc_operativa_lite";
 const LS_TOKEN="nodo_panel_session_token_lite";
-let solicitudes=[], billeteras=[], billeterasTodas=[], chats=[], chatMensajes=[], chatMensajesTodos=[];
+let solicitudes=[], billeteras=[], billeterasTodas=[], chats=[], chatMensajes=[];
 let timersIniciados=false;
 let lastPendientesIds=new Set(), lastChatUnread=0;
 let chatActualId="", chatImagenBase64="", chatImagenNombre="";
@@ -916,7 +916,6 @@ async function cargarChats(silencioso=false){
   });
 
   const mensajes = errorMensajes ? [] : (mensajesData || []);
-  chatMensajesTodos = mensajes;
 
   if(errorMensajes){
     console.error("Error cargando chat_mensajes RPC:", errorMensajes);
@@ -931,15 +930,8 @@ async function cargarChats(silencioso=false){
       String(m.tipo_emisor || "").toUpperCase() === "USUARIO"
     ).length;
 
-    const unreadDb = ms.filter(m =>
-      String(m.tipo_emisor || "").toUpperCase() === "USUARIO" &&
-      m.leido !== true
-    ).length;
-
-    // Fallback local por compatibilidad con versiones anteriores.
     const readCount = getChatReadCount(c.chat_id);
-    const unreadLocal = Math.max(0, userCount - readCount);
-    const sinLeer = unreadDb > 0 ? unreadDb : unreadLocal;
+    const sinLeer = Math.max(0, userCount - readCount);
 
     return {
       ID_CHAT: c.chat_id,
@@ -1571,50 +1563,19 @@ function renderChatList(){
   setBox("chatList",html);
 }
 async function abrirChat(id){
-  chatActualId = id;
-
+  chatActualId=id;
   await cargarChatActual(false);
 
-  const userCount = obtenerMensajesCacheChat(id).filter(m =>
-    String(m.tipo_emisor || m.TIPO_EMISOR || "").toUpperCase() === "USUARIO"
-  ).length || chatMensajes.filter(m =>
+  const userCount = chatMensajes.filter(m =>
     String(m.tipo_emisor || m.TIPO_EMISOR || "").toUpperCase() === "USUARIO"
   ).length;
 
   setChatReadCount(id, userCount);
 
-  await marcarChatLeido(id);
-
-  // Reflejo inmediato en UI: saca badge del chat abierto sin esperar polling.
-  chats = chats.map(c => String(c.ID_CHAT || c.chat_id) === String(id) ? {...c, SIN_LEER:0} : c);
-  chatMensajes = chatMensajes.map(m => String(m.tipo_emisor || m.TIPO_EMISOR || "").toUpperCase() === "USUARIO" ? {...m, leido:true} : m);
-  chatMensajesTodos = chatMensajesTodos.map(m => String(m.chat_id) === String(id) && String(m.tipo_emisor || "").toUpperCase() === "USUARIO" ? {...m, leido:true} : m);
-
+  await cargarChats(true);
   renderChatList();
   renderChatMensajes();
-  renderInicio();
-  verificarChats(false);
-
-  // Refresco suave para sincronizar con Supabase.
-  setTimeout(()=>cargarChats(true),500);
 }
-
-async function marcarChatLeido(id){
-  try{
-    const { error } = await supabaseClient.rpc("panel_operativo_marcar_chat_leido", {
-      p_session_token: requireSessionToken(),
-      p_chat_id: id
-    });
-    if(error) console.warn("No se pudo marcar chat leído:", error.message);
-  }catch(e){
-    console.warn("No se pudo marcar chat leído:", e.message);
-  }
-}
-
-function obtenerMensajesCacheChat(id){
-  return (chatMensajesTodos || []).filter(m => String(m.chat_id) === String(id));
-}
-
 
 const TRANSFER_CARD_PREFIX = "::TRANSFER_CARD::";
 
@@ -1713,25 +1674,20 @@ async function enviarTarjetaTransferencia(){
 
   if(error){
     console.error("Error enviando tarjeta transferencia RPC:", error);
-    alert("No se pudo enviar la tarjeta.");
+    alert("No se pudo enviar la tarjeta: " + (error.message || "error desconocido"));
+    await cargarChatActual(true);
     return;
   }
 
   marcarUltimoMensajePanelEnviado();
   toast("Tarjeta de transferencia enviada", "green");
-  setTimeout(()=>cargarChatActual(),400);
-  setTimeout(()=>cargarChats(true),700);
+  setTimeout(()=>cargarChatActual(true),300);
+  setTimeout(()=>cargarChats(true),600);
 }
 
-async function cargarChatActual(render=true){
+async function cargarChatActual(){
 
   if(!chatActualId) return;
-
-  const cache = obtenerMensajesCacheChat(chatActualId);
-  if(cache.length){
-    chatMensajes = cache;
-    if(render) renderChatMensajes();
-  }
 
   const { data, error } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes", {
     p_session_token: requireSessionToken(),
@@ -1740,23 +1696,12 @@ async function cargarChatActual(render=true){
 
   if(error){
     console.error("Error cargando mensajes del chat RPC:", error);
-    if(!cache.length) renderChatMensajes();
     return;
   }
 
-  const rows = data || [];
+  chatMensajes = data || [];
 
-  // Si la RPC puntual por alguna razón viene vacía pero el listado general tenía mensajes,
-  // conservamos el cache para no mostrar “Sin mensajes todavía” incorrectamente.
-  chatMensajes = rows.length ? rows : cache;
-
-  // Mantener cache general sincronizado con el chat abierto.
-  if(rows.length){
-    const otros = (chatMensajesTodos || []).filter(m => String(m.chat_id) !== String(chatActualId));
-    chatMensajesTodos = [...otros, ...rows].sort((a,b)=> new Date(a.created_at||0) - new Date(b.created_at||0));
-  }
-
-  if(render) renderChatMensajes();
+  renderChatMensajes();
 }
 
 function normalizarImagenUrl(url){
@@ -1778,9 +1723,7 @@ function renderChatMensajes(){
   setBox("chatEstado",chat.SOLICITUD_ID?`Solicitud: ${chat.SOLICITUD_ID}`:"Sin solicitud");
 
   if(!chatMensajes.length){
-    const preview = chat.ULTIMO_MENSAJE || "";
-    const msg = preview ? "No pude cargar la conversación completa todavía. Tocá Actualizar chats o reabrí el chat." : "Sin mensajes todavía.";
-    setBox("chatBody",`<div class="alert-box">${msg}</div>`);
+    setBox("chatBody",`<div class="alert-box">Sin mensajes todavía.</div>`);
     return;
   }
 
@@ -1829,7 +1772,8 @@ async function enviarChat(){
 
   if(error){
     console.error("Error enviando mensaje operador RPC:", error);
-    alert("No se pudo enviar el mensaje.");
+    alert("No se pudo enviar el mensaje: " + (error.message || "error desconocido"));
+    await cargarChatActual(true);
     return;
   }
 
@@ -1837,8 +1781,8 @@ async function enviarChat(){
   quitarImagenChat();
   marcarUltimoMensajePanelEnviado();
 
-  setTimeout(()=>cargarChatActual(),400);
-  setTimeout(()=>cargarChats(true),700);
+  setTimeout(()=>cargarChatActual(true),300);
+  setTimeout(()=>cargarChats(true),600);
 }
 
 function agregarMensajeLocalPanel(mensaje, imagen){
