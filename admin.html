@@ -4,7 +4,124 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>NODO · ADMIN RPC V15</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
+/* =========================================================
+   FIX ADMIN V15.1
+   Corrige carga de datos: loadConfig/loadSolicitudes faltaban
+   y fuerza que todas las lecturas usen RPC con session_token.
+========================================================= */
+
+async function reloadAll(){
+  try{
+    await Promise.allSettled([
+      loadPcs(false),
+      loadOperadores(false),
+      loadBilleteras(false),
+      loadConfig(false),
+      loadSolicitudes(false),
+      loadChats(false),
+      loadWorkerJobs(false)
+    ]);
+    fillPcSelects();
+    renderAll();
+    toast("Datos actualizados","okb");
+  }catch(e){
+    console.error("reloadAll error:", e);
+    toast("Error actualizando: "+(e.message||e),"err");
+  }
+}
+
+async function loadPcs(render=true){
+  const {data,error}=await supabaseClient.rpc("admin_get_pcs",{
+    p_session_token:requireAdminToken()
+  });
+  if(error){console.error("admin_get_pcs",error);pcs=[];return toast("Error PCs: "+error.message,"err")}
+  pcs=data||[];
+  if(render)renderAll();
+}
+
+async function loadOperadores(render=true){
+  const {data,error}=await supabaseClient.rpc("admin_get_operadores",{
+    p_session_token:requireAdminToken()
+  });
+  if(error){console.error("admin_get_operadores",error);operadores=[];return toast("Error operadores: "+error.message,"err")}
+  operadores=data||[];
+  if(render)renderAll();
+}
+
+async function loadBilleteras(render=true){
+  const pc=val("globalPc")||null;
+  const {data,error}=await supabaseClient.rpc("admin_get_billeteras",{
+    p_session_token:requireAdminToken(),
+    p_pc_codigo:pc
+  });
+  if(error){console.error("admin_get_billeteras",error);billeteras=[];return toast("Error billeteras: "+error.message,"err")}
+  billeteras=data||[];
+  if(render)renderAll();
+}
+
+async function loadConfig(render=true){
+  const {data,error}=await supabaseClient.rpc("admin_get_configuracion",{
+    p_session_token:requireAdminToken()
+  });
+  if(error){console.error("admin_get_configuracion",error);configuracion=[];return toast("Error config: "+error.message,"err")}
+  configuracion=data||[];
+  if(render)renderAll();
+}
+
+async function loadSolicitudes(render=true){
+  const pc=val("globalPc")||null;
+  const {data,error}=await supabaseClient.rpc("admin_get_solicitudes",{
+    p_session_token:requireAdminToken(),
+    p_pc_codigo:pc,
+    p_limit:1000
+  });
+  if(error){console.error("admin_get_solicitudes",error);solicitudes=[];return toast("Error solicitudes: "+error.message,"err")}
+  solicitudes=data||[];
+  if(render)renderAll();
+}
+
+async function loadChats(render=true){
+  const pc=val("globalPc")||null;
+  const {data:ses,error:e1}=await supabaseClient.rpc("admin_get_chat_sesiones",{
+    p_session_token:requireAdminToken(),
+    p_pc_codigo:pc
+  });
+  if(e1){console.error("admin_get_chat_sesiones",e1);chatSesiones=[];chatMensajes=[];return toast("Error chats: "+e1.message,"err")}
+  chatSesiones=ses||[];
+
+  const {data:ms,error:e2}=await supabaseClient.rpc("admin_get_chat_mensajes",{
+    p_session_token:requireAdminToken(),
+    p_pc_codigo:pc
+  });
+  if(e2){console.error("admin_get_chat_mensajes",e2);chatMensajes=[];return toast("Error mensajes chat: "+e2.message,"err")}
+  chatMensajes=ms||[];
+
+  if(render)renderAll();
+}
+
+async function loadWorkerJobs(render=true){
+  const pc=val("globalPc")||null;
+  const {data,error}=await supabaseClient.rpc("admin_get_worker_jobs",{
+    p_session_token:requireAdminToken(),
+    p_pc_codigo:pc,
+    p_limit:1500
+  });
+  if(error){console.error("admin_get_worker_jobs",error);workerJobs=[];return toast("Error worker_jobs: "+error.message,"err")}
+  workerJobs=data||[];
+  if(render)renderAll();
+}
+
+async function loadWorkerLogs(jobId){
+  const {data,error}=await supabaseClient.rpc("admin_get_worker_logs",{
+    p_session_token:requireAdminToken(),
+    p_worker_job_id:jobId?Number(jobId):null
+  });
+  if(error){console.error("admin_get_worker_logs",error);toast("No pude leer worker_logs: "+error.message,"err");return[]}
+  return data||[];
+}
+
+</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
 :root{--bg:#020617;--panel:#0f172a;--card:#111827;--card2:#1f2937;--line:#334155;--muted:#94a3b8;--txt:#f8fafc;--green:#22c55e;--red:#ef4444;--yellow:#f59e0b;--blue:#3b82f6;--violet:#8b5cf6}
@@ -749,6 +866,123 @@ function badges(){setText({badgeDashboard:solicitudes.length,badgeMetricas:solic
 function toast(msg,cls="okb"){const e=$("toast");e.className=`toast show ${cls}`;e.textContent=msg;clearTimeout(window.__to);window.__to=setTimeout(()=>e.classList.remove("show"),3200)}
 function empty(id,col,msg){$(id).innerHTML=`<tr><td colspan="${col}" class="empty">${safe(msg)}</td></tr>`}function val(id){return ($(id)?.value||"").trim()}function bool(id){return val(id)==="true"}function num(id){return Number(val(id)||0)}function norm(v){return String(v||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim()}function avg(a){return a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null}function money(n){return Number(n||0).toLocaleString("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0})}function fecha(f){if(!f)return"";return new Date(f).toLocaleString("es-AR",{timeZone:"America/Argentina/Buenos_Aires",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).replace(","," ·")}function fechaCompleta(f){if(!f)return"";return new Date(f).toLocaleString("es-AR",{timeZone:"America/Argentina/Buenos_Aires",day:"2-digit",month:"2-digit",year:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false}).replace(","," ·")}function estado(e){if(esRealizada({estado:e}))return pill(e||"Realizada","ok");if(norm(e)==="rechazada")return pill(e,"off");return pill(e||"Pendiente","warn")}
 function setVals(obj){Object.entries(obj).forEach(([k,v])=>{if($(k))$(k).value=v??""})}function setText(obj){Object.entries(obj).forEach(([k,v])=>{if($(k))$(k).textContent=v??""})}function safe(v){return String(v??"").replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]))}function attr(v){return safe(v).replace(/`/g,"&#96;")}function pill(t,type){const m={ok:"ok",off:"off",warn:"warn",info:"info",vio:"vio"};return`<span class="pill ${m[type]||'info'}">${safe(t)}</span>`}
+
+/* =========================================================
+   FIX ADMIN V15.1
+   Corrige carga de datos: loadConfig/loadSolicitudes faltaban
+   y fuerza que todas las lecturas usen RPC con session_token.
+========================================================= */
+
+async function reloadAll(){
+  try{
+    await Promise.allSettled([
+      loadPcs(false),
+      loadOperadores(false),
+      loadBilleteras(false),
+      loadConfig(false),
+      loadSolicitudes(false),
+      loadChats(false),
+      loadWorkerJobs(false)
+    ]);
+    fillPcSelects();
+    renderAll();
+    toast("Datos actualizados","okb");
+  }catch(e){
+    console.error("reloadAll error:", e);
+    toast("Error actualizando: "+(e.message||e),"err");
+  }
+}
+
+async function loadPcs(render=true){
+  const {data,error}=await supabaseClient.rpc("admin_get_pcs",{
+    p_session_token:requireAdminToken()
+  });
+  if(error){console.error("admin_get_pcs",error);pcs=[];return toast("Error PCs: "+error.message,"err")}
+  pcs=data||[];
+  if(render)renderAll();
+}
+
+async function loadOperadores(render=true){
+  const {data,error}=await supabaseClient.rpc("admin_get_operadores",{
+    p_session_token:requireAdminToken()
+  });
+  if(error){console.error("admin_get_operadores",error);operadores=[];return toast("Error operadores: "+error.message,"err")}
+  operadores=data||[];
+  if(render)renderAll();
+}
+
+async function loadBilleteras(render=true){
+  const pc=val("globalPc")||null;
+  const {data,error}=await supabaseClient.rpc("admin_get_billeteras",{
+    p_session_token:requireAdminToken(),
+    p_pc_codigo:pc
+  });
+  if(error){console.error("admin_get_billeteras",error);billeteras=[];return toast("Error billeteras: "+error.message,"err")}
+  billeteras=data||[];
+  if(render)renderAll();
+}
+
+async function loadConfig(render=true){
+  const {data,error}=await supabaseClient.rpc("admin_get_configuracion",{
+    p_session_token:requireAdminToken()
+  });
+  if(error){console.error("admin_get_configuracion",error);configuracion=[];return toast("Error config: "+error.message,"err")}
+  configuracion=data||[];
+  if(render)renderAll();
+}
+
+async function loadSolicitudes(render=true){
+  const pc=val("globalPc")||null;
+  const {data,error}=await supabaseClient.rpc("admin_get_solicitudes",{
+    p_session_token:requireAdminToken(),
+    p_pc_codigo:pc,
+    p_limit:1000
+  });
+  if(error){console.error("admin_get_solicitudes",error);solicitudes=[];return toast("Error solicitudes: "+error.message,"err")}
+  solicitudes=data||[];
+  if(render)renderAll();
+}
+
+async function loadChats(render=true){
+  const pc=val("globalPc")||null;
+  const {data:ses,error:e1}=await supabaseClient.rpc("admin_get_chat_sesiones",{
+    p_session_token:requireAdminToken(),
+    p_pc_codigo:pc
+  });
+  if(e1){console.error("admin_get_chat_sesiones",e1);chatSesiones=[];chatMensajes=[];return toast("Error chats: "+e1.message,"err")}
+  chatSesiones=ses||[];
+
+  const {data:ms,error:e2}=await supabaseClient.rpc("admin_get_chat_mensajes",{
+    p_session_token:requireAdminToken(),
+    p_pc_codigo:pc
+  });
+  if(e2){console.error("admin_get_chat_mensajes",e2);chatMensajes=[];return toast("Error mensajes chat: "+e2.message,"err")}
+  chatMensajes=ms||[];
+
+  if(render)renderAll();
+}
+
+async function loadWorkerJobs(render=true){
+  const pc=val("globalPc")||null;
+  const {data,error}=await supabaseClient.rpc("admin_get_worker_jobs",{
+    p_session_token:requireAdminToken(),
+    p_pc_codigo:pc,
+    p_limit:1500
+  });
+  if(error){console.error("admin_get_worker_jobs",error);workerJobs=[];return toast("Error worker_jobs: "+error.message,"err")}
+  workerJobs=data||[];
+  if(render)renderAll();
+}
+
+async function loadWorkerLogs(jobId){
+  const {data,error}=await supabaseClient.rpc("admin_get_worker_logs",{
+    p_session_token:requireAdminToken(),
+    p_worker_job_id:jobId?Number(jobId):null
+  });
+  if(error){console.error("admin_get_worker_logs",error);toast("No pude leer worker_logs: "+error.message,"err");return[]}
+  return data||[];
+}
+
 </script>
 </body>
 </html>async function loadBilleteras(render=true){
