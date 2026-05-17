@@ -397,6 +397,8 @@ function mapSolicitudSupabase(s){
     WORKER_JOB_ID: s.worker_job_id || "",
     WORKER_ERROR: s.worker_error || "",
     ACCION_WORKER: s.accion_worker || "",
+    RETIRO_ALIAS_CBU: s.retiro_alias_cbu || "",
+    RETIRO_TITULAR: s.retiro_titular || "",
     APROBADA_POR: s.aprobada_por || "",
     APROBADA_AT: s.aprobada_at || "",
     BILLETERA_NOMBRE: s.billetera_nombre || "",
@@ -1024,6 +1026,19 @@ function renderSolicitudes(){
   if(texto)lista=lista.filter(s=>normalizar(`${s.USUARIO||""} ${s.NOMBRE_COMPLETO||""} ${s.BILLETERA_NOMBRE||""} ${s.ID||""}`).includes(texto));
   setBox("tablaSolicitudesCompleta",tablaSolicitudesHTML(lista));
 }
+function destinoRetiroHTML(s){
+  const destino = s.RETIRO_ALIAS_CBU || s.retiro_alias_cbu || "";
+  const titular = s.RETIRO_TITULAR || s.retiro_titular || "";
+  if(!destino && !titular) return `<span class="small">Destino no cargado</span>`;
+  return `<div><b>Destino:</b> ${escapeHtml(destino || "-")}</div><div class="small"><b>Titular:</b> ${escapeHtml(titular || "-")}</div>`;
+}
+
+function billeteraODestinoHTML(s){
+  const tipo = normalizar(s.TIPO_SOLICITUD||s.TIPO);
+  if(tipo === "RETIRO") return destinoRetiroHTML(s);
+  return s.BILLETERA_NOMBRE||s.NOMBRE_BILLETERA||s.ID_BILLETERA||"-";
+}
+
 function tablaSolicitudesHTML(lista){
   if(!lista.length)return`<div class="alert-box">No hay solicitudes para mostrar.</div>`;
 
@@ -1031,7 +1046,7 @@ function tablaSolicitudesHTML(lista){
     <th>Fecha</th>
     <th>Tipo</th>
     <th>Usuario</th>
-    <th>Billetera</th>
+    <th>Billetera / Destino</th>
     <th>Monto</th>
     <th>Estado</th>
     <th>Worker</th>
@@ -1051,7 +1066,7 @@ function tablaSolicitudesHTML(lista){
         <b>${s.USUARIO||s.USUARIO_JUGADOR||"-"}</b><br>
         <span class="small">${s.NOMBRE_COMPLETO||""}</span>
       </td>
-      <td>${s.BILLETERA_NOMBRE||s.NOMBRE_BILLETERA||s.ID_BILLETERA||"-"}</td>
+      <td>${billeteraODestinoHTML(s)}</td>
       <td>${money(s.MONTO_REAL||s.MONTO_DECLARADO||s.MONTO||0)}</td>
       <td>${estadoBadge(s.ESTADO)}</td>
       <td>
@@ -1179,6 +1194,17 @@ function abrirCerrarRetiro(id){
       <b>${s.USUARIO||""}</b> · ${money(s.MONTO_DECLARADO||s.MONTO_REAL||0)}
     </div>
 
+    <div class="alert-box">
+      <b>Datos de cuenta para pagar el retiro</b><br>
+      Revisá estos datos antes de aprobar. El worker retira fichas en Agentes; el pago al CBU/alias se realiza manualmente.
+    </div>
+
+    <label>CBU / CVU / Alias de destino</label>
+    <input id="retDestino" value="${escapeHtml(s.RETIRO_ALIAS_CBU||"")}" placeholder="Alias o CBU/CVU">
+
+    <label>Titular de la cuenta</label>
+    <input id="retTitular" value="${escapeHtml(s.RETIRO_TITULAR||"")}" placeholder="Nombre y apellido del titular">
+
     <label>Monto final</label>
     <input id="retMonto" type="number" value="${s.MONTO_REAL||s.MONTO_DECLARADO||""}">
 
@@ -1192,10 +1218,22 @@ function abrirCerrarRetiro(id){
 
     const operadorNombre = operador?.usuario || operador?.nombre || "";
 
+    if(!val("retDestino")){
+      alert("Falta CBU/CVU o alias de destino del retiro.");
+      return;
+    }
+
+    if(!val("retTitular")){
+      alert("Falta titular de la cuenta de destino.");
+      return;
+    }
+
     const r = await actualizarSolicitudSupabase(id, {
       estado:"APROBADA_MANUAL",
       estado_worker:"PREPARANDO_COLA",
       monto:Number(val("retMonto") || s.MONTO_DECLARADO || 0),
+      retiro_alias_cbu:val("retDestino"),
+      retiro_titular:val("retTitular"),
       operador_usuario:operadorNombre,
       aprobada_por:operadorNombre,
       aprobada_at:new Date().toISOString(),
