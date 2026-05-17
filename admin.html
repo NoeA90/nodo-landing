@@ -23,6 +23,7 @@ button{border:0;border-radius:12px;padding:11px 14px;cursor:pointer;font-weight:
 .filters{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr auto;gap:10px;padding:14px 18px;background:rgba(31,41,55,.45);border-bottom:1px solid var(--line)}.tableWrap{overflow:auto;width:100%}table{width:100%;border-collapse:collapse;min-width:980px}th,td{padding:12px 10px;border-bottom:1px solid var(--line);font-size:13px;text-align:left;vertical-align:middle}th{background:rgba(2,6,23,.52);color:#d1d5db;position:sticky;top:0}.muted{color:var(--muted)}
 .pill{display:inline-flex;align-items:center;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:700;border:1px solid transparent;white-space:nowrap}.ok{background:rgba(34,197,94,.12);color:#86efac;border-color:rgba(34,197,94,.32)}.off{background:rgba(239,68,68,.12);color:#fca5a5;border-color:rgba(239,68,68,.32)}.warn{background:rgba(245,158,11,.13);color:#fcd34d;border-color:rgba(245,158,11,.32)}.info{background:rgba(59,130,246,.12);color:#93c5fd;border-color:rgba(59,130,246,.32)}.vio{background:rgba(139,92,246,.12);color:#c4b5fd;border-color:rgba(139,92,246,.32)}
 .rowActions{display:flex;gap:7px;flex-wrap:wrap}.empty{text-align:center;color:var(--muted);padding:26px}.notice{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.32);color:#fde68a;padding:13px 14px;border-radius:13px;margin-bottom:16px;font-size:14px;line-height:1.42}.list{display:grid;gap:10px}.item{border:1px solid var(--line);background:rgba(2,6,23,.38);border-radius:13px;padding:13px}.item strong{display:block;margin-bottom:5px}.item span{color:var(--muted);font-size:13px}.toast{position:fixed;right:20px;bottom:20px;z-index:99;background:#020617;border:1px solid var(--line);padding:14px 16px;border-radius:12px;box-shadow:0 12px 36px rgba(0,0,0,.35);display:none;max-width:430px}.toast.show{display:block}.toast.okb{border-color:rgba(34,197,94,.6)}.toast.err{border-color:rgba(239,68,68,.7)}
+.modalOverlay{position:fixed;inset:0;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center;z-index:200;padding:18px}.modalOverlay.show{display:flex}.modalBox{width:min(980px,96vw);max-height:88vh;overflow:auto;background:#020617;border:1px solid var(--line);border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.55)}.modalHead{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px}.modalHead h3{font-size:18px}.modalBody{padding:18px}.logLine{border:1px solid var(--line);background:rgba(15,23,42,.74);border-radius:13px;padding:12px;margin-bottom:10px}.logLine b{display:inline-block;margin-bottom:4px}.logMeta{color:var(--muted);font-size:12px}.workerGrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:13px;margin-bottom:18px}.workerError{max-width:280px;white-space:normal;color:#fca5a5;font-size:12px;line-height:1.35}.workerOk{color:#86efac}.workerWarn{color:#fcd34d}.workerInfo{color:#93c5fd}
 @media(max-width:1180px){.app{grid-template-columns:1fr}aside{position:relative;height:auto}.grid2,.gridDash{grid-template-columns:1fr}.filters{grid-template-columns:1fr 1fr}.stats{grid-template-columns:1fr 1fr}}@media(max-width:680px){main{padding:14px}.top{flex-direction:column}.filters,.g2,.g3,.stats{grid-template-columns:1fr}table{min-width:760px}}
 </style>
 </head>
@@ -32,6 +33,7 @@ button{border:0;border-radius:12px;padding:11px 14px;cursor:pointer;font-weight:
   <div class="nav">
     <button class="navBtn active" data-section="dashboard" onclick="showSection('dashboard')">Dashboard <span class="badge" id="badgeDashboard">0</span></button>
     <button class="navBtn" data-section="metricas" onclick="showSection('metricas')">Métricas <span class="badge" id="badgeMetricas">0</span></button>
+    <button class="navBtn" data-section="worker" onclick="showSection('worker')">Worker <span class="badge" id="badgeWorker">0</span></button>
     <button class="navBtn" data-section="operadores" onclick="showSection('operadores')">Operadores <span class="badge" id="badgeOperadores">0</span></button>
     <button class="navBtn" data-section="billeteras" onclick="showSection('billeteras')">Billeteras <span class="badge" id="badgeBilleteras">0</span></button>
     <button class="navBtn" data-section="pcs" onclick="showSection('pcs')">PCs <span class="badge" id="badgePcs">0</span></button>
@@ -54,7 +56,7 @@ button{border:0;border-radius:12px;padding:11px 14px;cursor:pointer;font-weight:
     <div class="card"><div class="card-h"><h3>Solicitudes por turno</h3></div><div class="card-b" id="dashTurnos"></div></div>
     <div class="card"><div class="card-h"><h3>Resumen por PC</h3></div><div class="card-b" id="dashPcs"></div></div>
   </div>
-  <div class="card"><div class="card-h"><h3>Últimas solicitudes</h3></div><div class="tableWrap"><table><thead><tr><th>Fecha</th><th>PC</th><th>Turno</th><th>Tipo</th><th>Usuario</th><th>Monto</th><th>Estado</th><th>Operador</th></tr></thead><tbody id="ultimasSolicitudes"></tbody></table></div></div>
+  <div class="card"><div class="card-h"><h3>Últimas solicitudes</h3></div><div class="tableWrap"><table><thead><tr><th>Fecha</th><th>PC</th><th>Turno</th><th>Tipo</th><th>Usuario</th><th>Monto</th><th>Estado</th><th>Worker</th><th>Operador</th></tr></thead><tbody id="ultimasSolicitudes"></tbody></table></div></div>
 </section>
 
 <section id="section-metricas" class="section">
@@ -68,6 +70,75 @@ button{border:0;border-radius:12px;padding:11px 14px;cursor:pointer;font-weight:
   <div class="gridDash">
     <div class="card"><div class="card-h"><h3>Estadística por operador</h3></div><div class="tableWrap"><table><thead><tr><th>Operador</th><th>Tomadas</th><th>Realizadas</th><th>Rechazadas</th><th>Rápidas</th><th>Prom. aprobación</th><th>Resp. chat</th><th>Prom. chat</th></tr></thead><tbody id="statsOperadores"></tbody></table></div></div>
     <div class="card"><div class="card-h"><h3>Estadística por PC</h3></div><div class="tableWrap"><table><thead><tr><th>PC</th><th>Total</th><th>Pend.</th><th>Real.</th><th>Rech.</th><th>TM</th><th>TT</th><th>TN</th></tr></thead><tbody id="statsPcs"></tbody></table></div></div>
+  </div>
+</section>
+
+
+<section id="section-worker" class="section">
+  <div class="notice">Control de automatización. Desde acá podés ver la cola del worker, errores, logs, reintentar trabajos, cancelar jobs o marcar una solicitud como resuelta manualmente.</div>
+
+  <div class="stats">
+    <div class="stat"><small>Jobs pendientes</small><strong id="wkPend">0</strong></div>
+    <div class="stat"><small>Procesando</small><strong id="wkProc">0</strong></div>
+    <div class="stat"><small>Completados</small><strong id="wkComp">0</strong></div>
+    <div class="stat"><small>Errores / manual</small><strong id="wkErr">0</strong></div>
+    <div class="stat"><small>Tiempo prom.</small><strong id="wkAvg">-</strong></div>
+  </div>
+
+  <div class="card">
+    <div class="card-h">
+      <h3>Cola del Worker</h3>
+      <div class="rowActions">
+        <button class="blue small" onclick="loadWorkerJobs()">Actualizar worker</button>
+        <button class="small" onclick="clearWorkerFilters()">Reset filtros</button>
+      </div>
+    </div>
+    <div class="filters">
+      <input id="wk_search" oninput="renderWorker()" placeholder="Buscar job, usuario, PC, error...">
+      <select id="wk_filter_estado" onchange="renderWorker()">
+        <option value="">Todos estados</option>
+        <option value="PENDIENTE">PENDIENTE</option>
+        <option value="TOMADO">TOMADO</option>
+        <option value="PROCESANDO">PROCESANDO</option>
+        <option value="COMPLETADO">COMPLETADO</option>
+        <option value="ERROR">ERROR</option>
+        <option value="REINTENTAR">REINTENTAR</option>
+        <option value="REQUIERE_MANUAL">REQUIERE_MANUAL</option>
+        <option value="CANCELADO">CANCELADO</option>
+      </select>
+      <select id="wk_filter_tipo" onchange="renderWorker()">
+        <option value="">Todos tipos</option>
+        <option value="CARGAR_FICHAS">CARGAR_FICHAS</option>
+        <option value="PROCESAR_RETIRO">PROCESAR_RETIRO</option>
+      </select>
+      <select id="wk_filter_pc" onchange="renderWorker()"></select>
+      <button onclick="renderWorker()">Filtrar</button>
+    </div>
+    <div class="tableWrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Job</th>
+            <th>Solicitud</th>
+            <th>PC</th>
+            <th>Usuario</th>
+            <th>Tipo</th>
+            <th>Monto</th>
+            <th>Estado</th>
+            <th>Intentos</th>
+            <th>Tiempo</th>
+            <th>Resultado / Error</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="workerBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="gridDash">
+    <div class="card"><div class="card-h"><h3>Resumen por PC</h3></div><div class="card-b" id="workerPcs"></div></div>
+    <div class="card"><div class="card-h"><h3>Errores recientes</h3></div><div class="card-b"><div class="list" id="workerErrores"></div></div></div>
   </div>
 </section>
 
@@ -96,27 +167,43 @@ button{border:0;border-radius:12px;padding:11px 14px;cursor:pointer;font-weight:
 <section id="section-config" class="section"><div class="grid2"><div class="card"><div class="card-h"><h3 id="cfgFormTitle">Crear configuración</h3><button class="small" onclick="resetCfgForm()">Limpiar</button></div><div class="card-b"><form id="cfgForm"><input type="hidden" id="cfg_id"><div class="row"><label>Clave</label><input id="cfg_clave" required></div><div class="row"><label>Valor</label><input id="cfg_valor"></div><div class="row"><label>Descripción</label><textarea id="cfg_descripcion"></textarea></div><div class="actions"><button class="primary" type="submit">Guardar</button><button type="button" onclick="resetCfgForm()">Cancelar</button></div></form></div></div><div class="card"><div class="card-h"><h3>Configuración</h3><button class="blue small" onclick="loadConfig()">Actualizar</button></div><div class="tableWrap"><table><thead><tr><th>ID</th><th>Clave</th><th>Valor</th><th>Descripción</th><th>Acciones</th></tr></thead><tbody id="cfgBody"></tbody></table></div></div></div></section>
 </main></div>
 <div id="toast" class="toast"></div>
+<div id="modalOverlay" class="modalOverlay"><div class="modalBox"><div class="modalHead"><h3 id="modalTitle">Detalle</h3><button class="small danger" onclick="cerrarModal()">Cerrar</button></div><div class="modalBody" id="modalBody"></div></div></div>
 
 <script>
 const SUPABASE_URL = "https://pjvvyvfcwjoocjqvdror.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_NYqRoKptTgcL90VAVF2kqA_Gl06mEUF";
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-const TABLES={operadores:"operadores",billeteras:"billeteras",pcs:"pcs",config:"configuracion",solicitudes:"solicitudes",chatSesiones:"chat_sesiones",chatMensajes:"chat_mensajes"};
-let operadores=[],billeteras=[],pcs=[],configuracion=[],solicitudes=[],chatSesiones=[],chatMensajes=[];
+const TABLES={operadores:"operadores",billeteras:"billeteras",pcs:"pcs",config:"configuracion",solicitudes:"solicitudes",chatSesiones:"chat_sesiones",chatMensajes:"chat_mensajes",workerJobs:"worker_jobs",workerLogs:"worker_logs"};
+let operadores=[],billeteras=[],pcs=[],configuracion=[],solicitudes=[],chatSesiones=[],chatMensajes=[],workerJobs=[],workerLogs=[];
 const $=id=>document.getElementById(id);
 
 document.addEventListener("DOMContentLoaded",()=>{$("operadorForm").addEventListener("submit",saveOperador);$("billeteraForm").addEventListener("submit",saveBilletera);$("pcForm").addEventListener("submit",savePc);$("cfgForm").addEventListener("submit",saveCfg);reloadAll();});
 
-function showSection(name){document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));document.querySelectorAll(".navBtn").forEach(b=>b.classList.remove("active"));$("section-"+name).classList.add("active");document.querySelector(`[data-section="${name}"]`)?.classList.add("active");const t={dashboard:["Dashboard","Resumen general navegable por PC."],metricas:["Métricas","Aprobación rápida, respuesta de chat y rendimiento por operador/PC."],operadores:["Operadores","Crear, editar, activar, desactivar o eliminar operadores."],billeteras:["Billeteras","Administrar cuentas, estados, prioridad y selección manual."],pcs:["PCs","Administrar catálogo de PCs."],config:["Configuración","Parámetros internos del sistema."]};$("pageTitle").textContent=t[name][0];$("pageSub").textContent=t[name][1];}
+function showSection(name){document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));document.querySelectorAll(".navBtn").forEach(b=>b.classList.remove("active"));$("section-"+name).classList.add("active");document.querySelector(`[data-section="${name}"]`)?.classList.add("active");const t={dashboard:["Dashboard","Resumen general navegable por PC."],metricas:["Métricas","Aprobación rápida, respuesta de chat y rendimiento por operador/PC."],worker:["Worker","Cola de automatización, logs, errores y reintentos."],operadores:["Operadores","Crear, editar, activar, desactivar o eliminar operadores."],billeteras:["Billeteras","Administrar cuentas, estados, prioridad y selección manual."],pcs:["PCs","Administrar catálogo de PCs."],config:["Configuración","Parámetros internos del sistema."]};$("pageTitle").textContent=t[name][0];$("pageSub").textContent=t[name][1];}
 
-async function reloadAll(){await Promise.allSettled([loadPcs(false),loadOperadores(false),loadBilleteras(false),loadConfig(false),loadSolicitudes(false),loadChats(false)]);fillPcSelects();renderAll();toast("Datos actualizados","okb")}
+async function reloadAll(){await Promise.allSettled([loadPcs(false),loadOperadores(false),loadBilleteras(false),loadConfig(false),loadSolicitudes(false),loadChats(false),loadWorkerJobs(false)]);fillPcSelects();renderAll();toast("Datos actualizados","okb")}
 async function loadOperadores(render=true){const {data,error}=await supabaseClient.from(TABLES.operadores).select("*").order("nombre",{ascending:true});if(error)return toast("Error operadores: "+error.message,"err");operadores=data||[];if(render)renderAll()}
 async function loadBilleteras(render=true){const {data,error}=await supabaseClient.from(TABLES.billeteras).select("*").order("prioridad",{ascending:false}).order("orden",{ascending:true}).order("id",{ascending:true});if(error)return toast("Error billeteras: "+error.message,"err");billeteras=data||[];if(render)renderAll()}
 async function loadPcs(render=true){const {data,error}=await supabaseClient.from(TABLES.pcs).select("*").order("codigo",{ascending:true});if(error)return toast("Error PCs: "+error.message,"err");pcs=data||[];if(render)renderAll()}
 async function loadConfig(render=true){const {data,error}=await supabaseClient.from(TABLES.config).select("*").order("clave",{ascending:true});if(error)return toast("Error config: "+error.message,"err");configuracion=data||[];if(render)renderAll()}
 async function loadSolicitudes(render=true){const {data,error}=await supabaseClient.from(TABLES.solicitudes).select("*").order("created_at",{ascending:false}).limit(1000);if(error){console.warn(error);solicitudes=[];return toast("No pude leer solicitudes: "+error.message,"err")}solicitudes=data||[];if(render)renderAll()}
 async function loadChats(render=true){const {data:ses,error:e1}=await supabaseClient.from(TABLES.chatSesiones).select("*").order("created_at",{ascending:false}).limit(1000);if(e1){console.warn(e1);chatSesiones=[];chatMensajes=[];return}chatSesiones=ses||[];const ids=chatSesiones.map(c=>c.chat_id).filter(Boolean);if(ids.length){const {data:ms,error:e2}=await supabaseClient.from(TABLES.chatMensajes).select("*").in("chat_id",ids).order("created_at",{ascending:true});if(e2){console.warn(e2);chatMensajes=[]}else chatMensajes=ms||[]}else chatMensajes=[];if(render)renderAll()}
-function renderAll(){fillPcSelects();renderDashboard();renderMetricas();renderOperadores();renderBilleteras();renderPcs();renderCfg();badges()}
+
+async function loadWorkerJobs(render=true){
+  const {data,error}=await supabaseClient.from(TABLES.workerJobs).select("*").order("created_at",{ascending:false}).limit(1500);
+  if(error){console.warn(error);workerJobs=[];return toast("No pude leer worker_jobs: "+error.message,"err")}
+  workerJobs=data||[];
+  if(render)renderAll()
+}
+async function loadWorkerLogs(jobId){
+  let q=supabaseClient.from(TABLES.workerLogs).select("*").order("created_at",{ascending:true});
+  if(jobId) q=q.eq("job_id",Number(jobId));
+  else q=q.limit(2000);
+  const {data,error}=await q;
+  if(error){console.warn(error);toast("No pude leer worker_logs: "+error.message,"err");return[]}
+  return data||[];
+}
+function renderAll(){fillPcSelects();renderDashboard();renderMetricas();renderWorker();renderOperadores();renderBilleteras();renderPcs();renderCfg();badges()}
 
 function pcSeleccionada(){return val("globalPc")}function listaFiltradaPc(arr,campo="pc_codigo"){const pc=pcSeleccionada();return pc?arr.filter(x=>String(x[campo]||"")===pc):arr}
 function hoyBA(fecha){const d=fecha?new Date(fecha):new Date();return d.toLocaleDateString("en-CA",{timeZone:"America/Argentina/Buenos_Aires"})}
@@ -131,7 +218,7 @@ function fmtMin(m){if(m===null||m===undefined||!isFinite(m))return"-";if(m<60)re
 function renderDashboard(){const pc=pcSeleccionada();const sol=listaFiltradaPc(solicitudes).filter(s=>esHoy(s.created_at));const chats=listaFiltradaPc(chatSesiones).filter(c=>esHoy(c.created_at));setText({stSolHoy:sol.length,stPend:sol.filter(esPendiente).length,stReal:sol.filter(esRealizada).length,stRet:sol.filter(s=>esPendiente(s)&&norm(s.tipo)==="retiro").length,stChats:chats.length});
 $("dashTurnos").innerHTML=resumenTurnosHTML(sol);
 $("dashPcs").innerHTML=resumenPcsHTML(solicitudes.filter(s=>esHoy(s.created_at)));
-$("ultimasSolicitudes").innerHTML=(listaFiltradaPc(solicitudes).slice(0,80).map(s=>`<tr><td>${fecha(s.created_at)}</td><td>${safe(s.pc_codigo)}</td><td>${turnoDe(s.created_at)}</td><td>${safe(s.tipo)}</td><td><strong>${safe(s.usuario)}</strong><br><span class="muted">${safe(s.nombre_completo)}</span></td><td>${money(s.monto)}</td><td>${estado(s.estado)}</td><td>${safe(s.operador_usuario)}</td></tr>`).join("")||`<tr><td colspan="8" class="empty">No hay solicitudes.</td></tr>`)}
+$("ultimasSolicitudes").innerHTML=(listaFiltradaPc(solicitudes).slice(0,80).map(s=>`<tr><td>${fecha(s.created_at)}</td><td>${safe(s.pc_codigo)}</td><td>${turnoDe(s.created_at)}</td><td>${safe(s.tipo)}</td><td><strong>${safe(s.usuario)}</strong><br><span class="muted">${safe(s.nombre_completo)}</span></td><td>${money(s.monto)}</td><td>${estado(s.estado)}</td><td>${workerSolicitudBadge(s)}</td><td>${safe(s.operador_usuario)}</td></tr>`).join("")||`<tr><td colspan="9" class="empty">No hay solicitudes.</td></tr>`)}
 
 function resumenTurnosHTML(lista){let rows=["TM","TT","TN"].map(t=>{const l=lista.filter(s=>turnoDe(s.created_at)===t);return`<div class="item"><strong>${t}</strong><span>Total ${l.length} · Pendientes ${l.filter(esPendiente).length} · Realizadas ${l.filter(esRealizada).length} · Retiros ${l.filter(s=>norm(s.tipo)==="retiro").length}</span></div>`}).join("");return`<div class="list">${rows}<div class="item"><strong>TOTAL</strong><span>${lista.length} solicitud/es en la vista actual.</span></div></div>`}
 function resumenPcsHTML(lista){const cods=[...new Set([...pcs.map(p=>p.codigo||p.nombre),...lista.map(s=>s.pc_codigo)].filter(Boolean))];return`<div class="list">${cods.map(c=>{const l=lista.filter(s=>String(s.pc_codigo||"")===String(c));return`<div class="item"><strong>${safe(c)}</strong><span>Total ${l.length} · Pend. ${l.filter(esPendiente).length} · Real. ${l.filter(esRealizada).length}</span></div>`}).join("")}</div>`}
@@ -141,6 +228,112 @@ renderStatsOperadores(chatStats.porOperador);renderStatsPcs();}
 function calcularChatStats(){const porOp={},tiempos=[];let totalResp=0;const pc=pcSeleccionada();const sesiones=pc?chatSesiones.filter(c=>c.pc_codigo===pc):chatSesiones;sesiones.forEach(c=>{const ms=chatMensajes.filter(m=>String(m.chat_id)===String(c.chat_id)).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));for(let i=0;i<ms.length;i++){if(norm(ms[i].tipo_emisor)==="usuario"){const next=ms.slice(i+1).find(m=>norm(m.tipo_emisor)==="operador");if(next){const emisor=next.emisor||"Operador";const min=minutosEntre(ms[i].created_at,next.created_at);if(min!==null){tiempos.push(min);porOp[emisor]=porOp[emisor]||{resp:0,tiempos:[]};porOp[emisor].resp++;porOp[emisor].tiempos.push(min);totalResp++;}break;}}}});return{porOperador:porOp,tiempos,totalResp}}
 function renderStatsOperadores(chatPorOp){const ops=[...new Set([...operadores.map(o=>o.usuario||o.nombre),...solicitudes.map(s=>s.operador_usuario),...Object.keys(chatPorOp)].filter(Boolean))];if(!ops.length)return empty("statsOperadores",8,"Sin datos.");$("statsOperadores").innerHTML=ops.map(op=>{const ss=listaFiltradaPc(solicitudes).filter(s=>String(s.operador_usuario||"")===String(op));const real=ss.filter(esRealizada);const rech=ss.filter(esRechazada);const tiempos=real.map(s=>minutosEntre(s.created_at,s.updated_at||s.update_at)).filter(x=>x!==null);const ch=chatPorOp[op]||{resp:0,tiempos:[]};return`<tr><td><strong>${safe(op)}</strong></td><td>${ss.length}</td><td>${real.length}</td><td>${rech.length}</td><td>${tiempos.filter(x=>x<=5).length}</td><td>${fmtMin(avg(tiempos))}</td><td>${ch.resp}</td><td>${fmtMin(avg(ch.tiempos))}</td></tr>`}).join("")}
 function renderStatsPcs(){const cods=[...new Set([...pcs.map(p=>p.codigo||p.nombre),...solicitudes.map(s=>s.pc_codigo)].filter(Boolean))];if(!cods.length)return empty("statsPcs",8,"Sin PCs.");$("statsPcs").innerHTML=cods.map(c=>{const l=solicitudes.filter(s=>s.pc_codigo===c && (!pcSeleccionada()||pcSeleccionada()===c));return`<tr><td><strong>${safe(c)}</strong></td><td>${l.length}</td><td>${l.filter(esPendiente).length}</td><td>${l.filter(esRealizada).length}</td><td>${l.filter(esRechazada).length}</td><td>${l.filter(s=>turnoDe(s.created_at)==="TM").length}</td><td>${l.filter(s=>turnoDe(s.created_at)==="TT").length}</td><td>${l.filter(s=>turnoDe(s.created_at)==="TN").length}</td></tr>`}).join("")}
+
+
+function renderWorker(){
+  if(!$("workerBody"))return;
+  const pc=pcSeleccionada();
+  const estadoFiltro=val("wk_filter_estado");
+  const tipoFiltro=val("wk_filter_tipo");
+  const pcFiltro=val("wk_filter_pc");
+  const q=norm(val("wk_search"));
+  let jobs=workerJobs.filter(j=>
+    (!pc||String(j.pc_codigo||"")===pc)&&
+    (!pcFiltro||String(j.pc_codigo||"")===pcFiltro)&&
+    (!estadoFiltro||String(j.estado||"")===estadoFiltro)&&
+    (!tipoFiltro||String(j.tipo_accion||"")===tipoFiltro)&&
+    (!q||norm([j.id,j.solicitud_id,j.pc_codigo,j.usuario,j.tipo_accion,j.estado,j.error_mensaje,j.resultado].join(" ")).includes(q))
+  );
+
+  setText({
+    wkPend:workerJobs.filter(j=>filtraJobPc(j)&&["PENDIENTE","REINTENTAR"].includes(String(j.estado||""))).length,
+    wkProc:workerJobs.filter(j=>filtraJobPc(j)&&["TOMADO","PROCESANDO"].includes(String(j.estado||""))).length,
+    wkComp:workerJobs.filter(j=>filtraJobPc(j)&&String(j.estado||"")==="COMPLETADO").length,
+    wkErr:workerJobs.filter(j=>filtraJobPc(j)&&["ERROR","REQUIERE_MANUAL"].includes(String(j.estado||""))).length,
+    wkAvg:fmtMin(avg(workerJobs.filter(j=>filtraJobPc(j)&&j.started_at&&j.finished_at).map(j=>minutosEntre(j.started_at,j.finished_at)).filter(x=>x!==null)))
+  });
+
+  if(!jobs.length){
+    empty("workerBody",11,"No hay jobs para mostrar.");
+  }else{
+    $("workerBody").innerHTML=jobs.map(j=>`<tr>
+      <td><strong>#${safe(j.id)}</strong><br><span class="muted">${fecha(j.created_at)}</span></td>
+      <td>${safe(j.solicitud_id)}</td>
+      <td>${safe(j.pc_codigo)}</td>
+      <td><strong>${safe(j.usuario)}</strong></td>
+      <td>${workerTipoBadge(j.tipo_accion)}</td>
+      <td>${money(j.monto)}</td>
+      <td>${workerEstadoBadge(j.estado)}</td>
+      <td>${safe(j.intentos||0)} / ${safe(j.max_intentos||0)}</td>
+      <td>${j.started_at&&j.finished_at?fmtMin(minutosEntre(j.started_at,j.finished_at)):(j.started_at?"Procesando":"-")}</td>
+      <td>${j.error_mensaje?`<div class="workerError">${safe(j.error_mensaje)}</div>`:`<span class="muted">${safe(j.resultado||"-")}</span>`}</td>
+      <td><div class="rowActions">
+        <button class="small blue" onclick="abrirLogsWorker('${j.id}')">Logs</button>
+        ${["ERROR","REQUIERE_MANUAL","REINTENTAR"].includes(String(j.estado||""))?`<button class="small primary" onclick="reintentarWorker('${j.id}','${j.solicitud_id}')">Reintentar</button>`:""}
+        ${!["COMPLETADO","CANCELADO"].includes(String(j.estado||""))?`<button class="small warning" onclick="cancelarWorker('${j.id}','${j.solicitud_id}')">Cancelar</button>`:""}
+        ${["ERROR","REQUIERE_MANUAL"].includes(String(j.estado||""))?`<button class="small violet" onclick="resolverManualWorker('${j.id}','${j.solicitud_id}','${j.tipo_accion}')">Manual OK</button>`:""}
+      </div></td>
+    </tr>`).join("");
+  }
+
+  renderWorkerResumenPc();
+  renderWorkerErrores();
+}
+function filtraJobPc(j){const pc=pcSeleccionada();return !pc||String(j.pc_codigo||"")===pc}
+function renderWorkerResumenPc(){
+  if(!$("workerPcs"))return;
+  const cods=[...new Set([...pcs.map(p=>p.codigo||p.nombre),...workerJobs.map(j=>j.pc_codigo)].filter(Boolean))];
+  $("workerPcs").innerHTML=`<div class="list">${cods.map(c=>{const l=workerJobs.filter(j=>String(j.pc_codigo||"")===String(c));return`<div class="item"><strong>${safe(c)}</strong><span>Pend. ${l.filter(j=>["PENDIENTE","REINTENTAR"].includes(j.estado)).length} · Proc. ${l.filter(j=>["TOMADO","PROCESANDO"].includes(j.estado)).length} · OK ${l.filter(j=>j.estado==="COMPLETADO").length} · Error ${l.filter(j=>["ERROR","REQUIERE_MANUAL"].includes(j.estado)).length}</span></div>`}).join("")||`<div class="item"><strong>Sin datos</strong><span>No hay jobs.</span></div>`}</div>`;
+}
+function renderWorkerErrores(){
+  if(!$("workerErrores"))return;
+  const errs=workerJobs.filter(j=>filtraJobPc(j)&&["ERROR","REQUIERE_MANUAL"].includes(String(j.estado||""))).slice(0,10);
+  $("workerErrores").innerHTML=errs.length?errs.map(j=>`<div class="item"><strong>Job #${safe(j.id)} · ${safe(j.usuario)} · ${safe(j.pc_codigo)}</strong><span>${safe(j.error_mensaje||"Sin detalle")}</span><div class="rowActions" style="margin-top:8px"><button class="small blue" onclick="abrirLogsWorker('${j.id}')">Logs</button><button class="small primary" onclick="reintentarWorker('${j.id}','${j.solicitud_id}')">Reintentar</button></div></div>`).join(""):`<div class="item"><strong>Sin errores críticos</strong><span>No hay jobs en ERROR o REQUIERE_MANUAL.</span></div>`;
+}
+function clearWorkerFilters(){setVals({wk_search:"",wk_filter_estado:"",wk_filter_tipo:"",wk_filter_pc:""});renderWorker()}
+async function abrirLogsWorker(jobId){
+  const logs=await loadWorkerLogs(jobId);
+  const job=workerJobs.find(j=>String(j.id)===String(jobId));
+  const head=job?`<div class="notice">Job #${safe(job.id)} · Solicitud ${safe(job.solicitud_id)} · ${safe(job.pc_codigo)} · ${safe(job.usuario)} · ${money(job.monto)} · ${workerEstadoBadge(job.estado)}</div>`:"";
+  const body=logs.length?logs.map(l=>`<div class="logLine"><b>${workerNivelBadge(l.nivel)} ${safe(l.paso||"")}</b><div>${safe(l.mensaje||"")}</div><div class="logMeta">${fechaCompleta(l.created_at)}</div></div>`).join(""):`<div class="notice">Todavía no hay logs para este job.</div>`;
+  abrirModal("Logs del worker",head+body);
+}
+async function reintentarWorker(jobId,solicitudId){
+  if(!confirm("¿Reintentar este job? Se reinician intentos y vuelve a la cola."))return;
+  const {error:e1}=await supabaseClient.from(TABLES.workerJobs).update({estado:"REINTENTAR",intentos:0,error_mensaje:null,locked_at:null,locked_by:null,updated_at:new Date().toISOString()}).eq("id",jobId);
+  if(e1)return toast("Error reintentando worker: "+e1.message,"err");
+  if(solicitudId){
+    const {error:e2}=await supabaseClient.from(TABLES.solicitudes).update({estado:"APROBADA_MANUAL",estado_worker:"EN_COLA_WORKER",worker_error:null,worker_intentos:0,updated_at:new Date().toISOString()}).eq("id",solicitudId);
+    if(e2)return toast("Job reintentado, pero error en solicitud: "+e2.message,"err");
+  }
+  await reloadAll();toast("Worker enviado a reintento","okb")
+}
+async function cancelarWorker(jobId,solicitudId){
+  if(!confirm("¿Cancelar este job? No será procesado por el worker."))return;
+  const {error:e1}=await supabaseClient.from(TABLES.workerJobs).update({estado:"CANCELADO",error_mensaje:"Cancelado desde Admin",locked_at:null,locked_by:null,updated_at:new Date().toISOString()}).eq("id",jobId);
+  if(e1)return toast("Error cancelando worker: "+e1.message,"err");
+  if(solicitudId){
+    await supabaseClient.from(TABLES.solicitudes).update({estado_worker:"CANCELADO",worker_error:"Cancelado desde Admin",updated_at:new Date().toISOString()}).eq("id",solicitudId);
+  }
+  await reloadAll();toast("Job cancelado","okb")
+}
+async function resolverManualWorker(jobId,solicitudId,tipoAccion){
+  const final=String(tipoAccion||"")==="PROCESAR_RETIRO"?"PAGADA":"ACREDITADA";
+  if(!confirm(`¿Marcar como resuelto manualmente? La solicitud quedará ${final}.`))return;
+  const {error:e1}=await supabaseClient.from(TABLES.workerJobs).update({estado:"COMPLETADO",resultado:"Resuelto manualmente desde Admin",error_mensaje:null,finished_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",jobId);
+  if(e1)return toast("Error marcando job manual: "+e1.message,"err");
+  if(solicitudId){
+    const {error:e2}=await supabaseClient.from(TABLES.solicitudes).update({estado:final,estado_worker:"RESUELTO_MANUAL",procesado_por_worker:false,worker_error:null,worker_finished_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",solicitudId);
+    if(e2)return toast("Job manual OK, pero error solicitud: "+e2.message,"err");
+  }
+  await reloadAll();toast("Solicitud resuelta manualmente","okb")
+}
+function workerEstadoBadge(e){const x=String(e||"SIN_ESTADO");if(x==="COMPLETADO")return pill(x,"ok");if(["ERROR","REQUIERE_MANUAL"].includes(x))return pill(x,"off");if(["PENDIENTE","REINTENTAR"].includes(x))return pill(x,"warn");if(["TOMADO","PROCESANDO"].includes(x))return pill(x,"info");if(x==="CANCELADO")return pill(x,"vio");return pill(x,"info")}
+function workerSolicitudBadge(s){const ew=s.estado_worker||"SIN_WORKER";if(ew==="COMPLETADO"||ew==="RESUELTO_MANUAL")return pill(ew,"ok");if(["ERROR","REQUIERE_MANUAL"].includes(ew))return pill(ew,"off");if(["EN_COLA_WORKER","PREPARANDO_COLA","REINTENTAR"].includes(ew))return pill(ew,"warn");if(["TOMADO","PROCESANDO"].includes(ew))return pill(ew,"info");return pill(ew,"vio")}
+function workerTipoBadge(t){return String(t||"").includes("RETIRO")?pill(t,"vio"):pill(t,"info")}
+function workerNivelBadge(n){const x=String(n||"INFO");if(x==="SUCCESS")return "✅";if(x==="ERROR")return "❌";if(x==="WARN")return "⚠️";return "ℹ️"}
+function abrirModal(titulo,html){$("modalTitle").textContent=titulo;$("modalBody").innerHTML=html;$("modalOverlay").classList.add("show")}
+function cerrarModal(){$("modalOverlay").classList.remove("show");$("modalBody").innerHTML=""}
 
 async function saveOperador(e){e.preventDefault();const id=val("op_id");const payload={usuario:val("op_usuario"),nombre:val("op_nombre"),clave:val("op_clave"),password:val("op_password"),rol:val("op_rol"),tipo:val("op_tipo"),pc_codigo:val("op_pc_codigo"),turno:val("op_turno"),telefono:val("op_telefono"),email:val("op_email"),activo:bool("op_activo"),observaciones:val("op_observaciones"),updated_at:new Date().toISOString()};if(!payload.password)delete payload.password;if(!payload.clave)delete payload.clave;const res=id?await supabaseClient.from(TABLES.operadores).update(payload).eq("id",id):await supabaseClient.from(TABLES.operadores).insert([payload]);if(res.error)return toast("Error operador: "+res.error.message,"err");resetOperadorForm();await loadOperadores();toast("Operador guardado","okb")}
 function renderOperadores(){const q=norm(val("op_search")),rol=val("op_filter_rol"),pc=val("op_filter_pc"),act=val("op_filter_activo");let rows=operadores.filter(o=>(!q||norm([o.id,o.usuario,o.nombre,o.rol,o.tipo,o.pc_codigo,o.turno,o.telefono,o.email].join(" ")).includes(q))&&(!rol||o.rol===rol)&&(!pc||o.pc_codigo===pc)&&(act===""||String(!!o.activo)===act));if(!rows.length)return empty("operadoresBody",9,"No hay operadores.");$("operadoresBody").innerHTML=rows.map(o=>`<tr><td>${safe(o.id)}</td><td>${safe(o.usuario)}</td><td><strong>${safe(o.nombre)}</strong></td><td>${pill(o.rol||'-','vio')}</td><td>${safe(o.tipo)}</td><td>${safe(o.pc_codigo)}</td><td>${safe(o.turno)}</td><td>${o.activo?pill('Activo','ok'):pill('Inactivo','off')}</td><td><div class="rowActions"><button class="small blue" onclick="editOperador('${o.id}')">Editar</button><button class="small ${o.activo?'warning':'primary'}" onclick="toggleRow('${TABLES.operadores}','${o.id}','activo',${!o.activo},loadOperadores)">${o.activo?'Desactivar':'Activar'}</button><button class="small danger" onclick="deleteRow('${TABLES.operadores}','${o.id}',loadOperadores,'operador')">Eliminar</button></div></td></tr>`).join("")}
@@ -165,10 +358,10 @@ function renderCfg(){if(!configuracion.length)return empty("cfgBody",5,"No hay c
 function editCfg(id){const c=configuracion.find(x=>String(x.id)===String(id));if(!c)return;setVals({cfg_id:c.id,cfg_clave:c.clave,cfg_valor:c.valor,cfg_descripcion:c.descripcion});$("cfgFormTitle").textContent="Editar configuración";showSection("config")}function resetCfgForm(){$("cfgForm").reset();setVals({cfg_id:""});$("cfgFormTitle").textContent="Crear configuración"}
 
 async function toggleRow(table,id,col,value,reload){const {error}=await supabaseClient.from(table).update({[col]:value,updated_at:new Date().toISOString()}).eq("id",id);if(error)return toast(error.message,"err");await reload();toast("Actualizado","okb")}async function deleteRow(table,id,reload,label){if(!confirm(`¿Seguro que querés eliminar ${label}?`))return;const {error}=await supabaseClient.from(table).delete().eq("id",id);if(error)return toast("Error al eliminar: "+error.message,"err");await reload();toast("Eliminado","okb")}
-function fillPcSelects(){const cods=[...new Set(pcs.map(p=>p.codigo||p.nombre).filter(Boolean))];const opts=['<option value="">Seleccionar</option>'].concat(cods.map(c=>`<option value="${attr(c)}">${safe(c)}</option>`)).join("");const filt=['<option value="">Todas las PCs</option>'].concat(cods.map(c=>`<option value="${attr(c)}">${safe(c)}</option>`)).join("");["op_pc_codigo","bi_pc_codigo"].forEach(id=>{const el=$(id);if(el){const v=el.value;el.innerHTML=opts;el.value=v}});["op_filter_pc","bi_filter_pc","globalPc"].forEach(id=>{const el=$(id);if(el){const v=el.value;el.innerHTML=filt;el.value=v}})}
-function badges(){setText({badgeDashboard:solicitudes.length,badgeMetricas:solicitudes.filter(esRealizada).length,badgeOperadores:operadores.length,badgeBilleteras:billeteras.length,badgePcs:pcs.length,badgeConfig:configuracion.length})}
+function fillPcSelects(){const cods=[...new Set(pcs.map(p=>p.codigo||p.nombre).filter(Boolean))];const opts=['<option value="">Seleccionar</option>'].concat(cods.map(c=>`<option value="${attr(c)}">${safe(c)}</option>`)).join("");const filt=['<option value="">Todas las PCs</option>'].concat(cods.map(c=>`<option value="${attr(c)}">${safe(c)}</option>`)).join("");["op_pc_codigo","bi_pc_codigo"].forEach(id=>{const el=$(id);if(el){const v=el.value;el.innerHTML=opts;el.value=v}});["op_filter_pc","bi_filter_pc","globalPc","wk_filter_pc"].forEach(id=>{const el=$(id);if(el){const v=el.value;el.innerHTML=filt;el.value=v}})}
+function badges(){setText({badgeDashboard:solicitudes.length,badgeMetricas:solicitudes.filter(esRealizada).length,badgeWorker:workerJobs.filter(j=>["PENDIENTE","REINTENTAR","TOMADO","PROCESANDO","ERROR","REQUIERE_MANUAL"].includes(j.estado)).length,badgeOperadores:operadores.length,badgeBilleteras:billeteras.length,badgePcs:pcs.length,badgeConfig:configuracion.length})}
 function toast(msg,cls="okb"){const e=$("toast");e.className=`toast show ${cls}`;e.textContent=msg;clearTimeout(window.__to);window.__to=setTimeout(()=>e.classList.remove("show"),3200)}
-function empty(id,col,msg){$(id).innerHTML=`<tr><td colspan="${col}" class="empty">${safe(msg)}</td></tr>`}function val(id){return ($(id)?.value||"").trim()}function bool(id){return val(id)==="true"}function num(id){return Number(val(id)||0)}function norm(v){return String(v||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim()}function avg(a){return a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null}function money(n){return Number(n||0).toLocaleString("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0})}function fecha(f){if(!f)return"";return new Date(f).toLocaleString("es-AR",{timeZone:"America/Argentina/Buenos_Aires",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).replace(","," ·")}function estado(e){if(esRealizada({estado:e}))return pill(e||"Realizada","ok");if(norm(e)==="rechazada")return pill(e,"off");return pill(e||"Pendiente","warn")}
+function empty(id,col,msg){$(id).innerHTML=`<tr><td colspan="${col}" class="empty">${safe(msg)}</td></tr>`}function val(id){return ($(id)?.value||"").trim()}function bool(id){return val(id)==="true"}function num(id){return Number(val(id)||0)}function norm(v){return String(v||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim()}function avg(a){return a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null}function money(n){return Number(n||0).toLocaleString("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0})}function fecha(f){if(!f)return"";return new Date(f).toLocaleString("es-AR",{timeZone:"America/Argentina/Buenos_Aires",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).replace(","," ·")}function fechaCompleta(f){if(!f)return"";return new Date(f).toLocaleString("es-AR",{timeZone:"America/Argentina/Buenos_Aires",day:"2-digit",month:"2-digit",year:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false}).replace(","," ·")}function estado(e){if(esRealizada({estado:e}))return pill(e||"Realizada","ok");if(norm(e)==="rechazada")return pill(e,"off");return pill(e||"Pendiente","warn")}
 function setVals(obj){Object.entries(obj).forEach(([k,v])=>{if($(k))$(k).value=v??""})}function setText(obj){Object.entries(obj).forEach(([k,v])=>{if($(k))$(k).textContent=v??""})}function safe(v){return String(v??"").replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]))}function attr(v){return safe(v).replace(/`/g,"&#96;")}function pill(t,type){const m={ok:"ok",off:"off",warn:"warn",info:"info",vio:"vio"};return`<span class="pill ${m[type]||'info'}">${safe(t)}</span>`}
 </script>
 </body>
