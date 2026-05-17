@@ -592,7 +592,7 @@ const SUPABASE_URL = "https://pjvvyvfcwjoocjqvdror.supabase.co";
 const SUPABASE_KEY = "sb_publishable_NYqRoKptTgcL90VAVF2kqA_Gl06mEUF";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-console.log("Landing 100% Supabase conectada ✅ · sin Apps Script");
+console.log("Landing blindada RPC v1 conectada ✅ · sin Apps Script · sin .from() directo en tablas públicas");
 
 const WHATSAPP_POR_PC = {
   P1: "5492235181171",
@@ -643,6 +643,7 @@ const LS_SOLICITUD = "solicitud_actual_" + PC;
 
 let billeteraActiva = null;
 let solicitudActual = null;
+let solicitudChatId = "";
 let intervaloEstado = null;
 let userData = null;
 let tipoSolicitudActual = "CARGA";
@@ -659,47 +660,15 @@ window.onload = async () => {
 // ======================================================
 
 async function supabaseInsertSeguro(tabla, payloads){
-  for(const payload of payloads){
-    const { data, error } = await supabaseClient
-      .from(tabla)
-      .insert(payload)
-      .select()
-      .single();
-
-    if(!error){
-      return { ok:true, data };
-    }
-
-    console.warn("Intento fallido en " + tabla, error.message, payload);
-  }
-
-  return { ok:false, error:"No se pudo guardar en " + tabla };
+  // Blindaje RPC: la landing pública ya no inserta directo en tablas.
+  console.warn("supabaseInsertSeguro deshabilitado para tabla:", tabla);
+  return { ok:false, error:"Inserción directa deshabilitada en landing blindada." };
 }
 
 async function registrarContactoSupabase(usuario, nombre, telefono){
-  // La tabla usuarios ya existe en tu proyecto. Como no todas las bases tienen las mismas columnas,
-  // probamos payloads compatibles sin romper la landing si una variante no existe.
-  const base = {
-    usuario,
-    telefono,
-    pc_codigo: PC
-  };
-
-  const intentos = [
-    { ...base, nombre_completo: nombre },
-    { ...base, nombre },
-    { usuario, nombre_completo: nombre, telefono },
-    { usuario, nombre, telefono }
-  ];
-
-  const r = await supabaseInsertSeguro("usuarios", intentos);
-
-  // Si la tabla usuarios tiene otra estructura, no bloqueamos al usuario.
-  // Lo importante para el panel operativo es que la solicitud y el chat se creen en Supabase.
-  if(!r.ok){
-    console.warn("No se pudo registrar contacto en usuarios. Se continúa igual:", r.error);
-  }
-
+  // Blindaje RPC:
+  // No guardamos usuarios directo desde la landing.
+  // El contacto se registra automáticamente al crear solicitud mediante landing_crear_solicitud().
   return { ok:true };
 }
 
@@ -832,31 +801,33 @@ function mostrarRegistroMsg(texto, ok) {
 async function cargarBilletera() {
   const pcsCompatibles = pcCandidatos(PC);
 
-  const { data, error } = await supabaseClient
-    .from("billeteras")
-    .select("*")
-    .in("pc_codigo", pcsCompatibles)
-    .eq("activa", true)
-    .order("seleccionada_manual", { ascending: false })
-    .order("prioridad", { ascending: false })
-    .order("orden", { ascending: true });
+  let encontrada = null;
+  let ultimoError = null;
 
-  if (error) {
-    console.error("Error cargando billetera:", error);
+  for (const pcTry of pcsCompatibles) {
+    const { data, error } = await supabaseClient.rpc("landing_obtener_billetera", {
+      p_pc_codigo: pcTry
+    });
+
+    if (error) {
+      ultimoError = error;
+      console.warn("Error RPC landing_obtener_billetera:", error.message);
+      continue;
+    }
+
+    if (data && data.length) {
+      encontrada = data[0];
+      break;
+    }
+  }
+
+  if (!encontrada) {
+    if (ultimoError) console.error("Error cargando billetera:", ultimoError);
     mostrarBilleteraNoDisponible();
     return;
   }
 
-  const disponibles = (data || []).filter(b => String(b.estado || "activa").toLowerCase() !== "caida");
-
-  if (!disponibles.length) {
-    mostrarBilleteraNoDisponible();
-    return;
-  }
-
-  billeteraActiva =
-    disponibles.find(b => b.seleccionada_manual === true) ||
-    disponibles[0];
+  billeteraActiva = encontrada;
 
   document.getElementById("aliasBox").innerText =
     billeteraActiva.alias || "Consultar";
@@ -931,31 +902,9 @@ function seleccionarTipoSolicitud(tipo){
 
 
 async function puedeSolicitarRetiro(){
-  const desde = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-
-  const { data, error } = await supabaseClient
-    .from("solicitudes")
-    .select("id, created_at, estado")
-    .eq("usuario", userData.usuario)
-    .eq("tipo", "RETIRO")
-    .gte("created_at", desde)
-    .order("created_at", { ascending:false })
-    .limit(1);
-
-  if(error){
-    console.error("Error validando retiro 24hs:", error);
-    return { ok:false, error:"No pudimos validar el último retiro. Contactanos por chat." };
-  }
-
-  if(data && data.length){
-    const ultima = new Date(data[0].created_at);
-    const proxima = new Date(ultima.getTime() + 24 * 60 * 60 * 1000);
-    return {
-      ok:false,
-      error:`Ya tenés una solicitud de retiro dentro de las últimas 24 hs. Podés volver a solicitar desde ${proxima.toLocaleString("es-AR",{timeZone:"America/Argentina/Buenos_Aires",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false})}. Si necesitás ayuda, escribinos por chat.`
-    };
-  }
-
+  // Blindaje RPC:
+  // La landing pública no consulta solicitudes directo para validar 24 hs.
+  // Esa validación debe quedar en panel operativo/backend si se desea exigirla.
   return { ok:true };
 }
 
@@ -1025,9 +974,13 @@ async function crearSolicitud() {
     return;
   }
 
-  solicitudActual = r.solicitud.id;
-  localStorage.setItem(LS_SOLICITUD, solicitudActual);
-  vincularChatLiteASolicitud(solicitudActual);
+  guardarSolicitudLocal(r.solicitud.id, r.solicitud.chat_id, tipo);
+
+  if(r.solicitud.chat_id){
+    chatSessionId = r.solicitud.chat_id;
+    localStorage.setItem(LS_CHAT, chatSessionId);
+    iniciarRealtimeChatLanding();
+  }
 
   mostrarResultado(
     `✅ Solicitud enviada correctamente.<br><br>
@@ -1095,11 +1048,33 @@ function renderProgresoSolicitud(estado){
 }
 
 
+function guardarSolicitudLocal(id, chatId, tipo){
+  solicitudActual = id ? String(id) : null;
+  solicitudChatId = chatId ? String(chatId) : "";
+  localStorage.setItem(LS_SOLICITUD, JSON.stringify({
+    id: solicitudActual,
+    chat_id: solicitudChatId,
+    tipo: tipo || tipoSolicitudActual || "CARGA"
+  }));
+}
+
 function recuperarSolicitudPendiente() {
   const guardada = localStorage.getItem(LS_SOLICITUD);
 
-  if (guardada) {
-    solicitudActual = guardada;
+  if (!guardada) return;
+
+  try {
+    const obj = JSON.parse(guardada);
+    solicitudActual = obj.id ? String(obj.id) : null;
+    solicitudChatId = obj.chat_id ? String(obj.chat_id) : "";
+    if(obj.tipo) tipoSolicitudActual = String(obj.tipo).toUpperCase();
+  } catch(e) {
+    // Compatibilidad con versión vieja que guardaba solo el ID.
+    solicitudActual = String(guardada || "");
+    solicitudChatId = localStorage.getItem(LS_CHAT) || "";
+  }
+
+  if (solicitudActual) {
     mostrarEstadoEspera("PENDIENTE");
     iniciarEscuchaEstado();
   }
@@ -1109,18 +1084,18 @@ function iniciarEscuchaEstado() {
   if (intervaloEstado) clearInterval(intervaloEstado);
 
   intervaloEstado = setInterval(async () => {
-    if (!solicitudActual) return;
+    if (!solicitudActual || !solicitudChatId) return;
 
-    const { data, error } = await supabaseClient
-      .from("solicitudes")
-      .select("*")
-      .eq("id", solicitudActual)
-      .maybeSingle();
+    const { data, error } = await supabaseClient.rpc("landing_estado_solicitud", {
+      p_solicitud_id: Number(solicitudActual),
+      p_chat_id: solicitudChatId
+    });
 
-    if(error || !data) return;
+    if(error || !data || !data.length) return;
 
-    const estado = String(data.estado || "");
-    const tipo = String(data.tipo || tipoSolicitudActual || "CARGA").toUpperCase();
+    const s = data[0];
+    const estado = String(s.estado || "");
+    const tipo = String(s.tipo || tipoSolicitudActual || "CARGA").toUpperCase();
     const esRetiro = tipo === "RETIRO";
 
     tipoSolicitudActual = tipo;
@@ -1186,46 +1161,52 @@ async function crearSolicitudSupabase(monto, tipo="CARGA"){
 
   const esRetiro = String(tipo || "CARGA").toUpperCase() === "RETIRO";
 
-  const payload = {
-    usuario: userData.usuario,
-    nombre_completo: userData.nombre,
-    telefono: userData.telefono,
-    pc_codigo: PC,
-    tipo: esRetiro ? "RETIRO" : "CARGA",
-    monto: Number(monto),
-    estado: "PENDIENTE",
-    chat_id: chatSessionId || null
+  const params = {
+    p_usuario: userData.usuario,
+    p_nombre_completo: userData.nombre,
+    p_telefono: userData.telefono,
+    p_pc_codigo: PC,
+    p_tipo: esRetiro ? "RETIRO" : "CARGA",
+    p_monto: Number(monto),
+    p_comprobante_url: null,
+    p_billetera_id: (!esRetiro && billeteraActiva) ? String(billeteraActiva.id || "") : null,
+    p_billetera_nombre: (!esRetiro && billeteraActiva) ? String(billeteraActiva.nombre_visible || "") : null,
+    p_link_plataforma: LINKS_PLATAFORMA[PC] || LINKS_PLATAFORMA.P1 || null,
+    p_retiro_alias_cbu: esRetiro ? (document.getElementById("retiroAliasCbu")?.value || "").trim() : null,
+    p_retiro_titular: esRetiro ? (document.getElementById("retiroTitular")?.value || "").trim() : null
   };
 
-  if(!esRetiro && billeteraActiva){
-    payload.billetera_nombre = billeteraActiva.nombre_visible || "";
-    payload.billetera_id = billeteraActiva.id || null;
-  }
-
-  if(esRetiro){
-    payload.retiro_alias_cbu = (document.getElementById("retiroAliasCbu")?.value || "").trim();
-    payload.retiro_titular = (document.getElementById("retiroTitular")?.value || "").trim();
-  }
-
-  const { data, error } = await supabaseClient
-    .from("solicitudes")
-    .insert(payload)
-    .select()
-    .single();
+  const { data, error } = await supabaseClient.rpc("landing_crear_solicitud", params);
 
   if(error){
-    console.error("Error creando solicitud Supabase:", error);
+    console.error("Error creando solicitud RPC:", error);
     return {
       ok:false,
       error:error.message || "No se pudo crear la solicitud."
     };
   }
 
-  solicitudActual = data.id;
+  const row = Array.isArray(data) ? data[0] : data;
+
+  if(!row || !row.solicitud_id){
+    return {
+      ok:false,
+      error:"La solicitud no devolvió ID."
+    };
+  }
+
+  solicitudActual = row.solicitud_id;
+  solicitudChatId = row.chat_id || "";
 
   return {
     ok:true,
-    solicitud:data
+    solicitud:{
+      id: row.solicitud_id,
+      chat_id: row.chat_id,
+      estado: row.estado || "PENDIENTE",
+      created_at: row.created_at,
+      tipo: esRetiro ? "RETIRO" : "CARGA"
+    }
   };
 }
 
@@ -1261,45 +1242,29 @@ const LS_CHAT="bet300_chat_"+PC;let chatSessionId=localStorage.getItem(LS_CHAT)|
 async function asegurarChatLite(){
 
   if(chatSessionId){
-
-    const { data: existente, error } = await supabaseClient
-      .from("chat_sesiones")
-      .select("chat_id")
-      .eq("chat_id", chatSessionId)
-      .maybeSingle();
-
-    if(existente && !error){
-      iniciarRealtimeChatLanding();
-      return chatSessionId;
-    }
-
-    localStorage.removeItem(LS_CHAT);
-    chatSessionId = "";
+    iniciarRealtimeChatLanding();
+    return chatSessionId;
   }
 
-  const nuevoChatId = crypto.randomUUID();
-
-  const payload = {
-    chat_id: nuevoChatId,
-    usuario: userData?.usuario || "",
-    telefono: userData?.telefono || "",
-    pc_codigo: PC,
-    estado: "ABIERTO",
-    solicitud_id: solicitudActual || null
-  };
-
-  const { data, error } = await supabaseClient
-    .from("chat_sesiones")
-    .insert(payload)
-    .select()
-    .single();
+  const { data, error } = await supabaseClient.rpc("landing_crear_chat", {
+    p_usuario: userData?.usuario || "",
+    p_telefono: userData?.telefono || "",
+    p_pc_codigo: PC,
+    p_solicitud_id: solicitudActual ? Number(solicitudActual) : null
+  });
 
   if(error){
-    console.error("Error creando chat_sesiones:", error);
+    console.error("Error creando chat RPC:", error);
     throw new Error("No se pudo iniciar el chat.");
   }
 
-  chatSessionId = data.chat_id;
+  const row = Array.isArray(data) ? data[0] : data;
+
+  if(!row || !row.chat_id){
+    throw new Error("No se pudo iniciar el chat.");
+  }
+
+  chatSessionId = row.chat_id;
   localStorage.setItem(LS_CHAT, chatSessionId);
 
   iniciarRealtimeChatLanding();
@@ -1313,14 +1278,12 @@ async function cargarChatLite(){
 
   if(!chatSessionId) return;
 
-  const { data, error } = await supabaseClient
-    .from("chat_mensajes")
-    .select("*")
-    .eq("chat_id", chatSessionId)
-    .order("created_at",{ascending:true});
+  const { data, error } = await supabaseClient.rpc("landing_leer_chat", {
+    p_chat_id: chatSessionId
+  });
 
   if(error){
-    console.error("Error cargando chat:", error);
+    console.error("Error cargando chat RPC:", error);
     return;
   }
 
@@ -1329,7 +1292,7 @@ async function cargarChatLite(){
     MENSAJE:m.mensaje,
     IMAGEN_URL:m.imagen_url,
     FECHA:m.created_at,
-    LEIDO:"SI"
+    LEIDO:m.leido ? "SI" : "NO"
   }));
 
   chatLiteMensajesCount = mensajes.length;
@@ -1338,7 +1301,7 @@ async function cargarChatLite(){
 }
 
 
-  
+
 
 
 function normalizarImagenUrl(url){
@@ -1521,18 +1484,15 @@ async function enviarChatLite(){
   box.scrollTop = box.scrollHeight;
   input.value = "";
 
-  const { error } = await supabaseClient
-    .from("chat_mensajes")
-    .insert({
-      chat_id: chatSessionId,
-      tipo_emisor: "USUARIO",
-      emisor: userData?.usuario || "Usuario",
-      mensaje: mensaje || "",
-      imagen_url: chatLiteImagenBase64 || ""
-    });
+  const { error } = await supabaseClient.rpc("landing_enviar_mensaje", {
+    p_chat_id: chatSessionId,
+    p_emisor: userData?.usuario || "Usuario",
+    p_mensaje: mensaje || "",
+    p_imagen_url: chatLiteImagenBase64 || ""
+  });
 
   if(error){
-    console.error("Error enviando chat:", error);
+    console.error("Error enviando chat RPC:", error);
     alert("No se pudo enviar el mensaje.");
     return;
   }
@@ -1547,32 +1507,10 @@ async function enviarChatLite(){
 let realtimeChatChannel = null;
 
 function iniciarRealtimeChatLanding(){
-
-  if(!chatSessionId) return;
-
-  if(realtimeChatChannel){
-    supabaseClient.removeChannel(realtimeChatChannel);
-  }
-
-  realtimeChatChannel = supabaseClient
-    .channel("chat_landing_" + chatSessionId)
-    .on(
-      "postgres_changes",
-      {
-        event:"INSERT",
-        schema:"public",
-        table:"chat_mensajes",
-        filter:"chat_id=eq." + chatSessionId
-      },
-      payload => {
-        const m = payload.new;
-
-        if(String(m.tipo_emisor || "").toUpperCase() === "OPERADOR"){
-          cargarChatLite();
-        }
-      }
-    )
-    .subscribe();
+  // Blindaje RPC:
+  // Evitamos suscripción directa a la tabla pública chat_mensajes.
+  // El chat se actualiza por polling con landing_leer_chat().
+  return;
 }
 
 function marcarUltimoMensajeChatLiteEnviado(){
@@ -1586,23 +1524,9 @@ function quitarImagenChatLite(){chatLiteImagenBase64="";chatLiteImagenNombre="";
 document.addEventListener("paste",e=>{const chatVisible=!document.getElementById("chatLite").classList.contains("hidden");if(!chatVisible)return;const items=e.clipboardData?.items||[];for(const item of items){if(item.type&&item.type.startsWith("image/")){const file=item.getAsFile();if(file){leerImagenChatLite(file);e.preventDefault();return}}}});
 setTimeout(()=>{document.getElementById("chatLiteInput")?.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();enviarChatLite()}})},0);
 async function vincularChatLiteASolicitud(idSolicitud){
-  if(!idSolicitud) return;
-
-  try{
-    if(!chatSessionId && userData?.usuario){
-      await asegurarChatLite();
-    }
-
-    if(!chatSessionId) return;
-
-    await supabaseClient
-      .from("chat_sesiones")
-      .update({ solicitud_id: Number(idSolicitud) })
-      .eq("chat_id", chatSessionId);
-
-  }catch(e){
-    console.warn("No se pudo vincular chat a solicitud:", e);
-  }
+  // Blindaje RPC:
+  // La solicitud creada por landing_crear_solicitud ya devuelve y vincula su chat_id.
+  return;
 }
 
 </script>
