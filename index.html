@@ -458,7 +458,7 @@ button:disabled{
 
   <div class="card" id="registroCard">
     <h1>Identificá tu cuenta</h1>
-    <p class="muted">Completá tus datos para continuar con la carga.</p>
+    <p class="muted">Completá tus datos. Validamos tu usuario antes de continuar.</p>
 
     <label>Usuario *</label>
     <input id="regUsuario" placeholder="ej: maurito564">
@@ -468,6 +468,9 @@ button:disabled{
 
     <label>WhatsApp *</label>
     <input id="regTelefono" placeholder="ej: 1133344455">
+
+    <label>DNI *</label>
+    <input id="regDni" inputmode="numeric" placeholder="ej: 30111222">
 
     <button id="btnContinuar" onclick="continuarRegistro()">Continuar</button>
 
@@ -502,6 +505,8 @@ button:disabled{
       Usuario identificado.
     </div>
 
+    <div id="referenciaPagoBox" class="result ok hidden"></div>
+
     <button class="change-data" onclick="cambiarDatos()">Cambiar mis datos</button>
 
     <label>Tipo de solicitud *</label>
@@ -516,10 +521,12 @@ button:disabled{
     <div id="retiroDatosBox" class="retiro-data-box hidden">
       <div class="hint">Para retiros, indicá la cuenta donde querés recibir el dinero. Estos datos los revisa el operador antes de aprobar.</div>
 
-      <label>CBU / CVU / Alias de destino *</label>
+      <div id="retiroCuentaRegistradaBox" class="result ok hidden"></div>
+
+      <label id="retiroAliasLabel">CBU / CVU / Alias de destino *</label>
       <input id="retiroAliasCbu" placeholder="ej: alias.mp o CVU/CBU completo">
 
-      <label>Titular de la cuenta *</label>
+      <label id="retiroTitularLabel">Titular de la cuenta *</label>
       <input id="retiroTitular" placeholder="Nombre y apellido del titular">
     </div>
 
@@ -592,7 +599,7 @@ const SUPABASE_URL = "https://pjvvyvfcwjoocjqvdror.supabase.co";
 const SUPABASE_KEY = "sb_publishable_NYqRoKptTgcL90VAVF2kqA_Gl06mEUF";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-console.log("Landing blindada RPC v1 conectada ✅ · sin Apps Script · sin .from() directo en tablas públicas");
+console.log("Landing blindada RPC v2 DNI + validación Agentes + MP preparada conectada ✅ · sin Apps Script · sin .from() directo en tablas públicas");
 
 const WHATSAPP_POR_PC = {
   P1: "5492235181171",
@@ -647,6 +654,9 @@ let solicitudChatId = "";
 let intervaloEstado = null;
 let userData = null;
 let tipoSolicitudActual = "CARGA";
+let validacionUsuarioActual = null;
+let cuentaRetiroVerificada = null;
+let referenciaPagoActual = "";
 
 window.onload = async () => {
   prepararWhatsapp();
@@ -730,7 +740,7 @@ function cargarUsuarioGuardado() {
   try {
     userData = JSON.parse(raw);
 
-    if (userData.usuario && userData.nombre && userData.telefono) {
+    if (userData.usuario && userData.nombre && userData.telefono && userData.dni && userData.usuario_validado) {
       mostrarCarga();
     }
   } catch (e) {}
@@ -743,7 +753,9 @@ function mostrarCarga() {
   document.getElementById("datosUsuarioBox").innerHTML = `
     <b>Usuario:</b> ${userData.usuario}<br>
     <b>Nombre:</b> ${userData.nombre}<br>
-    <b>WhatsApp:</b> ${userData.telefono}
+    <b>WhatsApp:</b> ${userData.telefono}<br>
+    <b>DNI:</b> ${userData.dni}<br>
+    <b>Validación:</b> Usuario encontrado en Agentes ✅
   `;
 }
 
@@ -757,15 +769,18 @@ function cambiarDatos() {
   document.getElementById("regUsuario").value = "";
   document.getElementById("regNombre").value = "";
   document.getElementById("regTelefono").value = "";
+  document.getElementById("regDni").value = "";
+  validacionUsuarioActual = null;
 }
 
 async function continuarRegistro() {
   const usuario = document.getElementById("regUsuario").value.trim();
   const nombre = document.getElementById("regNombre").value.trim();
   const telefono = document.getElementById("regTelefono").value.trim();
+  const dni = (document.getElementById("regDni")?.value || "").replace(/\D/g, "");
 
-  if (!usuario || !nombre || !telefono) {
-    mostrarRegistroMsg("Completá usuario, nombre y WhatsApp.", false);
+  if (!usuario || !nombre || !telefono || !dni) {
+    mostrarRegistroMsg("Completá usuario, nombre, WhatsApp y DNI.", false);
     return;
   }
 
@@ -774,21 +789,128 @@ async function continuarRegistro() {
     return;
   }
 
-  document.getElementById("btnContinuar").disabled = true;
-  document.getElementById("btnContinuar").innerText = "Guardando...";
-
-  const r = await registrarContactoSupabase(usuario, nombre, telefono);
-
-  document.getElementById("btnContinuar").disabled = false;
-  document.getElementById("btnContinuar").innerText = "Continuar";
-
-  if (!r.ok) {
-    mostrarRegistroMsg(r.error || "No se pudo registrar.", false);
+  if (dni.length < 7) {
+    mostrarRegistroMsg("Revisá el DNI. Ingresá solo números.", false);
     return;
   }
 
-  userData = { usuario, nombre, telefono };
+  document.getElementById("btnContinuar").disabled = true;
+  document.getElementById("btnContinuar").innerText = "Validando usuario...";
+
+  userData = { usuario, nombre, telefono, dni, usuario_validado:false };
+  mostrarRegistroMsg(`<span class="loader"></span> Estamos validando tu usuario en Agentes. Esto puede demorar unos segundos.`, true);
+
+  const { data, error } = await supabaseClient.rpc("landing_solicitar_validacion_usuario", {
+    p_usuario: usuario,
+    p_nombre_completo: nombre,
+    p_telefono: telefono,
+    p_dni: dni,
+    p_pc_codigo: PC
+  });
+
+  if(error){
+    console.error("Error solicitando validación:", error);
+    document.getElementById("btnContinuar").disabled = false;
+    document.getElementById("btnContinuar").innerText = "Continuar";
+    mostrarRegistroMsg("No pudimos iniciar la validación. Intentá nuevamente o consultanos por chat.", false);
+    return;
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+
+  if(!row){
+    document.getElementById("btnContinuar").disabled = false;
+    document.getElementById("btnContinuar").innerText = "Continuar";
+    mostrarRegistroMsg("No pudimos validar el usuario. Consultanos por chat.", false);
+    return;
+  }
+
+  if(row.estado === "EXISTE"){
+    validacionUsuarioActual = row.validacion_id || null;
+    finalizarRegistroValidado(usuario, nombre, telefono, dni, validacionUsuarioActual);
+    return;
+  }
+
+  validacionUsuarioActual = row.validacion_id;
+  await esperarValidacionUsuario(usuario, nombre, telefono, dni, validacionUsuarioActual);
+}
+
+async function esperarValidacionUsuario(usuario, nombre, telefono, dni, validacionId){
+  const maxIntentos = 40;
+  let intentos = 0;
+
+  while(intentos < maxIntentos){
+    intentos++;
+    await new Promise(resolve => setTimeout(resolve, 2500));
+
+    const { data, error } = await supabaseClient.rpc("landing_estado_validacion_usuario", {
+      p_validacion_id: Number(validacionId)
+    });
+
+    if(error){
+      console.error("Error consultando validación:", error);
+      continue;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+    const estado = String(row?.estado || "").toUpperCase();
+
+    if(estado === "EXISTE"){
+      finalizarRegistroValidado(usuario, nombre, telefono, dni, validacionId);
+      return;
+    }
+
+    if(estado === "NO_EXISTE"){
+      document.getElementById("btnContinuar").disabled = false;
+      document.getElementById("btnContinuar").innerText = "Continuar";
+
+      userData = { usuario, nombre, telefono, dni, usuario_validado:false };
+      mostrarRegistroMsg(`
+        No encontramos ese usuario en Agentes.<br><br>
+        Revisá que esté escrito igual que en la plataforma o consultanos por chat.
+        <br><br>
+        <button type="button" onclick="abrirChatLite()">💬 Consultar por chat</button>
+      `, false);
+      return;
+    }
+
+    if(estado === "ERROR"){
+      document.getElementById("btnContinuar").disabled = false;
+      document.getElementById("btnContinuar").innerText = "Continuar";
+
+      userData = { usuario, nombre, telefono, dni, usuario_validado:false };
+      mostrarRegistroMsg(`
+        No pudimos validar automáticamente tu usuario.<br>
+        Podés intentar nuevamente o consultarnos por chat.
+        <br><br>
+        <button type="button" onclick="abrirChatLite()">💬 Consultar por chat</button>
+      `, false);
+      return;
+    }
+
+    mostrarRegistroMsg(`<span class="loader"></span> Validando usuario en Agentes... intento ${intentos}/${maxIntentos}`, true);
+  }
+
+  document.getElementById("btnContinuar").disabled = false;
+  document.getElementById("btnContinuar").innerText = "Continuar";
+  mostrarRegistroMsg("La validación está demorando más de lo habitual. Intentá nuevamente o consultanos por chat.", false);
+}
+
+function finalizarRegistroValidado(usuario, nombre, telefono, dni, validacionId){
+  userData = {
+    usuario,
+    nombre,
+    telefono,
+    dni,
+    usuario_validado:true,
+    validacion_id: validacionId || null,
+    validado_at: new Date().toISOString()
+  };
+
   localStorage.setItem(LS_USER, JSON.stringify(userData));
+  document.getElementById("btnContinuar").disabled = false;
+  document.getElementById("btnContinuar").innerText = "Continuar";
+  mostrarRegistroMsg("Usuario validado correctamente ✅", true);
   mostrarCarga();
 }
 
@@ -893,12 +1015,87 @@ function seleccionarTipoSolicitud(tipo){
     retiroBox.classList.toggle("hidden", !esRetiro);
   }
 
+  if(esRetiro){
+    cargarCuentaRetiroVerificada();
+  }else{
+    cuentaRetiroVerificada = null;
+    actualizarVistaCuentaRetiro();
+  }
+
   const minTxt = document.getElementById("montoMinimoTxt");
   if(minTxt){
     minTxt.innerText = esRetiro ? "⚠️ Retiro mínimo: $5.000" : "⚠️ Carga mínima: $2.000";
   }
 }
 
+
+
+
+async function cargarCuentaRetiroVerificada(){
+  cuentaRetiroVerificada = null;
+
+  if(!userData || !userData.usuario || !userData.dni){
+    actualizarVistaCuentaRetiro();
+    return;
+  }
+
+  const { data, error } = await supabaseClient.rpc("landing_obtener_cuenta_retiro", {
+    p_usuario: userData.usuario,
+    p_dni: userData.dni,
+    p_pc_codigo: PC
+  });
+
+  if(error){
+    console.warn("No pude consultar cuenta de retiro verificada:", error.message);
+    actualizarVistaCuentaRetiro();
+    return;
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+
+  if(row && row.cuenta_id){
+    cuentaRetiroVerificada = row;
+  }
+
+  actualizarVistaCuentaRetiro();
+}
+
+function actualizarVistaCuentaRetiro(){
+  const box = document.getElementById("retiroCuentaRegistradaBox");
+  const aliasInput = document.getElementById("retiroAliasCbu");
+  const titularInput = document.getElementById("retiroTitular");
+  const aliasLabel = document.getElementById("retiroAliasLabel");
+  const titularLabel = document.getElementById("retiroTitularLabel");
+
+  if(!box || !aliasInput || !titularInput) return;
+
+  if(cuentaRetiroVerificada && cuentaRetiroVerificada.cuenta_id){
+    box.classList.remove("hidden");
+    box.innerHTML = `
+      <b>Cuenta de retiro verificada</b><br>
+      <b>Titular:</b> ${escapeHtml(cuentaRetiroVerificada.titular || "")}<br>
+      <b>Alias/CBU:</b> ${escapeHtml(cuentaRetiroVerificada.alias_cbu || "")}<br>
+      <span class="mini">Por seguridad, los retiros se envían a la cuenta registrada. Para cambiarla, consultá por chat.</span>
+    `;
+
+    aliasInput.value = cuentaRetiroVerificada.alias_cbu || "";
+    titularInput.value = cuentaRetiroVerificada.titular || "";
+    aliasInput.disabled = true;
+    titularInput.disabled = true;
+
+    if(aliasLabel) aliasLabel.innerText = "Alias / CBU verificado";
+    if(titularLabel) titularLabel.innerText = "Titular verificado";
+  }else{
+    box.classList.add("hidden");
+    box.innerHTML = "";
+
+    aliasInput.disabled = false;
+    titularInput.disabled = false;
+
+    if(aliasLabel) aliasLabel.innerText = "CBU / CVU / Alias de destino *";
+    if(titularLabel) titularLabel.innerText = "Titular de la cuenta *";
+  }
+}
 
 
 async function puedeSolicitarRetiro(){
@@ -913,8 +1110,14 @@ async function crearSolicitud() {
   const tipo = String(tipoSolicitudActual || "CARGA").toUpperCase();
   const esRetiro = tipo === "RETIRO";
 
-  if (!userData || !userData.usuario || !userData.nombre || !userData.telefono) {
-    mostrarResultado("Primero completá tus datos.", false);
+  if (!userData || !userData.usuario || !userData.nombre || !userData.telefono || !userData.dni) {
+    mostrarResultado("Primero completá tus datos y DNI.", false);
+    return;
+  }
+
+  if (!userData.usuario_validado) {
+    mostrarResultado("Primero necesitamos validar tu usuario en Agentes.", false);
+    cambiarDatos();
     return;
   }
 
@@ -982,10 +1185,15 @@ async function crearSolicitud() {
     iniciarRealtimeChatLanding();
   }
 
+  referenciaPagoActual = r.solicitud.referencia_pago || "";
+
+  mostrarReferenciaPago(r.solicitud);
+
   mostrarResultado(
     `✅ Solicitud enviada correctamente.<br><br>
     <b>ID:</b> ${r.solicitud.id}<br>
     <b>Tipo:</b> ${tipo}<br>
+    ${(!esRetiro && referenciaPagoActual) ? `<b>Referencia:</b> ${referenciaPagoActual}<br>` : ""}
     <b>Estado:</b> ${r.solicitud.estado}<br><br>
     ${esRetiro ? "Estamos revisando tu retiro." : "Estamos verificando tu transferencia."}`,
     true
@@ -1002,6 +1210,34 @@ async function crearSolicitud() {
     if(titularInput) titularInput.value = "";
   }
 }
+
+
+function mostrarReferenciaPago(solicitud){
+  const box = document.getElementById("referenciaPagoBox");
+  if(!box) return;
+
+  const tipo = String(solicitud?.tipo || tipoSolicitudActual || "CARGA").toUpperCase();
+  const ref = solicitud?.referencia_pago || solicitud?.referencia_pago_visible || "";
+
+  if(tipo !== "CARGA" || !ref){
+    box.classList.add("hidden");
+    box.innerHTML = "";
+    return;
+  }
+
+  box.classList.remove("hidden");
+  box.innerHTML = `
+    <b>Referencia de carga:</b> ${escapeHtml(ref)}<br>
+    <span class="mini">Si tu billetera permite agregar nota o motivo, escribí esta referencia. Esto ayuda a validar tu pago más rápido.</span>
+    <button class="copy-btn" type="button" onclick="copiarReferenciaPago('${escapeAttr(ref)}')">Copiar referencia</button>
+  `;
+}
+
+function copiarReferenciaPago(ref){
+  navigator.clipboard.writeText(String(ref || ""));
+  mostrarResultado("Referencia copiada correctamente.", true);
+}
+
 
 function mostrarEstadoEspera(estado="PENDIENTE") {
   document.getElementById("estadoEspera").classList.remove("hidden");
@@ -1161,10 +1397,20 @@ async function crearSolicitudSupabase(monto, tipo="CARGA"){
 
   const esRetiro = String(tipo || "CARGA").toUpperCase() === "RETIRO";
 
+  const destinoRetiro = esRetiro
+    ? (cuentaRetiroVerificada?.alias_cbu || document.getElementById("retiroAliasCbu")?.value || "").trim()
+    : null;
+
+  const titularRetiro = esRetiro
+    ? (cuentaRetiroVerificada?.titular || document.getElementById("retiroTitular")?.value || "").trim()
+    : null;
+
   const params = {
     p_usuario: userData.usuario,
     p_nombre_completo: userData.nombre,
     p_telefono: userData.telefono,
+    p_dni: userData.dni,
+    p_validacion_usuario_id: userData.validacion_id ? Number(userData.validacion_id) : null,
     p_pc_codigo: PC,
     p_tipo: esRetiro ? "RETIRO" : "CARGA",
     p_monto: Number(monto),
@@ -1172,14 +1418,15 @@ async function crearSolicitudSupabase(monto, tipo="CARGA"){
     p_billetera_id: (!esRetiro && billeteraActiva) ? String(billeteraActiva.id || "") : null,
     p_billetera_nombre: (!esRetiro && billeteraActiva) ? String(billeteraActiva.nombre_visible || "") : null,
     p_link_plataforma: LINKS_PLATAFORMA[PC] || LINKS_PLATAFORMA.P1 || null,
-    p_retiro_alias_cbu: esRetiro ? (document.getElementById("retiroAliasCbu")?.value || "").trim() : null,
-    p_retiro_titular: esRetiro ? (document.getElementById("retiroTitular")?.value || "").trim() : null
+    p_retiro_alias_cbu: destinoRetiro,
+    p_retiro_titular: titularRetiro,
+    p_cuenta_retiro_id: esRetiro && cuentaRetiroVerificada?.cuenta_id ? Number(cuentaRetiroVerificada.cuenta_id) : null
   };
 
-  const { data, error } = await supabaseClient.rpc("landing_crear_solicitud", params);
+  const { data, error } = await supabaseClient.rpc("landing_crear_solicitud_v2", params);
 
   if(error){
-    console.error("Error creando solicitud RPC:", error);
+    console.error("Error creando solicitud RPC v2:", error);
     return {
       ok:false,
       error:error.message || "No se pudo crear la solicitud."
@@ -1205,7 +1452,10 @@ async function crearSolicitudSupabase(monto, tipo="CARGA"){
       chat_id: row.chat_id,
       estado: row.estado || "PENDIENTE",
       created_at: row.created_at,
-      tipo: esRetiro ? "RETIRO" : "CARGA"
+      tipo: esRetiro ? "RETIRO" : "CARGA",
+      referencia_pago: row.referencia_pago || "",
+      referencia_pago_visible: row.referencia_pago_visible || row.referencia_pago || "",
+      retiro_requiere_revision: row.retiro_requiere_revision || false
     }
   };
 }
@@ -1225,6 +1475,13 @@ async function crearSolicitudSupabase(monto, tipo="CARGA"){
 
   const modal = document.getElementById("successModal");
   if(modal) modal.classList.add("hidden");
+
+  referenciaPagoActual = "";
+  const refBox = document.getElementById("referenciaPagoBox");
+  if(refBox){
+    refBox.innerHTML = "";
+    refBox.classList.add("hidden");
+  }
 
   const resultado = document.getElementById("resultado");
   if(resultado){
