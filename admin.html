@@ -25,6 +25,14 @@ button{border:0;border-radius:12px;padding:11px 14px;cursor:pointer;font-weight:
 .rowActions{display:flex;gap:7px;flex-wrap:wrap}.empty{text-align:center;color:var(--muted);padding:26px}.notice{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.32);color:#fde68a;padding:13px 14px;border-radius:13px;margin-bottom:16px;font-size:14px;line-height:1.42}.list{display:grid;gap:10px}.item{border:1px solid var(--line);background:rgba(2,6,23,.38);border-radius:13px;padding:13px}.item strong{display:block;margin-bottom:5px}.item span{color:var(--muted);font-size:13px}.toast{position:fixed;right:20px;bottom:20px;z-index:99;background:#020617;border:1px solid var(--line);padding:14px 16px;border-radius:12px;box-shadow:0 12px 36px rgba(0,0,0,.35);display:none;max-width:430px}.toast.show{display:block}.toast.okb{border-color:rgba(34,197,94,.6)}.toast.err{border-color:rgba(239,68,68,.7)}
 .modalOverlay{position:fixed;inset:0;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center;z-index:200;padding:18px}.modalOverlay.show{display:flex}.modalBox{width:min(980px,96vw);max-height:88vh;overflow:auto;background:#020617;border:1px solid var(--line);border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.55)}.modalHead{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px}.modalHead h3{font-size:18px}.modalBody{padding:18px}.logLine{border:1px solid var(--line);background:rgba(15,23,42,.74);border-radius:13px;padding:12px;margin-bottom:10px}.logLine b{display:inline-block;margin-bottom:4px}.logMeta{color:var(--muted);font-size:12px}.workerGrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:13px;margin-bottom:18px}.workerError{max-width:280px;white-space:normal;color:#fca5a5;font-size:12px;line-height:1.35}.workerOk{color:#86efac}.workerWarn{color:#fcd34d}.workerInfo{color:#93c5fd}
 @media(max-width:1180px){.app{grid-template-columns:1fr}aside{position:relative;height:auto}.grid2,.gridDash{grid-template-columns:1fr}.filters{grid-template-columns:1fr 1fr}.stats{grid-template-columns:1fr 1fr}}@media(max-width:680px){main{padding:14px}.top{flex-direction:column}.filters,.g2,.g3,.stats{grid-template-columns:1fr}table{min-width:760px}}
+
+.mp-box{border:1px solid rgba(59,130,246,.35);background:rgba(59,130,246,.06);border-radius:14px;padding:14px;margin:14px 0}
+.mp-box h4{font-size:15px;margin-bottom:10px;color:#bfdbfe}
+.mp-secret-note{font-size:12px;color:#fde68a;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.25);border-radius:10px;padding:9px;margin:8px 0 12px}
+.mp-status-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0 12px}
+.mp-status-card{background:rgba(2,6,23,.45);border:1px solid var(--line);border-radius:10px;padding:9px;font-size:12px;color:var(--muted)}
+.mp-status-card b{display:block;color:#fff;margin-top:3px}
+
 </style>
 </head>
 <body>
@@ -110,6 +118,7 @@ button{border:0;border-radius:12px;padding:11px 14px;cursor:pointer;font-weight:
         <option value="">Todos tipos</option>
         <option value="CARGAR_FICHAS">CARGAR_FICHAS</option>
         <option value="PROCESAR_RETIRO">PROCESAR_RETIRO</option>
+        <option value="VALIDAR_USUARIO">VALIDAR_USUARIO</option>
       </select>
       <select id="wk_filter_pc" onchange="renderWorker()"></select>
       <button onclick="renderWorker()">Filtrar</button>
@@ -157,9 +166,68 @@ button{border:0;border-radius:12px;padding:11px 14px;cursor:pointer;font-weight:
     <input type="hidden" id="bi_id"><div class="g2"><div class="row"><label>PC Código</label><select id="bi_pc_codigo"></select></div><div class="row"><label>Banco</label><select id="bi_banco"><option value="">Seleccionar</option><option>MP</option><option>UALA</option><option>NJX</option><option>PERSONAL PAY</option><option>BRUBANK</option><option>PREX</option><option>OTRO</option></select></div></div>
     <div class="row"><label>Nombre visible</label><input id="bi_nombre_visible" required></div><div class="row"><label>Titular</label><input id="bi_titular"></div><div class="row"><label>Alias</label><input id="bi_alias"></div><div class="row"><label>CBU / CVU</label><input id="bi_cbu"></div>
     <div class="g3"><div class="row"><label>Estado</label><select id="bi_estado"><option value="activa">activa</option><option value="pausada">pausada</option><option value="caida">caida</option><option value="revision">revision</option><option value="inactiva">inactiva</option></select></div><div class="row"><label>Prioridad</label><input id="bi_prioridad" type="number" value="0"></div><div class="row"><label>Orden</label><input id="bi_orden" type="number" value="0"></div></div>
-    <div class="g2"><div class="row"><label>Activa</label><select id="bi_activa"><option value="true">Sí</option><option value="false">No</option></select></div><div class="row"><label>Seleccionada manual</label><select id="bi_manual"><option value="false">No</option><option value="true">Sí</option></select></div></div><div class="row"><label>Observaciones</label><textarea id="bi_observaciones"></textarea></div><div class="actions"><button class="primary" type="submit">Guardar billetera</button><button type="button" onclick="resetBilleteraForm()">Cancelar</button></div>
+    <div class="g2"><div class="row"><label>Activa</label><select id="bi_activa"><option value="true">Sí</option><option value="false">No</option></select></div><div class="row"><label>Seleccionada manual</label><select id="bi_manual"><option value="false">No</option><option value="true">Sí</option></select></div></div>
+
+    <div class="mp-box">
+      <h4>Integración Mercado Pago</h4>
+      <div class="notice" style="margin-bottom:12px">Estos datos son solo para el panel admin y futura conciliación. Nada de esto se muestra en landing. Los secretos se guardan por RPC y no se vuelven a mostrar completos.</div>
+
+      <div class="mp-status-grid">
+        <div class="mp-status-card">Access Token<b id="bi_mp_token_status">No cargado</b></div>
+        <div class="mp-status-card">Webhook Secret<b id="bi_mp_webhook_secret_status">No cargado</b></div>
+      </div>
+
+      <div class="g3">
+        <div class="row"><label>MP habilitado</label><select id="bi_mp_habilitado"><option value="false">No</option><option value="true">Sí</option></select></div>
+        <div class="row"><label>Modo</label><select id="bi_mp_modo"><option>DESACTIVADO</option><option>TEST</option><option>PRODUCCION</option></select></div>
+        <div class="row"><label>Tipo integración</label><select id="bi_mp_tipo_integracion"><option>NINGUNA</option><option>WEBHOOK</option><option>REPORTE_MOVIMIENTOS</option><option>CHECKOUT_LINK</option><option>MIXTA</option></select></div>
+      </div>
+
+      <div class="g2">
+        <div class="row"><label>Collector ID</label><input id="bi_mp_collector_id" placeholder="ID vendedor / collector"></div>
+        <div class="row"><label>User ID</label><input id="bi_mp_user_id" placeholder="User ID Mercado Pago"></div>
+      </div>
+
+      <div class="row"><label>Public Key</label><input id="bi_mp_public_key" placeholder="APP_USR-... o TEST-..."></div>
+
+      <div class="g2">
+        <div class="row"><label>Prefijo referencia</label><input id="bi_mp_referencia_prefijo" placeholder="NODO"></div>
+        <div class="row"><label>Webhook URL</label><input id="bi_mp_webhook_url" placeholder="https://..."></div>
+      </div>
+
+      <div class="g2">
+        <div class="row"><label>Reporte habilitado</label><select id="bi_mp_reporte_habilitado"><option value="false">No</option><option value="true">Sí</option></select></div>
+        <div class="row"><label>Tipo reporte</label><select id="bi_mp_reporte_tipo"><option>ACCOUNT_MONEY</option><option>RELEASED_MONEY</option><option>OTRO</option></select></div>
+      </div>
+
+      <div class="g2">
+        <div class="row"><label>Score automático mínimo</label><input id="bi_mp_match_min_score" type="number" value="80"></div>
+        <div class="row"><label>Score revisión manual</label><input id="bi_mp_match_revision_score" type="number" value="50"></div>
+      </div>
+
+      <div class="g2">
+        <div class="row"><label>Detectar pagos automáticamente</label><select id="bi_mp_auto_detectar"><option value="false">No</option><option value="true">Sí</option></select></div>
+        <div class="row"><label>Auto aprobar cargas</label><select id="bi_mp_auto_aprobar"><option value="false">No, solo sugerir</option><option value="true">Sí</option></select></div>
+      </div>
+
+      <div class="mp-secret-note">Pegá secretos solo para guardar/reemplazar. Si los dejás vacíos, se conservan los existentes. No se muestran luego en el panel.</div>
+
+      <div class="row"><label>Access Token</label><input id="bi_mp_access_token" type="password" autocomplete="off" placeholder="Pegar solo para guardar/reemplazar"></div>
+      <div class="g2">
+        <div class="row"><label>Client ID</label><input id="bi_mp_client_id" autocomplete="off" placeholder="Opcional"></div>
+        <div class="row"><label>Client Secret</label><input id="bi_mp_client_secret" type="password" autocomplete="off" placeholder="Opcional"></div>
+      </div>
+      <div class="g2">
+        <div class="row"><label>Webhook Secret</label><input id="bi_mp_webhook_secret" type="password" autocomplete="off" placeholder="Pegar solo para guardar/reemplazar"></div>
+        <div class="row"><label>Refresh Token</label><input id="bi_mp_refresh_token" type="password" autocomplete="off" placeholder="Opcional"></div>
+      </div>
+
+      <button type="button" class="warning small" onclick="desactivarMpBilletera()">Desactivar MP de esta billetera</button>
+    </div>
+
+    <div class="row"><label>Observaciones</label><textarea id="bi_observaciones"></textarea></div><div class="actions"><button class="primary" type="submit">Guardar billetera</button><button type="button" onclick="resetBilleteraForm()">Cancelar</button></div>
   </form></div></div>
-  <div class="card"><div class="card-h"><h3>Billeteras</h3><button class="blue small" onclick="loadBilleteras()">Actualizar</button></div><div class="filters"><input id="bi_search" oninput="renderBilleteras()" placeholder="Buscar..."><select id="bi_filter_banco" onchange="renderBilleteras()"><option value="">Todos bancos</option><option>MP</option><option>UALA</option><option>NJX</option><option>PERSONAL PAY</option><option>BRUBANK</option><option>PREX</option><option>OTRO</option></select><select id="bi_filter_pc" onchange="renderBilleteras()"></select><select id="bi_filter_activa" onchange="renderBilleteras()"><option value="">Todas</option><option value="true">Activas</option><option value="false">Inactivas</option></select><button onclick="clearBiFilters()">Reset</button></div><div class="tableWrap"><table><thead><tr><th>ID</th><th>PC</th><th>Nombre</th><th>Titular</th><th>Banco</th><th>Alias</th><th>Estado</th><th>Prioridad</th><th>Manual</th><th>Acciones</th></tr></thead><tbody id="billeterasBody"></tbody></table></div></div>
+  <div class="card"><div class="card-h"><h3>Billeteras</h3><button class="blue small" onclick="loadBilleteras()">Actualizar</button></div><div class="filters"><input id="bi_search" oninput="renderBilleteras()" placeholder="Buscar..."><select id="bi_filter_banco" onchange="renderBilleteras()"><option value="">Todos bancos</option><option>MP</option><option>UALA</option><option>NJX</option><option>PERSONAL PAY</option><option>BRUBANK</option><option>PREX</option><option>OTRO</option></select><select id="bi_filter_pc" onchange="renderBilleteras()"></select><select id="bi_filter_activa" onchange="renderBilleteras()"><option value="">Todas</option><option value="true">Activas</option><option value="false">Inactivas</option></select><button onclick="clearBiFilters()">Reset</button></div><div class="tableWrap"><table><thead><tr><th>ID</th><th>PC</th><th>Nombre</th><th>Titular</th><th>Banco</th><th>Alias</th><th>Estado</th><th>MP</th><th>Prioridad</th><th>Manual</th><th>Acciones</th></tr></thead><tbody id="billeterasBody"></tbody></table></div></div>
 </div></section>
 
 <section id="section-pcs" class="section"><div class="grid2"><div class="card"><div class="card-h"><h3 id="pcFormTitle">Crear PC</h3><button class="small" onclick="resetPcForm()">Limpiar</button></div><div class="card-b"><form id="pcForm"><input type="hidden" id="pc_id"><div class="row"><label>Código</label><input id="pc_codigo" required placeholder="P1"></div><div class="row"><label>Nombre</label><input id="pc_nombre"></div><div class="row"><label>Descripción</label><textarea id="pc_descripcion"></textarea></div><div class="row"><label>Activa</label><select id="pc_activa"><option value="true">Sí</option><option value="false">No</option></select></div><div class="actions"><button class="primary" type="submit">Guardar PC</button><button type="button" onclick="resetPcForm()">Cancelar</button></div></form></div></div><div class="card"><div class="card-h"><h3>PCs</h3><button class="blue small" onclick="loadPcs()">Actualizar</button></div><div class="tableWrap"><table><thead><tr><th>ID</th><th>Código</th><th>Nombre</th><th>Descripción</th><th>Activa</th><th>Acciones</th></tr></thead><tbody id="pcsBody"></tbody></table></div></div></div></section>
@@ -179,11 +247,28 @@ const $=id=>document.getElementById(id);
 
 document.addEventListener("DOMContentLoaded",()=>{$("operadorForm").addEventListener("submit",saveOperador);$("billeteraForm").addEventListener("submit",saveBilletera);$("pcForm").addEventListener("submit",savePc);$("cfgForm").addEventListener("submit",saveCfg);reloadAll();});
 
-function showSection(name){document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));document.querySelectorAll(".navBtn").forEach(b=>b.classList.remove("active"));$("section-"+name).classList.add("active");document.querySelector(`[data-section="${name}"]`)?.classList.add("active");const t={dashboard:["Dashboard","Resumen general navegable por PC."],metricas:["Métricas","Aprobación rápida, respuesta de chat y rendimiento por operador/PC."],worker:["Worker","Cola de automatización, logs, errores y reintentos."],operadores:["Operadores","Crear, editar, activar, desactivar o eliminar operadores."],billeteras:["Billeteras","Administrar cuentas, estados, prioridad y selección manual."],pcs:["PCs","Administrar catálogo de PCs."],config:["Configuración","Parámetros internos del sistema."]};$("pageTitle").textContent=t[name][0];$("pageSub").textContent=t[name][1];}
+function showSection(name){document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));document.querySelectorAll(".navBtn").forEach(b=>b.classList.remove("active"));$("section-"+name).classList.add("active");document.querySelector(`[data-section="${name}"]`)?.classList.add("active");const t={dashboard:["Dashboard","Resumen general navegable por PC."],metricas:["Métricas","Aprobación rápida, respuesta de chat y rendimiento por operador/PC."],worker:["Worker","Cola de automatización, logs, errores y reintentos."],operadores:["Operadores","Crear, editar, activar, desactivar o eliminar operadores."],billeteras:["Billeteras","Administrar cuentas, estados, prioridad, selección manual e integración Mercado Pago."],pcs:["PCs","Administrar catálogo de PCs."],config:["Configuración","Parámetros internos del sistema."]};$("pageTitle").textContent=t[name][0];$("pageSub").textContent=t[name][1];}
 
 async function reloadAll(){await Promise.allSettled([loadPcs(false),loadOperadores(false),loadBilleteras(false),loadConfig(false),loadSolicitudes(false),loadChats(false),loadWorkerJobs(false)]);fillPcSelects();renderAll();toast("Datos actualizados","okb")}
 async function loadOperadores(render=true){const {data,error}=await supabaseClient.from(TABLES.operadores).select("*").order("nombre",{ascending:true});if(error)return toast("Error operadores: "+error.message,"err");operadores=data||[];if(render)renderAll()}
-async function loadBilleteras(render=true){const {data,error}=await supabaseClient.from(TABLES.billeteras).select("*").order("prioridad",{ascending:false}).order("orden",{ascending:true}).order("id",{ascending:true});if(error)return toast("Error billeteras: "+error.message,"err");billeteras=data||[];if(render)renderAll()}
+async function loadBilleteras(render=true){
+  const {data,error}=await supabaseClient.from(TABLES.billeteras).select("*").order("prioridad",{ascending:false}).order("orden",{ascending:true}).order("id",{ascending:true});
+  if(error)return toast("Error billeteras: "+error.message,"err");
+
+  let base=data||[];
+
+  // Datos Mercado Pago admin sin exponer secretos.
+  const {data:mpData,error:mpError}=await supabaseClient.rpc("admin_mp_listar_billeteras");
+  if(mpError){
+    console.warn("No pude leer config MP admin:",mpError);
+    billeteras=base;
+  }else{
+    const mpMap=new Map((mpData||[]).map(x=>[String(x.billetera_id),x]));
+    billeteras=base.map(b=>({...b,...(mpMap.get(String(b.id))||{})}));
+  }
+
+  if(render)renderAll()
+}
 async function loadPcs(render=true){const {data,error}=await supabaseClient.from(TABLES.pcs).select("*").order("codigo",{ascending:true});if(error)return toast("Error PCs: "+error.message,"err");pcs=data||[];if(render)renderAll()}
 async function loadConfig(render=true){const {data,error}=await supabaseClient.from(TABLES.config).select("*").order("clave",{ascending:true});if(error)return toast("Error config: "+error.message,"err");configuracion=data||[];if(render)renderAll()}
 async function loadSolicitudes(render=true){const {data,error}=await supabaseClient.from(TABLES.solicitudes).select("*").order("created_at",{ascending:false}).limit(1000);if(error){console.warn(error);solicitudes=[];return toast("No pude leer solicitudes: "+error.message,"err")}solicitudes=data||[];if(render)renderAll()}
@@ -341,13 +426,191 @@ function editOperador(id){const o=operadores.find(x=>String(x.id)===String(id));
 function resetOperadorForm(){$("operadorForm").reset();setVals({op_id:"",op_rol:"OPERADOR",op_tipo:"fijo",op_activo:"true"});$("opFormTitle").textContent="Crear operador"}
 function clearOpFilters(){setVals({op_search:"",op_filter_rol:"",op_filter_pc:"",op_filter_activo:""});renderOperadores()}
 
-async function saveBilletera(e){e.preventDefault();const id=val("bi_id"),manual=bool("bi_manual");const payload={pc_codigo:val("bi_pc_codigo"),nombre_visible:val("bi_nombre_visible"),titular:val("bi_titular"),alias:val("bi_alias"),cbu:val("bi_cbu"),banco:val("bi_banco"),estado:val("bi_estado"),prioridad:num("bi_prioridad"),activa:bool("bi_activa"),seleccionada_manual:manual,orden:num("bi_orden"),observaciones:val("bi_observaciones"),updated_at:new Date().toISOString()};if(manual)await supabaseClient.from(TABLES.billeteras).update({seleccionada_manual:false}).neq("id",id||-1);const res=id?await supabaseClient.from(TABLES.billeteras).update(payload).eq("id",id):await supabaseClient.from(TABLES.billeteras).insert([payload]);if(res.error)return toast("Error billetera: "+res.error.message,"err");resetBilleteraForm();await loadBilleteras();toast("Billetera guardada","okb")}
-function renderBilleteras(){const q=norm(val("bi_search")),banco=val("bi_filter_banco"),pc=val("bi_filter_pc"),act=val("bi_filter_activa");let rows=billeteras.filter(b=>(!q||norm([b.id,b.pc_codigo,b.nombre_visible,b.titular,b.alias,b.cbu,b.banco,b.estado].join(" ")).includes(q))&&(!banco||b.banco===banco)&&(!pc||b.pc_codigo===pc)&&(act===""||String(!!b.activa)===act));if(!rows.length)return empty("billeterasBody",10,"No hay billeteras.");$("billeterasBody").innerHTML=rows.map(b=>`<tr><td>${safe(b.id)}</td><td>${safe(b.pc_codigo)}</td><td><strong>${safe(b.nombre_visible)}</strong></td><td>${safe(b.titular)}</td><td>${safe(b.banco)}</td><td>${safe(b.alias)}</td><td>${estadoBi(b)}</td><td>${safe(b.prioridad||0)}</td><td>${b.seleccionada_manual?pill('Manual','warn'):'<span class="muted">No</span>'}</td><td><div class="rowActions"><button class="small blue" onclick="editBilletera('${b.id}')">Editar</button><button class="small ${b.activa?'warning':'primary'}" onclick="toggleBilletera('${b.id}',${!b.activa})">${b.activa?'Pausar':'Activar'}</button><button class="small violet" onclick="setManual('${b.id}')">Manual</button><button class="small danger" onclick="deleteRow('${TABLES.billeteras}','${b.id}',loadBilleteras,'billetera')">Eliminar</button></div></td></tr>`).join("")}
+async function saveBilletera(e){
+  e.preventDefault();
+  const id=val("bi_id"),manual=bool("bi_manual");
+  const payload={
+    pc_codigo:val("bi_pc_codigo"),
+    nombre_visible:val("bi_nombre_visible"),
+    titular:val("bi_titular"),
+    alias:val("bi_alias"),
+    cbu:val("bi_cbu"),
+    banco:val("bi_banco"),
+    estado:val("bi_estado"),
+    prioridad:num("bi_prioridad"),
+    activa:bool("bi_activa"),
+    seleccionada_manual:manual,
+    orden:num("bi_orden"),
+    observaciones:val("bi_observaciones"),
+    updated_at:new Date().toISOString()
+  };
+
+  if(manual)await supabaseClient.from(TABLES.billeteras).update({seleccionada_manual:false}).neq("id",id||-1);
+
+  let res;
+  let billeteraId=id;
+
+  if(id){
+    res=await supabaseClient.from(TABLES.billeteras).update(payload).eq("id",id).select("id").single();
+  }else{
+    res=await supabaseClient.from(TABLES.billeteras).insert([payload]).select("id").single();
+  }
+
+  if(res.error)return toast("Error billetera: "+res.error.message,"err");
+  billeteraId=res.data?.id || id;
+
+  const mpOk=await guardarMpDeFormulario(billeteraId);
+  if(!mpOk)return;
+
+  resetBilleteraForm();
+  await loadBilleteras();
+  toast("Billetera guardada","okb")
+}
+
+async function guardarMpDeFormulario(billeteraId){
+  if(!billeteraId)return true;
+
+  const operadorNombre="admin";
+
+  const {error:cfgError}=await supabaseClient.rpc("admin_mp_guardar_config",{
+    p_billetera_id:Number(billeteraId),
+    p_mp_habilitado:bool("bi_mp_habilitado"),
+    p_mp_modo:val("bi_mp_modo")||"DESACTIVADO",
+    p_mp_tipo_integracion:val("bi_mp_tipo_integracion")||"NINGUNA",
+    p_mp_collector_id:val("bi_mp_collector_id")||null,
+    p_mp_user_id:val("bi_mp_user_id")||null,
+    p_mp_public_key:val("bi_mp_public_key")||null,
+    p_mp_referencia_prefijo:val("bi_mp_referencia_prefijo")||"NODO",
+    p_mp_webhook_url:val("bi_mp_webhook_url")||null,
+    p_mp_reporte_habilitado:bool("bi_mp_reporte_habilitado"),
+    p_mp_reporte_tipo:val("bi_mp_reporte_tipo")||"ACCOUNT_MONEY",
+    p_mp_match_min_score:num("bi_mp_match_min_score")||80,
+    p_mp_match_revision_score:num("bi_mp_match_revision_score")||50,
+    p_mp_auto_detectar:bool("bi_mp_auto_detectar"),
+    p_mp_auto_aprobar:bool("bi_mp_auto_aprobar"),
+    p_actualizado_por:operadorNombre
+  });
+
+  if(cfgError){
+    toast("Error config MP: "+cfgError.message,"err");
+    return false;
+  }
+
+  const haySecretos=!!(val("bi_mp_access_token")||val("bi_mp_client_id")||val("bi_mp_client_secret")||val("bi_mp_webhook_secret")||val("bi_mp_refresh_token"));
+
+  if(haySecretos){
+    const {error:secError}=await supabaseClient.rpc("admin_mp_guardar_secretos",{
+      p_billetera_id:Number(billeteraId),
+      p_modo:val("bi_mp_modo")==="PRODUCCION"?"PRODUCCION":"TEST",
+      p_access_token:val("bi_mp_access_token")||null,
+      p_client_id:val("bi_mp_client_id")||null,
+      p_client_secret:val("bi_mp_client_secret")||null,
+      p_webhook_secret:val("bi_mp_webhook_secret")||null,
+      p_refresh_token:val("bi_mp_refresh_token")||null,
+      p_actualizado_por:operadorNombre
+    });
+
+    if(secError){
+      toast("Error secretos MP: "+secError.message,"err");
+      return false;
+    }
+  }
+
+  return true;
+}
+
+async function desactivarMpBilletera(){
+  const id=val("bi_id");
+  if(!id){toast("Primero editá una billetera existente.","err");return}
+  if(!confirm("¿Desactivar Mercado Pago para esta billetera?"))return;
+  const {error}=await supabaseClient.rpc("admin_mp_desactivar",{p_billetera_id:Number(id),p_actualizado_por:"admin"});
+  if(error)return toast("Error desactivando MP: "+error.message,"err");
+  await loadBilleteras();
+  editBilletera(id);
+  toast("MP desactivado para esta billetera","okb");
+}
+
+function renderBilleteras(){const q=norm(val("bi_search")),banco=val("bi_filter_banco"),pc=val("bi_filter_pc"),act=val("bi_filter_activa");let rows=billeteras.filter(b=>(!q||norm([b.id,b.pc_codigo,b.nombre_visible,b.titular,b.alias,b.cbu,b.banco,b.estado].join(" ")).includes(q))&&(!banco||b.banco===banco)&&(!pc||b.pc_codigo===pc)&&(act===""||String(!!b.activa)===act));if(!rows.length)return empty("billeterasBody",11,"No hay billeteras.");$("billeterasBody").innerHTML=rows.map(b=>`<tr><td>${safe(b.id)}</td><td>${safe(b.pc_codigo)}</td><td><strong>${safe(b.nombre_visible)}</strong></td><td>${safe(b.titular)}</td><td>${safe(b.banco)}</td><td>${safe(b.alias)}</td><td>${estadoBi(b)}</td><td>${mpBadge(b)}</td><td>${safe(b.prioridad||0)}</td><td>${b.seleccionada_manual?pill('Manual','warn'):'<span class="muted">No</span>'}</td><td><div class="rowActions"><button class="small blue" onclick="editBilletera('${b.id}')">Editar</button><button class="small ${b.activa?'warning':'primary'}" onclick="toggleBilletera('${b.id}',${!b.activa})">${b.activa?'Pausar':'Activar'}</button><button class="small violet" onclick="setManual('${b.id}')">Manual</button><button class="small danger" onclick="deleteRow('${TABLES.billeteras}','${b.id}',loadBilleteras,'billetera')">Eliminar</button></div></td></tr>`).join("")}
 function estadoBi(b){if(!b.activa)return pill('Inactiva','off');if(norm(b.estado)==='activa')return pill('Activa','ok');if(norm(b.estado)==='caida')return pill('Caída','off');return pill(b.estado||'-','warn')}
-function editBilletera(id){const b=billeteras.find(x=>String(x.id)===String(id));if(!b)return;setVals({bi_id:b.id,bi_pc_codigo:b.pc_codigo,bi_nombre_visible:b.nombre_visible,bi_titular:b.titular,bi_alias:b.alias,bi_cbu:b.cbu,bi_banco:b.banco,bi_estado:b.estado||'activa',bi_prioridad:b.prioridad||0,bi_activa:String(!!b.activa),bi_manual:String(!!b.seleccionada_manual),bi_orden:b.orden||0,bi_observaciones:b.observaciones});$("biFormTitle").textContent="Editar billetera";showSection("billeteras");scrollTo(0,0)}
+function mpBadge(b){if(!b.mp_habilitado)return pill('MP OFF','vio');if(b.mp_estado_integracion==='CONFIGURADA')return pill((b.mp_modo||'MP')+' · OK','ok');if(b.mp_estado_integracion==='ERROR')return pill('MP ERROR','off');return pill('MP '+(b.mp_estado_integracion||'REV'),'warn')}
+function editBilletera(id){
+  const b=billeteras.find(x=>String(x.id)===String(id));
+  if(!b)return;
+  setVals({
+    bi_id:b.id,
+    bi_pc_codigo:b.pc_codigo,
+    bi_nombre_visible:b.nombre_visible,
+    bi_titular:b.titular,
+    bi_alias:b.alias,
+    bi_cbu:b.cbu,
+    bi_banco:b.banco,
+    bi_estado:b.estado||'activa',
+    bi_prioridad:b.prioridad||0,
+    bi_activa:String(!!b.activa),
+    bi_manual:String(!!b.seleccionada_manual),
+    bi_orden:b.orden||0,
+    bi_observaciones:b.observaciones,
+
+    bi_mp_habilitado:String(!!b.mp_habilitado),
+    bi_mp_modo:b.mp_modo||'DESACTIVADO',
+    bi_mp_tipo_integracion:b.mp_tipo_integracion||'NINGUNA',
+    bi_mp_collector_id:b.mp_collector_id||'',
+    bi_mp_user_id:b.mp_user_id||'',
+    bi_mp_public_key:b.mp_public_key||'',
+    bi_mp_referencia_prefijo:b.mp_referencia_prefijo||'NODO',
+    bi_mp_webhook_url:b.mp_webhook_url||'',
+    bi_mp_reporte_habilitado:String(!!b.mp_reporte_habilitado),
+    bi_mp_reporte_tipo:b.mp_reporte_tipo||'ACCOUNT_MONEY',
+    bi_mp_match_min_score:b.mp_match_min_score||80,
+    bi_mp_match_revision_score:b.mp_match_revision_score||50,
+    bi_mp_auto_detectar:String(!!b.mp_auto_detectar),
+    bi_mp_auto_aprobar:String(!!b.mp_auto_aprobar),
+
+    bi_mp_access_token:'',
+    bi_mp_client_id:'',
+    bi_mp_client_secret:'',
+    bi_mp_webhook_secret:'',
+    bi_mp_refresh_token:''
+  });
+
+  if($("bi_mp_token_status"))$("bi_mp_token_status").textContent=b.tiene_access_token?'Cargado':'No cargado';
+  if($("bi_mp_webhook_secret_status"))$("bi_mp_webhook_secret_status").textContent=b.tiene_webhook_secret?'Cargado':'No cargado';
+
+  $("biFormTitle").textContent="Editar billetera";
+  showSection("billeteras");
+  scrollTo(0,0)
+}
 async function toggleBilletera(id,activa){const {error}=await supabaseClient.from(TABLES.billeteras).update({activa,estado:activa?'activa':'inactiva',updated_at:new Date().toISOString()}).eq("id",id);if(error)return toast(error.message,"err");await loadBilleteras();toast("Billetera actualizada","okb")}
 async function setManual(id){if(!confirm("¿Dejar esta billetera como manual y quitar manual de las demás?"))return;await supabaseClient.from(TABLES.billeteras).update({seleccionada_manual:false});const {error}=await supabaseClient.from(TABLES.billeteras).update({seleccionada_manual:true,activa:true,estado:'activa'}).eq("id",id);if(error)return toast(error.message,"err");await loadBilleteras();toast("Manual actualizada","okb")}
-function resetBilleteraForm(){$("billeteraForm").reset();setVals({bi_id:"",bi_estado:"activa",bi_prioridad:0,bi_orden:0,bi_activa:"true",bi_manual:"false"});$("biFormTitle").textContent="Crear billetera"}function clearBiFilters(){setVals({bi_search:"",bi_filter_banco:"",bi_filter_pc:"",bi_filter_activa:""});renderBilleteras()}
+function resetBilleteraForm(){
+  $("billeteraForm").reset();
+  setVals({
+    bi_id:"",
+    bi_estado:"activa",
+    bi_prioridad:0,
+    bi_orden:0,
+    bi_activa:"true",
+    bi_manual:"false",
+    bi_mp_habilitado:"false",
+    bi_mp_modo:"DESACTIVADO",
+    bi_mp_tipo_integracion:"NINGUNA",
+    bi_mp_referencia_prefijo:"NODO",
+    bi_mp_reporte_habilitado:"false",
+    bi_mp_reporte_tipo:"ACCOUNT_MONEY",
+    bi_mp_match_min_score:80,
+    bi_mp_match_revision_score:50,
+    bi_mp_auto_detectar:"false",
+    bi_mp_auto_aprobar:"false",
+    bi_mp_access_token:"",
+    bi_mp_client_id:"",
+    bi_mp_client_secret:"",
+    bi_mp_webhook_secret:"",
+    bi_mp_refresh_token:""
+  });
+  if($("bi_mp_token_status"))$("bi_mp_token_status").textContent="No cargado";
+  if($("bi_mp_webhook_secret_status"))$("bi_mp_webhook_secret_status").textContent="No cargado";
+  $("biFormTitle").textContent="Crear billetera"
+}function clearBiFilters(){setVals({bi_search:"",bi_filter_banco:"",bi_filter_pc:"",bi_filter_activa:""});renderBilleteras()}
 
 async function savePc(e){e.preventDefault();const id=val("pc_id"),codigo=val("pc_codigo");const payload={codigo,nombre:val("pc_nombre")||codigo,descripcion:val("pc_descripcion"),activa:bool("pc_activa"),updated_at:new Date().toISOString()};const res=id?await supabaseClient.from(TABLES.pcs).update(payload).eq("id",id):await supabaseClient.from(TABLES.pcs).insert([payload]);if(res.error)return toast("Error PC: "+res.error.message,"err");resetPcForm();await loadPcs();toast("PC guardada","okb")}
 function renderPcs(){if(!pcs.length)return empty("pcsBody",6,"No hay PCs.");$("pcsBody").innerHTML=pcs.map(p=>`<tr><td>${safe(p.id)}</td><td><strong>${safe(p.codigo)}</strong></td><td>${safe(p.nombre)}</td><td>${safe(p.descripcion)}</td><td>${p.activa?pill('Activa','ok'):pill('Inactiva','off')}</td><td><div class="rowActions"><button class="small blue" onclick="editPc('${p.id}')">Editar</button><button class="small danger" onclick="deleteRow('${TABLES.pcs}','${p.id}',loadPcs,'PC')">Eliminar</button></div></td></tr>`).join("")}
