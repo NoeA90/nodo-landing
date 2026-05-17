@@ -76,6 +76,54 @@ table{width:100%;border-collapse:collapse}th,td{padding:11px;border-bottom:1px s
 .mobile-top{display:none;background:#151821;border-bottom:1px solid #272b36;padding:12px;align-items:center;justify-content:space-between}.mobile-menu{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1200}.mobile-menu .sidebar{display:block;width:280px;height:100%;position:absolute;left:0;top:0}
 @media(max-width:900px){body{overflow:auto}.layout{display:block;height:auto;min-height:100vh}.sidebar{display:none}.main{padding:12px}.mobile-top{display:flex}.top-grid{grid-template-columns:repeat(2,1fr);gap:10px}.stat-value{font-size:21px}th,td{font-size:11px;padding:8px}.mobile-menu.open{display:block}.chat-layout{grid-template-columns:1fr}.chat-body{max-height:420px}}
 
+
+/* === CHAT LISTA LIMPIA + COPIAR USUARIO === */
+.chat-title-main{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-width:0;
+}
+.chat-title-main .chat-user-name{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.chat-copy-user{
+  border:none;
+  border-radius:999px;
+  padding:4px 8px;
+  font-size:11px;
+  font-weight:900;
+  cursor:pointer;
+  background:#2d3443;
+  color:#fff;
+  white-space:nowrap;
+}
+.chat-copy-user:hover{background:#3d5afe}
+.chat-last-preview{
+  margin-top:5px;
+  color:#98a2b3;
+  line-height:1.25;
+  max-height:34px;
+  overflow:hidden;
+}
+.chat-last-preview.card{
+  color:#ffd98f;
+}
+.chat-head-actions{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+.chat-user-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+}
+
 .transfer-send-box{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
 .transfer-send-grid{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end}
 .transfer-send-grid select{margin:0;background:#fff;color:#111}
@@ -942,7 +990,8 @@ async function cargarChats(silencioso=false){
       TELEFONO: c.telefono || "",
       FECHA: c.created_at,
       FECHA_ULTIMO: ultimo?.created_at || c.created_at,
-      ULTIMO_MENSAJE: ultimo?.mensaje || (ultimo?.imagen_url ? "Imagen adjunta" : ""),
+      ULTIMO_MENSAJE: ultimo?.mensaje || "",
+      ULTIMA_IMAGEN: ultimo?.imagen_url || "",
       SIN_LEER: sinLeer,
       USER_COUNT: userCount,
       SOLICITUD_ID: c.solicitud_id || "",
@@ -1533,6 +1582,57 @@ async function cambiarEstadoBilletera(id,estado){
   await cargarBilleteras();
 }
 
+
+function previewMensajeChat(mensaje, imagen=""){
+  const raw = String(mensaje || "").trim();
+
+  if(parseTransferCardMessage(raw)){
+    return { texto:"📄 Tarjeta de transferencia enviada", esTarjeta:true };
+  }
+
+  if(raw){
+    const corto = raw.length > 58 ? raw.slice(0,58) + "..." : raw;
+    return { texto:corto, esTarjeta:false };
+  }
+
+  if(imagen){
+    return { texto:"🖼️ Imagen adjunta", esTarjeta:false };
+  }
+
+  return { texto:"Sin mensajes todavía", esTarjeta:false };
+}
+
+function copiarUsuarioChat(usuario, ev){
+  if(ev){
+    ev.preventDefault();
+    ev.stopPropagation();
+  }
+
+  const u = String(usuario || "").trim();
+  if(!u){
+    toast("Usuario no disponible","red");
+    return;
+  }
+
+  navigator.clipboard.writeText(u).then(()=>{
+    toast("Usuario copiado: " + u, "green");
+  }).catch(()=>{
+    const tmp = document.createElement("textarea");
+    tmp.value = u;
+    document.body.appendChild(tmp);
+    tmp.select();
+    document.execCommand("copy");
+    document.body.removeChild(tmp);
+    toast("Usuario copiado: " + u, "green");
+  });
+}
+
+function copiarUsuarioChatActual(){
+  const chat = chats.find(c=>String(c.ID_CHAT||c.chat_id)===String(chatActualId)) || {};
+  copiarUsuarioChat(chat.USUARIO || "");
+}
+
+
 function renderChatList(){
   if(!chats.length){
     setBox("chatList",`<div class="alert-box" style="margin:12px">No hay chats activos.</div>`);
@@ -1544,15 +1644,20 @@ function renderChatList(){
   chats.forEach(c=>{
     const id = c.ID_CHAT || c.chat_id || "";
     const unread=Number(c.SIN_LEER||0);
+    const usuario = c.USUARIO || "Usuario landing";
+    const preview = previewMensajeChat(c.ULTIMO_MENSAJE || "", c.ULTIMA_IMAGEN || "");
 
     html+=`<div class="chat-item ${String(id)===String(chatActualId)?"active":""}" onclick="abrirChat('${id}')">
       <div class="chat-item-title">
-        <span>${escapeHtml(c.USUARIO||"Usuario landing")}</span>
+        <span class="chat-title-main">
+          <span class="chat-user-name">${escapeHtml(usuario)}</span>
+          <button class="chat-copy-user" type="button" onclick="copiarUsuarioChat('${escapeAttr(usuario)}', event)">Copiar</button>
+        </span>
         ${unread?`<span class="chat-unread">${unread}</span>`:""}
       </div>
-      <div class="small">${escapeHtml(c.NOMBRE_COMPLETO||"")} ${c.TELEFONO ? "· "+escapeHtml(c.TELEFONO) : ""}</div>
+      <div class="small">${c.TELEFONO ? "📱 "+escapeHtml(c.TELEFONO) : ""}</div>
       <div class="small">${formatFecha(c.FECHA_ULTIMO||c.FECHA||"")}</div>
-      <div class="small">${escapeHtml(c.ULTIMO_MENSAJE||"")}</div>
+      <div class="chat-last-preview ${preview.esTarjeta?"card":""}">${escapeHtml(preview.texto)}</div>
     </div>`;
   });
 
@@ -1707,8 +1812,13 @@ function renderChatMensajes(){
   renderWalletSelectChat();
   const chat=chats.find(c=>String(c.ID_CHAT||c.chat_id)===String(chatActualId))||{};
 
-  setBox("chatTitulo",chat.USUARIO||"Chat landing");
-  setBox("chatSubtitulo",`${chat.NOMBRE_COMPLETO||""} ${chat.TELEFONO? "· "+chat.TELEFONO:""}`);
+  setBox("chatTitulo",`
+    <span class="chat-user-chip">
+      ${escapeHtml(chat.USUARIO||"Chat landing")}
+      ${chat.USUARIO ? `<button class="chat-copy-user" type="button" onclick="copiarUsuarioChatActual()">Copiar usuario</button>` : ""}
+    </span>
+  `);
+  setBox("chatSubtitulo",`${chat.TELEFONO? "📱 "+escapeHtml(chat.TELEFONO):""}`);
   setBox("chatEstado",chat.SOLICITUD_ID?`Solicitud: ${chat.SOLICITUD_ID}`:"Sin solicitud");
 
   if(!chatMensajes.length){
