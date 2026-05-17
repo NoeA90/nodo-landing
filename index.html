@@ -380,6 +380,59 @@ button:disabled{
   color:#07131f;
 }
 
+
+
+/* === TARJETA DE TRANSFERENCIA EN CHAT === */
+.transfer-chat-card{
+  background:linear-gradient(145deg,rgba(45,35,12,.96),rgba(13,30,46,.94));
+  border:1px solid rgba(212,175,55,.38);
+  border-radius:16px;
+  padding:12px;
+  min-width:230px;
+}
+.transfer-chat-title{
+  color:#f7d774;
+  font-weight:900;
+  font-size:15px;
+  margin-bottom:10px;
+}
+.transfer-chat-row{
+  background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:12px;
+  padding:9px;
+  margin-top:8px;
+}
+.transfer-chat-label{
+  color:#cbd5e1;
+  font-size:11px;
+  font-weight:900;
+  text-transform:uppercase;
+  letter-spacing:.3px;
+  margin-bottom:4px;
+}
+.transfer-chat-value{
+  color:#fff;
+  font-weight:900;
+  word-break:break-all;
+}
+.transfer-copy-btn{
+  width:100%;
+  margin:8px 0 0;
+  padding:9px 10px;
+  font-size:13px;
+  border-radius:10px;
+  background:rgba(255,255,255,.12);
+  color:#fff;
+  box-shadow:none;
+}
+.transfer-chat-note{
+  color:#f9d36b;
+  font-size:12px;
+  margin-top:10px;
+  line-height:1.35;
+}
+
 </style>
 </head>
 
@@ -753,15 +806,7 @@ function mostrarRegistroMsg(texto, ok) {
 }
 
 async function cargarBilletera() {
-  const pcsCompatibles = [PC];
-
-  if (PC.startsWith("P") && !PC.startsWith("PC")) {
-    pcsCompatibles.push("PC" + PC.replace("P", ""));
-  }
-
-  if (PC.startsWith("PC")) {
-    pcsCompatibles.push("P" + PC.replace("PC", ""));
-  }
+  const pcsCompatibles = pcCandidatos(PC);
 
   const { data, error } = await supabaseClient
     .from("billeteras")
@@ -778,14 +823,16 @@ async function cargarBilletera() {
     return;
   }
 
-  if (!data || data.length === 0) {
+  const disponibles = (data || []).filter(b => String(b.estado || "activa").toLowerCase() !== "caida");
+
+  if (!disponibles.length) {
     mostrarBilleteraNoDisponible();
     return;
   }
 
   billeteraActiva =
-    data.find(b => b.seleccionada_manual === true) ||
-    data[0];
+    disponibles.find(b => b.seleccionada_manual === true) ||
+    disponibles[0];
 
   document.getElementById("aliasBox").innerText =
     billeteraActiva.alias || "Consultar";
@@ -807,29 +854,6 @@ function mostrarBilleteraNoDisponible() {
   document.getElementById("cbuBox").innerText = "No disponible";
   document.getElementById("titularBox").innerText = "Consultar por chat";
   document.getElementById("bancoBox").innerText = "Consultar";
-}
-  const disponibles = (data || []).filter(b => String(b.estado || "activa").toLowerCase() !== "caida");
-
-  if (!disponibles.length) {
-    document.getElementById("cvuBox").innerText = "No disponible";
-    document.getElementById("titularBox").innerText = "Consultar por chat";
-    document.getElementById("bancoBox").innerText = "Consultar";
-    billeteraActiva = null;
-    return;
-  }
-
-  billeteraActiva =
-    disponibles.find(b => b.seleccionada_manual === true) ||
-    disponibles[0];
-
-  document.getElementById("cvuBox").innerText =
-    billeteraActiva.alias || billeteraActiva.cbu || "Consultar";
-
-  document.getElementById("titularBox").innerText =
-    billeteraActiva.titular || billeteraActiva.nombre_visible || "Consultar";
-
-  document.getElementById("bancoBox").innerText =
-    billeteraActiva.banco || "Billetera";
 }
 
 function copiarTextoDato(id, nombreDato) {
@@ -1274,7 +1298,88 @@ function normalizarImagenUrl(url){
   return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w1000` : u;
 }
 
-function renderChatLite(mensajes){const box=document.getElementById("chatLiteBody");let html=`<div class="chat-day">Chat de soporte</div>`;if(!mensajes.length){html+=`<div class="chat-msg operator"><div class="chat-bubble">Hola 👋 Escribinos tu consulta o adjuntá el comprobante si necesitás ayuda con la carga.</div><div class="chat-meta">Soporte</div></div>`}mensajes.forEach(m=>{const tipo=String(m.TIPO_EMISOR||"").toUpperCase();const esUsuario=tipo==="USUARIO";const cls=esUsuario?"user":"operator";const hora=formatearHoraChat(m.FECHA);const leido=String(m.LEIDO||"").toUpperCase()==="SI";html+=`<div class="chat-msg ${cls}"><div class="chat-bubble">${escapeHtml(m.MENSAJE||"")}${m.IMAGEN_URL?`<img src="${normalizarImagenUrl(m.IMAGEN_URL)}" alt="Imagen adjunta">`:""}</div><div class="chat-meta">${esUsuario?estadoMensajeChat(leido):"Soporte"} · ${hora}</div></div>`});box.innerHTML=html;box.scrollTop=box.scrollHeight}
+
+const TRANSFER_CARD_PREFIX = "::TRANSFER_CARD::";
+
+function parseTransferCardMessage(text){
+  const raw = String(text || "").trim();
+  if(!raw.startsWith(TRANSFER_CARD_PREFIX)) return null;
+  try{
+    return JSON.parse(raw.slice(TRANSFER_CARD_PREFIX.length));
+  }catch(e){
+    console.warn("Tarjeta de transferencia inválida", e);
+    return null;
+  }
+}
+
+function copiarDatoChat(valor, nombreDato){
+  const texto = String(valor || "").trim();
+  if(!texto || texto === "Consultar" || texto === "No disponible"){
+    alert((nombreDato || "Dato") + " no disponible.");
+    return;
+  }
+  navigator.clipboard.writeText(texto);
+  const old = document.getElementById("resultado");
+  if(old) mostrarResultado((nombreDato || "Dato") + " copiado correctamente.", true);
+}
+
+function renderTransferCardChat(card){
+  const alias = card.alias || "Consultar";
+  const cbu = card.cbu || "Consultar";
+  const titular = card.titular || card.nombre_visible || "Consultar";
+  const banco = card.banco || "Billetera";
+  const nombre = card.nombre_visible || "Datos para transferir";
+
+  return `
+    <div class="transfer-chat-card">
+      <div class="transfer-chat-title">💳 ${escapeHtml(nombre)}</div>
+      <div class="transfer-chat-row">
+        <div class="transfer-chat-label">Alias</div>
+        <div class="transfer-chat-value">${escapeHtml(alias)}</div>
+        <button class="transfer-copy-btn" type="button" onclick="copiarDatoChat('${escapeAttr(alias)}','Alias')">Copiar alias</button>
+      </div>
+      <div class="transfer-chat-row">
+        <div class="transfer-chat-label">CBU / CVU</div>
+        <div class="transfer-chat-value">${escapeHtml(cbu)}</div>
+        <button class="transfer-copy-btn" type="button" onclick="copiarDatoChat('${escapeAttr(cbu)}','CBU / CVU')">Copiar CBU/CVU</button>
+      </div>
+      <div class="transfer-chat-row">
+        <div class="transfer-chat-label">Titular</div>
+        <div class="transfer-chat-value">${escapeHtml(titular)}</div>
+      </div>
+      <div class="line" style="font-size:13px;margin-top:10px"><b>Banco:</b> ${escapeHtml(banco)}</div>
+      <div class="transfer-chat-note">Transferí y luego enviá la solicitud o el comprobante por este chat.</div>
+    </div>`;
+}
+
+function escapeAttr(text){
+  return String(text || "").replaceAll("&","&amp;").replaceAll("'","&#039;").replaceAll('"',"&quot;").replaceAll("<","&lt;").replaceAll(">","&gt;");
+}
+
+function renderChatLite(mensajes){
+  const box=document.getElementById("chatLiteBody");
+  let html=`<div class="chat-day">Chat de soporte</div>`;
+
+  if(!mensajes.length){
+    html+=`<div class="chat-msg operator"><div class="chat-bubble">Hola 👋 Escribinos tu consulta o adjuntá el comprobante si necesitás ayuda con la carga.</div><div class="chat-meta">Soporte</div></div>`;
+  }
+
+  mensajes.forEach(m=>{
+    const tipo=String(m.TIPO_EMISOR||"").toUpperCase();
+    const esUsuario=tipo==="USUARIO";
+    const cls=esUsuario?"user":"operator";
+    const hora=formatearHoraChat(m.FECHA);
+    const leido=String(m.LEIDO||"").toUpperCase()==="SI";
+    const mensaje = m.MENSAJE || "";
+    const card = parseTransferCardMessage(mensaje);
+
+    html+=`<div class="chat-msg ${cls}"><div class="chat-bubble">${card ? renderTransferCardChat(card) : escapeHtml(mensaje)}${m.IMAGEN_URL?`<img src="${normalizarImagenUrl(m.IMAGEN_URL)}" alt="Imagen adjunta">`:""}</div><div class="chat-meta">${esUsuario?estadoMensajeChat(leido):"Soporte"} · ${hora}</div></div>`;
+  });
+
+  box.innerHTML=html;
+  box.scrollTop=box.scrollHeight;
+}
+
 function estadoMensajeChat(leido){return leido?"✓✓ recibido":"✓ enviado"}
 function formatFecha(fechaRaw){
 
