@@ -75,6 +75,12 @@ table{width:100%;border-collapse:collapse}th,td{padding:11px;border-bottom:1px s
 .toast{position:fixed;top:20px;right:20px;background:var(--blue);color:#fff;padding:14px 18px;border-radius:14px;z-index:99999;font-weight:bold;box-shadow:0 10px 30px rgba(0,0,0,.35)}
 .mobile-top{display:none;background:#151821;border-bottom:1px solid #272b36;padding:12px;align-items:center;justify-content:space-between}.mobile-menu{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1200}.mobile-menu .sidebar{display:block;width:280px;height:100%;position:absolute;left:0;top:0}
 @media(max-width:900px){body{overflow:auto}.layout{display:block;height:auto;min-height:100vh}.sidebar{display:none}.main{padding:12px}.mobile-top{display:flex}.top-grid{grid-template-columns:repeat(2,1fr);gap:10px}.stat-value{font-size:21px}th,td{font-size:11px;padding:8px}.mobile-menu.open{display:block}.chat-layout{grid-template-columns:1fr}.chat-body{max-height:420px}}
+
+.transfer-send-box{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
+.transfer-send-grid{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end}
+.transfer-send-grid select{margin:0;background:#fff;color:#111}
+.transfer-chat-card{background:linear-gradient(145deg,rgba(45,35,12,.96),rgba(13,30,46,.94));border:1px solid rgba(253,176,34,.42);border-radius:14px;padding:12px;min-width:230px}.transfer-chat-title{color:#ffd98f;font-weight:900;margin-bottom:10px}.transfer-chat-row{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:8px;margin-top:8px}.transfer-chat-label{font-size:11px;color:#cbd5e1;text-transform:uppercase;font-weight:900;margin-bottom:4px}.transfer-chat-value{font-weight:900;color:#fff;word-break:break-all}.transfer-chat-note{color:#ffd98f;font-size:12px;margin-top:10px;line-height:1.35}
+
 </style>
 </head>
 
@@ -217,6 +223,14 @@ table{width:100%;border-collapse:collapse}th,td{padding:11px;border-bottom:1px s
                 <textarea id="chatInput" rows="1" placeholder="Responder..."></textarea>
                 <button class="mini-btn blue" onclick="enviarChat()">➤</button>
               </div>
+              <div class="transfer-send-box">
+                <label class="small" style="display:block;margin-bottom:6px">Enviar datos de transferencia por chat</label>
+                <div class="transfer-send-grid">
+                  <select id="chatWalletSelect"></select>
+                  <button class="mini-btn yellow" onclick="enviarTarjetaTransferencia()">Enviar tarjeta</button>
+                </div>
+                <div class="small" style="margin-top:6px">Toma todas las billeteras del sistema, incluso si no están activas en landing.</div>
+              </div>
               <input id="chatFile" type="file" accept="image/*" style="display:none" onchange="tomarImagenChatFile()">
               <div class="small" style="text-align:center;margin-top:8px">Ctrl + V admite texto e imagen del portapapeles.</div>
             </div>
@@ -258,7 +272,7 @@ const SUPABASE_KEY = "sb_publishable_NYqRoKptTgcL90VAVF2kqA_Gl06mEUF";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let operador=null, pcOperativa=null;
-let solicitudes=[], billeteras=[], chats=[], chatMensajes=[];
+let solicitudes=[], billeteras=[], billeterasTodas=[], chats=[], chatMensajes=[];
 let timersIniciados=false;
 let lastPendientesIds=new Set(), lastChatUnread=0;
 let chatActualId="", chatImagenBase64="", chatImagenNombre="";
@@ -735,7 +749,7 @@ async function cargarBilleteras(render=true){
   const { data, error } = await supabaseClient
     .from("billeteras")
     .select("*")
-    .eq("pc_codigo", pcOperativa)
+    .order("pc_codigo", { ascending:true })
     .order("prioridad", { ascending:false })
     .order("orden", { ascending:true });
 
@@ -745,8 +759,11 @@ async function cargarBilleteras(render=true){
     return;
   }
 
-  billeteras = (data || []).map(mapBilleteraSupabase);
+  billeterasTodas = (data || []).map(mapBilleteraSupabase);
+  billeteras = billeterasTodas.filter(b => String(b.PC || "") === String(pcOperativa || ""));
+
   if(render)renderBilleteras();
+  renderWalletSelectChat();
   renderInicio();
 }
 async function cargarChats(silencioso=false){
@@ -1118,6 +1135,91 @@ async function abrirChat(id){
   renderChatList();
   renderChatMensajes();
 }
+
+const TRANSFER_CARD_PREFIX = "::TRANSFER_CARD::";
+
+function buildTransferCardMessageFromWallet(b){
+  const payload = {
+    id: b.ID_BILLETERA || "",
+    pc_codigo: b.PC || "",
+    nombre_visible: b.NOMBRE_VISIBLE || b.BILLETERA_NOMBRE || "Billetera",
+    titular: b.TITULAR || "",
+    alias: b.ALIAS || "",
+    cbu: b.CVU_CBU || "",
+    banco: b.TIPO || "",
+    observaciones: b.OBSERVACIONES || ""
+  };
+  return TRANSFER_CARD_PREFIX + JSON.stringify(payload);
+}
+
+function parseTransferCardMessage(text){
+  const raw = String(text || "").trim();
+  if(!raw.startsWith(TRANSFER_CARD_PREFIX)) return null;
+  try{return JSON.parse(raw.slice(TRANSFER_CARD_PREFIX.length));}
+  catch(e){console.warn("Tarjeta inválida", e);return null;}
+}
+
+function renderTransferCardChat(card){
+  return `<div class="transfer-chat-card">
+    <div class="transfer-chat-title">💳 ${escapeHtml(card.nombre_visible || "Datos para transferir")}</div>
+    <div class="transfer-chat-row"><div class="transfer-chat-label">Alias</div><div class="transfer-chat-value">${escapeHtml(card.alias || "Consultar")}</div></div>
+    <div class="transfer-chat-row"><div class="transfer-chat-label">CBU / CVU</div><div class="transfer-chat-value">${escapeHtml(card.cbu || "Consultar")}</div></div>
+    <div class="transfer-chat-row"><div class="transfer-chat-label">Titular</div><div class="transfer-chat-value">${escapeHtml(card.titular || "Consultar")}</div></div>
+    <div style="margin-top:10px;font-size:13px"><b>Banco:</b> ${escapeHtml(card.banco || "Billetera")} ${card.pc_codigo ? `· <b>PC:</b> ${escapeHtml(card.pc_codigo)}` : ""}</div>
+    <div class="transfer-chat-note">El usuario recibe esta tarjeta con botones para copiar alias y CBU/CVU.</div>
+  </div>`;
+}
+
+function renderWalletSelectChat(){
+  const sel = document.getElementById("chatWalletSelect");
+  if(!sel) return;
+  const all = billeterasTodas && billeterasTodas.length ? billeterasTodas : billeteras;
+  if(!all.length){
+    sel.innerHTML = '<option value="">No hay billeteras cargadas</option>';
+    return;
+  }
+  sel.innerHTML = '<option value="">Elegir billetera...</option>' + all.map(b=>{
+    const nombre = `${b.PC || "SIN PC"} · ${b.NOMBRE_VISIBLE || b.BILLETERA_NOMBRE || b.ID_BILLETERA} · ${b.TIPO || ""}${normalizar(b.ACTIVA)==="SI" ? "" : " · pausada"}`;
+    return `<option value="${escapeAttr(b.ID_BILLETERA)}">${escapeHtml(nombre)}</option>`;
+  }).join("");
+}
+
+function escapeAttr(text){
+  return String(text || "").replaceAll("&","&amp;").replaceAll("'","&#039;").replaceAll('"',"&quot;").replaceAll("<","&lt;").replaceAll(">","&gt;");
+}
+
+async function enviarTarjetaTransferencia(){
+  if(!chatActualId){alert("Seleccioná un chat primero.");return;}
+  const id = document.getElementById("chatWalletSelect")?.value || "";
+  if(!id){alert("Elegí una billetera para enviar.");return;}
+  const b = (billeterasTodas.length ? billeterasTodas : billeteras).find(x => String(x.ID_BILLETERA) === String(id));
+  if(!b){alert("No se encontró la billetera seleccionada.");return;}
+
+  const mensaje = buildTransferCardMessageFromWallet(b);
+  agregarMensajeLocalPanel(mensaje, "");
+
+  const { error } = await supabaseClient
+    .from("chat_mensajes")
+    .insert({
+      chat_id: chatActualId,
+      tipo_emisor: "OPERADOR",
+      emisor: operador.nombre || operador.usuario || "Operador",
+      mensaje,
+      imagen_url: ""
+    });
+
+  if(error){
+    console.error("Error enviando tarjeta transferencia:", error);
+    alert("No se pudo enviar la tarjeta.");
+    return;
+  }
+
+  marcarUltimoMensajePanelEnviado();
+  toast("Tarjeta de transferencia enviada", "green");
+  setTimeout(()=>cargarChatActual(),400);
+  setTimeout(()=>cargarChats(true),700);
+}
+
 async function cargarChatActual(){
 
   if(!chatActualId) return;
@@ -1148,6 +1250,7 @@ function normalizarImagenUrl(url){
 }
 
 function renderChatMensajes(){
+  renderWalletSelectChat();
   const chat=chats.find(c=>String(c.ID_CHAT||c.chat_id)===String(chatActualId))||{};
 
   setBox("chatTitulo",chat.USUARIO||"Chat landing");
@@ -1167,10 +1270,11 @@ function renderChatMensajes(){
     const mensaje = m.mensaje || m.MENSAJE || "";
     const imagen = m.imagen_url || m.IMAGEN_URL || "";
     const fecha = m.created_at || m.FECHA || "";
+    const card = parseTransferCardMessage(mensaje);
 
     html+=`<div class="chat-msg ${esUser?"user":"op"}">
       <div class="chat-bubble">
-        ${escapeHtml(mensaje)}
+        ${card ? renderTransferCardChat(card) : escapeHtml(mensaje)}
         ${imagen?`<img src="${normalizarImagenUrl(imagen)}" alt="Imagen">`:""}
       </div>
       <div class="chat-meta">${esUser?"Usuario":"Operador"} · ${formatFecha(fecha)}</div>
@@ -1220,10 +1324,11 @@ async function enviarChat(){
 
 function agregarMensajeLocalPanel(mensaje, imagen){
   const box = document.getElementById("chatBody");
+  const card = parseTransferCardMessage(mensaje || "");
   box.insertAdjacentHTML("beforeend", `
     <div class="chat-msg op">
       <div class="chat-bubble">
-        ${escapeHtml(mensaje || "")}
+        ${card ? renderTransferCardChat(card) : escapeHtml(mensaje || "")}
         ${imagen ? `<img src="${imagen}" alt="Imagen">` : ""}
       </div>
       <div class="chat-meta">Operador · enviando...</div>
