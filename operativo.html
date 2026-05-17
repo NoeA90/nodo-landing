@@ -173,7 +173,7 @@ table{width:100%;border-collapse:collapse}th,td{padding:11px;border-bottom:1px s
   <div class="login-card">
     <img src="logo-nodo.png" class="logo" alt="NODO">
     <h2 style="margin-bottom:6px">PANEL OPERATIVO LITE</h2>
-    <div class="small" style="margin-bottom:16px">Versión V3 · Login Supabase directo</div>
+    <div class="small" style="margin-bottom:16px">Versión V7 · Login seguro por sesión</div>
     <label>Usuario</label>
     <input id="loginUsuario" autocomplete="username">
     <label>Clave</label>
@@ -547,7 +547,7 @@ function mapSolicitudSupabase(s){
   };
 }
 
-async async function cargarSolicitudesSupabase(){
+async function cargarSolicitudesSupabase(){
   try{
     const { data, error } = await supabaseClient.rpc("panel_operativo_get_solicitudes", {
       p_session_token: requireSessionToken(),
