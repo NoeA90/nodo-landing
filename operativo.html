@@ -137,6 +137,29 @@ table{width:100%;border-collapse:collapse}th,td{padding:11px;border-bottom:1px s
 .verify-copy{
   margin-top:8px;
   width:auto;
+  padding:7px 10px;
+  border-radius:9px;
+  background:#2d3443;
+  color:#fff;
+  font-size:12px;
+}
+.copy-inline{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:8px;
+  align-items:center;
+}
+.copy-inline input{
+  margin:0;
+}
+.copy-mini{
+  width:auto;
+  white-space:nowrap;
+  padding:10px 12px;
+  margin:0;
+  border-radius:10px;
+  background:#2d3443;
+  color:#fff;
 }
 @media(max-width:620px){
   .verify-grid{grid-template-columns:1fr}
@@ -450,6 +473,11 @@ function mapSolicitudSupabase(s){
     USUARIO_JUGADOR: s.usuario,
     NOMBRE_COMPLETO: s.nombre_completo,
     TELEFONO: s.telefono,
+    DNI: s.dni || "",
+    DNI_NORMALIZADO: s.dni_normalizado || "",
+    REFERENCIA_PAGO: s.referencia_pago_visible || s.referencia_pago || "",
+    USUARIO_VALIDADO_AGENTES: !!s.usuario_validado_agentes,
+    VALIDACION_USUARIO_ID: s.validacion_usuario_id || "",
     PC: s.pc_codigo,
     MONTO_DECLARADO: s.monto,
     MONTO_REAL: s.monto,
@@ -460,6 +488,10 @@ function mapSolicitudSupabase(s){
     ACCION_WORKER: s.accion_worker || "",
     RETIRO_ALIAS_CBU: s.retiro_alias_cbu || "",
     RETIRO_TITULAR: s.retiro_titular || "",
+    CUENTA_RETIRO_ID: s.cuenta_retiro_id || "",
+    RETIRO_CUENTA_ESTADO: s.retiro_cuenta_estado || "",
+    RETIRO_REQUIERE_REVISION: !!s.retiro_requiere_revision,
+    ANTIFRAUDE_ESTADO: s.antifraude_estado || "",
     APROBADA_POR: s.aprobada_por || "",
     APROBADA_AT: s.aprobada_at || "",
     BILLETERA_NOMBRE: s.billetera_nombre || "",
@@ -1215,12 +1247,34 @@ function buscarBilleteraDeSolicitud(s){
   return null;
 }
 
-function verifyRow(label, value, extraClass=""){
+
+function copiarTextoOperativo(texto, nombre="Dato"){
+  const valor = String(texto || "").trim();
+  if(!valor || valor === "-"){
+    toast(nombre + " no disponible", "red");
+    return;
+  }
+  navigator.clipboard.writeText(valor).then(()=>{
+    toast(nombre + " copiado", "green");
+  }).catch(()=>{
+    const tmp = document.createElement("textarea");
+    tmp.value = valor;
+    document.body.appendChild(tmp);
+    tmp.select();
+    document.execCommand("copy");
+    document.body.removeChild(tmp);
+    toast(nombre + " copiado", "green");
+  });
+}
+
+function verifyRow(label, value, extraClass="", copiar=false){
   const v = value === null || value === undefined || String(value).trim() === "" ? "-" : value;
+  const btn = copiar ? `<button class="verify-copy" type="button" onclick="copiarTextoOperativo('${escapeAttr(v)}','${escapeAttr(label)}')">Copiar</button>` : "";
   return `
     <div class="verify-row">
       <div class="verify-label">${escapeHtml(label)}</div>
       <div class="verify-value ${extraClass}">${escapeHtml(v)}</div>
+      ${btn}
     </div>
   `;
 }
@@ -1233,8 +1287,11 @@ function renderDatosSolicitudModal(s){
         ${verifyRow("Usuario", s.USUARIO || s.USUARIO_JUGADOR || "-")}
         ${verifyRow("Nombre completo", s.NOMBRE_COMPLETO || "-")}
         ${verifyRow("WhatsApp", s.TELEFONO || "-")}
+        ${verifyRow("DNI", s.DNI_NORMALIZADO || s.DNI || "-")}
         ${verifyRow("Tipo", normalizar(s.TIPO_SOLICITUD || s.TIPO))}
         ${verifyRow("Monto solicitado", money(s.MONTO_DECLARADO || s.MONTO_REAL || 0), "big")}
+        ${verifyRow("Referencia pago", s.REFERENCIA_PAGO || "-")}
+        ${verifyRow("Validación Agentes", s.USUARIO_VALIDADO_AGENTES ? "Usuario validado ✅" : "Sin validación")}
         ${verifyRow("Fecha", formatFecha(s.FECHA_CREACION || s.FECHA))}
       </div>
     </div>
@@ -1280,9 +1337,12 @@ function renderDestinoRetiroModal(s){
     <div class="verify-box">
       <div class="verify-title">🏦 Destino del retiro</div>
       <div class="verify-grid">
-        ${verifyRow("Alias / CBU / CVU destino", s.RETIRO_ALIAS_CBU || "-")}
-        ${verifyRow("Titular destino", s.RETIRO_TITULAR || "-")}
+        ${verifyRow("Alias / CBU / CVU destino", s.RETIRO_ALIAS_CBU || "-", "", true)}
+        ${verifyRow("Titular destino", s.RETIRO_TITULAR || "-", "", true)}
         ${verifyRow("Monto solicitado", money(s.MONTO_DECLARADO || s.MONTO_REAL || 0), "big")}
+        ${verifyRow("Cuenta retiro", s.RETIRO_CUENTA_ESTADO || "-")}
+        ${verifyRow("Requiere revisión", s.RETIRO_REQUIERE_REVISION ? "Sí" : "No")}
+        ${verifyRow("Antifraude", s.ANTIFRAUDE_ESTADO || "-")}
         ${verifyRow("Usuario", s.USUARIO || s.USUARIO_JUGADOR || "-")}
       </div>
     </div>
@@ -1354,6 +1414,70 @@ function abrirAprobarSolicitud(id){
   },"Enviar al worker");
 }
 
+
+function cuentaRetiroAccionesHtml(s){
+  if(!s.CUENTA_RETIRO_ID) return "";
+  const estado = String(s.RETIRO_CUENTA_ESTADO || "").toUpperCase();
+  const puedeVerificar = estado !== "VERIFICADA" && estado !== "BLOQUEADA";
+  const puedeBloquear = estado !== "BLOQUEADA";
+
+  return `
+    <div class="verify-box warn">
+      <div class="verify-title">🛡️ Control cuenta de retiro</div>
+      <div class="alert-box">
+        Estado actual: <b>${escapeHtml(s.RETIRO_CUENTA_ESTADO || "Sin estado")}</b><br>
+        Si los datos coinciden con el criterio operativo, podés marcar esta cuenta como verificada.
+      </div>
+      <div class="row-actions">
+        ${puedeVerificar ? `<button class="mini-btn green" type="button" onclick="verificarCuentaRetiro('${s.CUENTA_RETIRO_ID}')">Verificar cuenta</button>` : ""}
+        ${puedeBloquear ? `<button class="mini-btn red" type="button" onclick="bloquearCuentaRetiro('${s.CUENTA_RETIRO_ID}')">Bloquear cuenta</button>` : ""}
+      </div>
+    </div>
+  `;
+}
+
+async function verificarCuentaRetiro(cuentaId){
+  if(!confirm("¿Marcar esta cuenta de retiro como VERIFICADA?")) return;
+  const operadorNombre = operador?.usuario || operador?.nombre || "";
+
+  const { data, error } = await supabaseClient.rpc("panel_retiro_verificar_cuenta", {
+    p_cuenta_id: Number(cuentaId),
+    p_operador: operadorNombre
+  });
+
+  if(error){
+    alert(error.message || "No se pudo verificar la cuenta.");
+    return;
+  }
+
+  toast("Cuenta de retiro verificada", "green");
+  cerrarModal();
+  await refrescarTodo(false);
+}
+
+async function bloquearCuentaRetiro(cuentaId){
+  const motivo = prompt("Motivo del bloqueo:", "Datos no coinciden / requiere revisión");
+  if(motivo === null) return;
+
+  const operadorNombre = operador?.usuario || operador?.nombre || "";
+
+  const { data, error } = await supabaseClient.rpc("panel_retiro_bloquear_cuenta", {
+    p_cuenta_id: Number(cuentaId),
+    p_motivo: motivo,
+    p_operador: operadorNombre
+  });
+
+  if(error){
+    alert(error.message || "No se pudo bloquear la cuenta.");
+    return;
+  }
+
+  toast("Cuenta de retiro bloqueada", "red");
+  cerrarModal();
+  await refrescarTodo(false);
+}
+
+
 function abrirCerrarRetiro(id){
   const s = solicitudes.find(x=>String(x.ID||x.SOLICITUD_ID)===String(id));
 
@@ -1362,6 +1486,7 @@ function abrirCerrarRetiro(id){
   abrirModal("Aprobar retiro",`
     ${renderDatosSolicitudModal(s)}
     ${renderDestinoRetiroModal(s)}
+    ${cuentaRetiroAccionesHtml(s)}
 
     <div class="alert-box">
       <b>Datos de cuenta para pagar el retiro</b><br>
@@ -1369,10 +1494,16 @@ function abrirCerrarRetiro(id){
     </div>
 
     <label>CBU / CVU / Alias de destino</label>
-    <input id="retDestino" value="${escapeHtml(s.RETIRO_ALIAS_CBU||"")}" placeholder="Alias o CBU/CVU">
+    <div class="copy-inline">
+      <input id="retDestino" value="${escapeHtml(s.RETIRO_ALIAS_CBU||"")}" placeholder="Alias o CBU/CVU">
+      <button class="copy-mini" type="button" onclick="copiarTextoOperativo(document.getElementById('retDestino').value,'Alias/CBU destino')">Copiar</button>
+    </div>
 
     <label>Titular de la cuenta</label>
-    <input id="retTitular" value="${escapeHtml(s.RETIRO_TITULAR||"")}" placeholder="Nombre y apellido del titular">
+    <div class="copy-inline">
+      <input id="retTitular" value="${escapeHtml(s.RETIRO_TITULAR||"")}" placeholder="Nombre y apellido del titular">
+      <button class="copy-mini" type="button" onclick="copiarTextoOperativo(document.getElementById('retTitular').value,'Titular destino')">Copiar</button>
+    </div>
 
     <label>Monto final</label>
     <input id="retMonto" type="number" value="${s.MONTO_REAL||s.MONTO_DECLARADO||""}">
@@ -1386,6 +1517,11 @@ function abrirCerrarRetiro(id){
   `,async()=>{
 
     const operadorNombre = operador?.usuario || operador?.nombre || "";
+
+    if(String(s.RETIRO_CUENTA_ESTADO || "").toUpperCase() === "BLOQUEADA"){
+      alert("La cuenta de retiro está BLOQUEADA. No se puede aprobar este retiro.");
+      return;
+    }
 
     if(!val("retDestino")){
       alert("Falta CBU/CVU o alias de destino del retiro.");
