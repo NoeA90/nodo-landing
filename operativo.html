@@ -81,6 +81,67 @@ table{width:100%;border-collapse:collapse}th,td{padding:11px;border-bottom:1px s
 .transfer-send-grid select{margin:0;background:#fff;color:#111}
 .transfer-chat-card{background:linear-gradient(145deg,rgba(45,35,12,.96),rgba(13,30,46,.94));border:1px solid rgba(253,176,34,.42);border-radius:14px;padding:12px;min-width:230px}.transfer-chat-title{color:#ffd98f;font-weight:900;margin-bottom:10px}.transfer-chat-row{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:8px;margin-top:8px}.transfer-chat-label{font-size:11px;color:#cbd5e1;text-transform:uppercase;font-weight:900;margin-bottom:4px}.transfer-chat-value{font-weight:900;color:#fff;word-break:break-all}.transfer-chat-note{color:#ffd98f;font-size:12px;margin-top:10px;line-height:1.35}
 
+
+/* === MODAL DE VERIFICACIÓN DE SOLICITUD === */
+.verify-box{
+  border:1px solid #30384a;
+  background:#111827;
+  border-radius:16px;
+  padding:14px;
+  margin-bottom:14px;
+}
+.verify-box.good{
+  border-color:rgba(18,183,106,.45);
+  background:rgba(18,183,106,.09);
+}
+.verify-box.warn{
+  border-color:rgba(253,176,34,.45);
+  background:rgba(253,176,34,.09);
+}
+.verify-title{
+  font-size:15px;
+  font-weight:900;
+  margin-bottom:10px;
+  color:#fff;
+}
+.verify-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+.verify-row{
+  background:rgba(255,255,255,.055);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:12px;
+  padding:10px;
+  min-height:58px;
+}
+.verify-label{
+  font-size:11px;
+  color:#98a2b3;
+  font-weight:900;
+  text-transform:uppercase;
+  letter-spacing:.25px;
+  margin-bottom:5px;
+}
+.verify-value{
+  font-size:15px;
+  color:#fff;
+  font-weight:800;
+  word-break:break-word;
+}
+.verify-value.big{
+  font-size:20px;
+  color:#b9f7cb;
+}
+.verify-copy{
+  margin-top:8px;
+  width:auto;
+}
+@media(max-width:620px){
+  .verify-grid{grid-template-columns:1fr}
+}
+
 </style>
 </head>
 
@@ -1133,21 +1194,122 @@ async function tomarSolicitud(id){
   toast("Solicitud tomada","green");
   await refrescarTodo(false);
 }
+
+function buscarBilleteraDeSolicitud(s){
+  const id = String(s.ID_BILLETERA || s.billetera_id || "").trim();
+  const nombre = normalizar(s.BILLETERA_NOMBRE || s.NOMBRE_BILLETERA || "");
+  const lista = (billeterasTodas && billeterasTodas.length) ? billeterasTodas : billeteras;
+
+  if(id){
+    const byId = lista.find(b => String(b.ID_BILLETERA || "").trim() === id);
+    if(byId) return byId;
+  }
+
+  if(nombre){
+    const byName = lista.find(b =>
+      normalizar(b.NOMBRE_VISIBLE || b.BILLETERA_NOMBRE || "") === nombre
+    );
+    if(byName) return byName;
+  }
+
+  return null;
+}
+
+function verifyRow(label, value, extraClass=""){
+  const v = value === null || value === undefined || String(value).trim() === "" ? "-" : value;
+  return `
+    <div class="verify-row">
+      <div class="verify-label">${escapeHtml(label)}</div>
+      <div class="verify-value ${extraClass}">${escapeHtml(v)}</div>
+    </div>
+  `;
+}
+
+function renderDatosSolicitudModal(s){
+  return `
+    <div class="verify-box good">
+      <div class="verify-title">✅ Datos de la solicitud</div>
+      <div class="verify-grid">
+        ${verifyRow("Usuario", s.USUARIO || s.USUARIO_JUGADOR || "-")}
+        ${verifyRow("Nombre completo", s.NOMBRE_COMPLETO || "-")}
+        ${verifyRow("WhatsApp", s.TELEFONO || "-")}
+        ${verifyRow("Tipo", normalizar(s.TIPO_SOLICITUD || s.TIPO))}
+        ${verifyRow("Monto solicitado", money(s.MONTO_DECLARADO || s.MONTO_REAL || 0), "big")}
+        ${verifyRow("Fecha", formatFecha(s.FECHA_CREACION || s.FECHA))}
+      </div>
+    </div>
+  `;
+}
+
+function renderBilleteraVerificacionModal(s){
+  const b = buscarBilleteraDeSolicitud(s);
+  const nombreLanding = s.BILLETERA_NOMBRE || s.NOMBRE_BILLETERA || s.ID_BILLETERA || "-";
+
+  if(!b){
+    return `
+      <div class="verify-box warn">
+        <div class="verify-title">💳 Billetera indicada por la landing</div>
+        <div class="alert-box">
+          No pude cruzar esta solicitud con una billetera cargada en el panel. Verificá manualmente el nombre mostrado.
+        </div>
+        <div class="verify-grid">
+          ${verifyRow("Billetera", nombreLanding)}
+          ${verifyRow("ID billetera", s.ID_BILLETERA || "-")}
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="verify-box">
+      <div class="verify-title">💳 Billetera a verificar</div>
+      <div class="verify-grid">
+        ${verifyRow("Nombre visible", b.NOMBRE_VISIBLE || b.BILLETERA_NOMBRE || nombreLanding)}
+        ${verifyRow("Titular", b.TITULAR || "-")}
+        ${verifyRow("Alias", b.ALIAS || "-")}
+        ${verifyRow("CBU / CVU", b.CVU_CBU || "-")}
+        ${verifyRow("Banco / Tipo", b.TIPO || "-")}
+        ${verifyRow("Estado", `${b.ACTIVA || "-"} · ${b.ESTADO || "-"}`)}
+      </div>
+    </div>
+  `;
+}
+
+function renderDestinoRetiroModal(s){
+  return `
+    <div class="verify-box">
+      <div class="verify-title">🏦 Destino del retiro</div>
+      <div class="verify-grid">
+        ${verifyRow("Alias / CBU / CVU destino", s.RETIRO_ALIAS_CBU || "-")}
+        ${verifyRow("Titular destino", s.RETIRO_TITULAR || "-")}
+        ${verifyRow("Monto solicitado", money(s.MONTO_DECLARADO || s.MONTO_REAL || 0), "big")}
+        ${verifyRow("Usuario", s.USUARIO || s.USUARIO_JUGADOR || "-")}
+      </div>
+    </div>
+  `;
+}
+
+
 function abrirAprobarSolicitud(id){
   const s = solicitudes.find(x=>String(x.ID||x.SOLICITUD_ID)===String(id));
 
   if(!s) return;
 
   abrirModal("Aprobar carga",`
-    <div class="ok-box">
-      <b>${s.USUARIO||""}</b> · ${money(s.MONTO_DECLARADO||s.MONTO_REAL||0)}
+    ${renderDatosSolicitudModal(s)}
+    ${renderBilleteraVerificacionModal(s)}
+
+    <div class="alert-box">
+      <b>Verificación manual:</b><br>
+      Buscá el movimiento recibido en la billetera usando titular, alias/CBU y monto solicitado. 
+      Si el importe real coincide, confirmá el monto y enviá al worker.
     </div>
 
-    <label>Monto real</label>
+    <label>Monto real a cargar</label>
     <input id="apMonto" type="number" value="${s.MONTO_REAL||s.MONTO_DECLARADO||""}">
 
     <label>Observaciones</label>
-    <textarea id="apObs"></textarea>
+    <textarea id="apObs" placeholder="Ej: comprobado en MP / titular coincide / ajuste de monto"></textarea>
 
     <div class="alert-box">
       Al aprobar, la solicitud NO se acredita todavía. Se enviará a la cola del worker para que el robot cargue en Agentes.
@@ -1156,10 +1318,17 @@ function abrirAprobarSolicitud(id){
 
     const operadorNombre = operador?.usuario || operador?.nombre || "";
 
+    const montoFinal = Number(val("apMonto") || s.MONTO_DECLARADO || 0);
+
+    if(!montoFinal || montoFinal <= 0){
+      alert("Ingresá un monto real válido antes de enviar al worker.");
+      return;
+    }
+
     const r = await actualizarSolicitudSupabase(id, {
       estado:"APROBADA_MANUAL",
       estado_worker:"PREPARANDO_COLA",
-      monto:Number(val("apMonto") || s.MONTO_DECLARADO || 0),
+      monto:montoFinal,
       operador_usuario:operadorNombre,
       aprobada_por:operadorNombre,
       aprobada_at:new Date().toISOString(),
@@ -1184,15 +1353,15 @@ function abrirAprobarSolicitud(id){
 
   },"Enviar al worker");
 }
+
 function abrirCerrarRetiro(id){
   const s = solicitudes.find(x=>String(x.ID||x.SOLICITUD_ID)===String(id));
 
   if(!s) return;
 
   abrirModal("Aprobar retiro",`
-    <div class="ok-box">
-      <b>${s.USUARIO||""}</b> · ${money(s.MONTO_DECLARADO||s.MONTO_REAL||0)}
-    </div>
+    ${renderDatosSolicitudModal(s)}
+    ${renderDestinoRetiroModal(s)}
 
     <div class="alert-box">
       <b>Datos de cuenta para pagar el retiro</b><br>
@@ -1209,7 +1378,7 @@ function abrirCerrarRetiro(id){
     <input id="retMonto" type="number" value="${s.MONTO_REAL||s.MONTO_DECLARADO||""}">
 
     <label>Observaciones</label>
-    <textarea id="retObs"></textarea>
+    <textarea id="retObs" placeholder="Ej: datos verificados / pago pendiente / diferencia consultada"></textarea>
 
     <div class="alert-box">
       Al aprobar, el retiro NO queda pagado todavía. Se enviará a la cola del worker para que el robot procese en Agentes.
@@ -1228,10 +1397,17 @@ function abrirCerrarRetiro(id){
       return;
     }
 
+    const montoFinal = Number(val("retMonto") || s.MONTO_DECLARADO || 0);
+
+    if(!montoFinal || montoFinal <= 0){
+      alert("Ingresá un monto final válido antes de enviar al worker.");
+      return;
+    }
+
     const r = await actualizarSolicitudSupabase(id, {
       estado:"APROBADA_MANUAL",
       estado_worker:"PREPARANDO_COLA",
-      monto:Number(val("retMonto") || s.MONTO_DECLARADO || 0),
+      monto:montoFinal,
       retiro_alias_cbu:val("retDestino"),
       retiro_titular:val("retTitular"),
       operador_usuario:operadorNombre,
@@ -1258,6 +1434,7 @@ function abrirCerrarRetiro(id){
 
   },"Enviar al worker");
 }
+
 function abrirRechazarSolicitud(id){
   abrirModal("Rechazar solicitud",`
     <label>Motivo</label>
