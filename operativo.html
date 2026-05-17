@@ -2,501 +2,249 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BET300 - Landing</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>NODO · OPERATIVO LITE</title>
 
 <style>
-*{box-sizing:border-box;font-family:Arial,sans-serif}
-
-body{
-  margin:0;
-  min-height:100vh;
-  background:radial-gradient(circle at top,#12352f 0%,#07131f 45%,#080a10 100%);
-  color:#f4f7fb;
+*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
+:root{
+  --bg:#0e1014;--panel:#151821;--card:#191d27;--card2:#1c2230;--line:#2c3140;
+  --muted:#98a2b3;--blue:#3d5afe;--green:#12b76a;--red:#f04438;--yellow:#fdb022;
+  --purple:#7c3aed;
 }
-
+body{background:var(--bg);color:#fff;overflow:hidden}
 .hidden{display:none!important}
-
-.wrap{
-  width:100%;
-  max-width:680px;
-  margin:auto;
-  padding:22px 16px 34px;
-}
-
-.logo-img{
-  width:270px;
-  max-width:84%;
-  height:auto;
-  display:block;
-  margin:0 auto 18px;
-  filter:drop-shadow(0 0 18px rgba(212,175,55,.25));
-}
-
-.card{
-  background:rgba(18,24,35,.88);
-  border:1px solid rgba(255,255,255,.12);
-  border-radius:24px;
-  padding:20px;
-  margin-bottom:18px;
-  box-shadow:0 18px 55px rgba(0,0,0,.28);
-}
-
-h1{
-  font-size:38px;
-  line-height:1.05;
-  margin:8px 0 12px;
-}
-
-.sub,.muted{
-  color:#cbd5e1;
-  font-size:18px;
-  line-height:1.45;
-  margin-bottom:22px;
-}
-
-label{
-  color:#cbd5e1;
-  font-weight:700;
-  margin-bottom:6px;
-  display:block;
-}
-
-input,button{
-  width:100%;
-  border:none;
-  border-radius:16px;
-  padding:17px;
-  font-size:18px;
-  margin-top:8px;
-  margin-bottom:18px;
-}
-
-input{
-  background:#090c13;
-  color:#fff;
-  border:1px solid rgba(255,255,255,.14);
-  outline:none;
-}
-
-input::placeholder{color:#6f7684}
-
-button{
-  font-weight:900;
-  cursor:pointer;
-  color:#08110f;
-  background:linear-gradient(135deg,#d4af37,#f7d774);
-  box-shadow:0 10px 30px rgba(212,175,55,.18);
-}
-
-button:disabled{
-  opacity:.45;
-  cursor:not-allowed;
-}
-
-.transfer-card{
-  border-color:rgba(212,175,55,.35);
-  background:linear-gradient(145deg,rgba(45,35,12,.92),rgba(13,30,46,.88));
-}
-
-.gold-title{
-  color:#d4af37;
-  font-size:24px;
-  font-weight:900;
-  margin-bottom:22px;
-}
-
-.data-row{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-}
-
-.big-data{
-  font-size:24px;
-  font-weight:900;
-  letter-spacing:1px;
-  word-break:break-all;
-  margin-bottom:12px;
-}
-
-.copy-btn{
-  background:rgba(255,255,255,.12);
-  color:#fff;
-  box-shadow:none;
-  margin:0;
-  padding:13px;
-  font-size:15px;
-  width:auto;
-  min-width:100px;
-}
-
-.line{
-  font-size:18px;
-  margin:8px 0;
-  color:#dbe5ef;
-}
-
-.warn{
-  margin-top:16px;
-  color:#f9d36b;
-  font-size:17px;
-  font-weight:800;
-}
-
-.actions{
-  display:grid;
-  grid-template-columns:1fr;
-  gap:10px;
-  margin-top:10px;
-}
-
-.wa{
-  text-decoration:none;
-  display:block;
-  text-align:center;
-  border-radius:16px;
-  padding:16px;
-  font-size:17px;
-  font-weight:900;
-  color:white;
-  background:linear-gradient(135deg,#ff7a66,#ff9b55);
-  box-shadow:0 10px 35px rgba(255,122,102,.25);
-}
-
-.wa.secondary{
-  background:rgba(255,255,255,.12);
-  box-shadow:none;
-}
-
-.result{
-  display:none;
-  padding:16px;
-  border-radius:16px;
-  margin-top:12px;
-  line-height:1.45;
-}
-
-.ok{
-  display:block;
-  background:rgba(22,163,74,.18);
-  border:1px solid rgba(22,163,74,.45);
-}
-
-.err{
-  display:block;
-  background:rgba(239,68,68,.18);
-  border:1px solid rgba(239,68,68,.45);
-}
-
-.mini{
-  font-size:13px;
-  color:#94a3b8;
-  text-align:center;
-  margin-top:16px;
-}
-
-.step-box{
-  margin-top:18px;
-  background:rgba(0,0,0,.22);
-  border:1px solid rgba(255,255,255,.1);
-  border-radius:18px;
-  padding:16px;
-}
-
-.step{
-  display:flex;
-  gap:12px;
-  align-items:flex-start;
-  margin-bottom:14px;
-  opacity:.55;
-}
-
-.step:last-child{margin-bottom:0}
-
-.step.active{
-  opacity:1;
-}
-
-.step.done{
-  opacity:1;
-}
-
-.step-dot{
-  width:30px;
-  height:30px;
-  min-width:30px;
-  border-radius:999px;
-  background:#2d3748;
-  display:grid;
-  place-items:center;
-  font-weight:900;
-}
-
-.step.done .step-dot{
-  background:#12b76a;
-}
-
-.step.active .step-dot{
-  background:#d4af37;
-  color:#07131f;
-  animation:pulse 1.2s infinite;
-}
-
-.step-title{
-  font-weight:900;
-  font-size:16px;
-}
-
-.step-text{
-  color:#cbd5e1;
-  font-size:14px;
-  margin-top:3px;
-}
-
-.loader{
-  width:18px;
-  height:18px;
-  border:3px solid rgba(255,255,255,.25);
-  border-top-color:#d4af37;
-  border-radius:50%;
-  display:inline-block;
-  animation:spin .8s linear infinite;
-  vertical-align:middle;
-  margin-right:8px;
-}
-
-.success-modal.hidden{display:none!important}
-
-.success-modal{
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,.82);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  z-index:9999;
-  padding:20px;
-}
-
-.success-box{
-  width:100%;
-  max-width:420px;
-  background:linear-gradient(145deg,#0c2d24,#111827);
-  border:1px solid rgba(38,255,169,.3);
-  border-radius:28px;
-  padding:34px 24px;
-  text-align:center;
-  animation:popIn .25s ease;
-  position:relative;
-}
-
-.close-modal{
-  width:auto;
-  position:absolute;
-  right:16px;
-  top:12px;
-  background:transparent;
-  color:white;
-  box-shadow:none;
-  font-size:28px;
-  padding:0;
-  margin:0;
-}
-
-.success-icon{
-  font-size:62px;
-  margin-bottom:12px;
-}
-
-.success-box h2{
-  margin:0 0 10px;
-  font-size:34px;
-}
-
-.success-box p{
-  color:#d0d7e2;
-  margin-bottom:24px;
-  font-size:18px;
-}
-
-.change-data{
-  background:transparent;
-  color:#d4af37;
-  box-shadow:none;
-  padding:8px;
-  margin-top:2px;
-  font-size:15px;
-}
-
-@keyframes pulse{
-  0%{box-shadow:0 0 0 0 rgba(212,175,55,.55)}
-  70%{box-shadow:0 0 0 12px rgba(212,175,55,0)}
-  100%{box-shadow:0 0 0 0 rgba(212,175,55,0)}
-}
-
-@keyframes spin{
-  to{transform:rotate(360deg)}
-}
-
-@keyframes popIn{
-  from{transform:scale(.85);opacity:0}
-  to{transform:scale(1);opacity:1}
-}
-
-@media(max-width:520px){
-  .wrap{padding:18px 14px 30px}
-  .logo-img{width:245px;margin-bottom:14px}
-  h1{font-size:34px}
-  .sub,.muted{font-size:17px}
-  .card{padding:18px;border-radius:22px}
-  .big-data{font-size:22px}
-}
-
-/* === CHAT LITE PRO === */
-.chat-lite-btn{position:fixed;right:18px;bottom:18px;width:auto;min-width:190px;z-index:9998;border-radius:999px;padding:15px 18px;margin:0;color:#07131f;background:linear-gradient(135deg,#d4af37,#f7d774);box-shadow:0 14px 40px rgba(212,175,55,.28)}
-.chat-lite.hidden{display:none!important}.chat-lite{position:fixed;right:18px;bottom:86px;width:min(390px,calc(100vw - 28px));height:min(590px,calc(100vh - 118px));z-index:9999;border-radius:24px;overflow:hidden;background:#101722;border:1px solid rgba(255,255,255,.14);box-shadow:0 22px 70px rgba(0,0,0,.45);display:flex;flex-direction:column}.chat-lite-head{padding:15px 16px;background:linear-gradient(135deg,#153b31,#111827);border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;gap:12px}.chat-agent{display:flex;align-items:center;gap:10px}.chat-avatar{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:#d4af37;color:#07131f;font-weight:900;box-shadow:0 0 0 4px rgba(212,175,55,.12)}.chat-title{font-weight:900;font-size:16px}.chat-status{color:#9ee6bd;font-size:12px;margin-top:2px}.chat-close{background:rgba(255,255,255,.1);color:#fff;box-shadow:none;width:38px;height:38px;padding:0;margin:0;border-radius:12px;font-size:20px}.chat-lite-body{flex:1;overflow-y:auto;padding:14px;background:radial-gradient(circle at top right,rgba(212,175,55,.08),transparent 30%),#0b111a}.chat-day{width:max-content;max-width:88%;margin:0 auto 12px;padding:7px 10px;border-radius:999px;background:rgba(255,255,255,.08);color:#cbd5e1;font-size:12px}.chat-msg{max-width:84%;margin-bottom:10px;display:flex;flex-direction:column}.chat-msg.user{margin-left:auto;align-items:flex-end}.chat-msg.operator{margin-right:auto;align-items:flex-start}.chat-bubble{padding:10px 12px;border-radius:16px;line-height:1.35;font-size:15px;word-break:break-word}.chat-msg.user .chat-bubble{background:linear-gradient(135deg,#d4af37,#f7d774);color:#07131f;border-bottom-right-radius:4px}.chat-msg.operator .chat-bubble{background:#1d2939;color:#f4f7fb;border-bottom-left-radius:4px}.chat-bubble img{width:100%;max-width:240px;border-radius:12px;display:block;margin-top:6px}.chat-meta{color:#94a3b8;font-size:11px;margin-top:4px;padding:0 4px}.chat-msg.user .chat-meta{color:#cbd5e1}.chat-lite-compose{padding:12px;background:#101722;border-top:1px solid rgba(255,255,255,.1)}.chat-preview{display:none;align-items:center;justify-content:space-between;gap:10px;padding:8px;border-radius:14px;background:rgba(255,255,255,.08);margin-bottom:10px}.chat-preview.show{display:flex}.chat-preview img{width:58px;height:58px;object-fit:cover;border-radius:12px}.chat-preview button{width:auto;min-width:34px;height:34px;padding:0;margin:0;background:rgba(239,68,68,.18);color:#fff;box-shadow:none}.chat-input-row{display:grid;grid-template-columns:42px 1fr 46px;gap:8px;align-items:end}.chat-file-btn,.chat-send-btn{width:42px;height:42px;min-width:42px;padding:0;margin:0;border-radius:14px;color:#fff;box-shadow:none}.chat-file-btn{background:rgba(255,255,255,.12)}.chat-send-btn{background:linear-gradient(135deg,#d4af37,#f7d774);color:#07131f}#chatLiteInput{min-height:42px;max-height:110px;margin:0;padding:11px 12px;resize:none;border-radius:14px;font-size:15px;background:#090c13;color:#fff;border:1px solid rgba(255,255,255,.14)}.chat-hint{color:#94a3b8;font-size:11px;margin-top:8px;text-align:center}@media(max-width:520px){.chat-lite-btn{right:14px;bottom:14px;min-width:0;width:calc(100vw - 28px)}.chat-lite{right:0;bottom:0;width:100vw;height:100vh;max-height:none;border-radius:0;border:none}.chat-lite-head{padding-top:18px}}
-
-
-.tipo-solicitud-box{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-  margin:12px 0 18px;
-}
-.tipo-option{
-  border:1px solid rgba(255,255,255,.14);
-  background:rgba(255,255,255,.08);
-  color:#fff;
-  border-radius:16px;
-  padding:14px;
-  font-weight:900;
-  cursor:pointer;
-  text-align:center;
-}
-.tipo-option.active{
-  background:linear-gradient(135deg,#d4af37,#f7d774);
-  color:#07131f;
-}
-
+.layout{display:grid;grid-template-columns:280px 1fr;height:100vh}
+.sidebar{background:var(--panel);border-right:1px solid #272b36;padding:18px;overflow-y:auto}
+.main{overflow-y:auto;padding:18px}
+.logo{width:170px;display:block;margin:0 auto 18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:16px}
+.card-title{font-size:20px;font-weight:900;margin-bottom:14px}
+.small{font-size:12px;color:var(--muted)}
+.nav-btn{width:100%;background:#1d2230;color:#fff;border:none;padding:12px;border-radius:12px;margin-bottom:8px;cursor:pointer;text-align:left;font-weight:bold;transition:.15s;position:relative}
+.nav-btn:hover{background:#262d3d}.nav-btn.active{background:var(--blue)}
+.badge-alert{position:absolute;right:12px;top:10px;background:#ff3b30;color:#fff;border-radius:999px;min-width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold}
+.badge-chat{right:42px;background:var(--purple)}
+.badge{display:inline-block;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:bold;margin:2px}
+.badge-pending{background:#5a3d09;color:#ffd98f}.badge-ok{background:#11371f;color:#b9f7cb}.badge-danger{background:#3a1515;color:#ffd0d0}.badge-blue{background:#16235f;color:#cbd5ff}.badge-muted{background:#2a2f3b;color:#d0d5dd}
+.top-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:18px}
+.stat-card{background:#1b202c;border:1px solid #2e3444;border-radius:18px;padding:16px}
+.stat-title{font-size:13px;color:var(--muted);margin-bottom:10px}.stat-value{font-size:28px;font-weight:900}.stat-sub{font-size:12px;color:var(--muted);margin-top:6px}
+.wallet-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.wallet-card{background:var(--card2);border:1px solid #30384a;border-radius:18px;padding:14px;position:relative;overflow:hidden}
+.wallet-card.ok{border-color:rgba(18,183,106,.45)}.wallet-card.paused{opacity:.72;border-color:rgba(240,68,56,.5)}.wallet-card.selected{border-color:rgba(61,90,254,.8);box-shadow:0 0 0 1px rgba(61,90,254,.45)}
+.wallet-name{font-weight:bold;font-size:16px}.wallet-type{color:var(--muted);margin-top:4px;font-size:13px}
+.wallet-actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+input,select,textarea,button{font-size:14px}
+input,select,textarea{width:100%;border:none;border-radius:10px;padding:11px;margin-top:6px;margin-bottom:12px;background:#fff;color:#111}
+textarea{resize:vertical;min-height:80px}
+.btn{width:100%;border:none;border-radius:12px;padding:12px;cursor:pointer;font-weight:bold}
+.btn-primary{background:var(--blue);color:#fff}.btn-green{background:var(--green);color:#fff}.btn-red{background:var(--red);color:#fff}.btn-gray{background:#667085;color:#fff}.btn-yellow{background:var(--yellow);color:#111}
+.mini-btn{border:none;border-radius:10px;padding:8px 10px;cursor:pointer;font-size:12px;font-weight:bold}
+.green{background:var(--green);color:#fff}.red{background:var(--red);color:#fff}.blue{background:var(--blue);color:#fff}.yellow{background:var(--yellow);color:#111}.gray{background:#667085;color:#fff}.purple{background:var(--purple);color:#fff}
+table{width:100%;border-collapse:collapse}th,td{padding:11px;border-bottom:1px solid #2d3342;text-align:left;font-size:13px;vertical-align:top}th{background:#202635;position:sticky;top:0;z-index:1}tr:hover{background:#1c2230}
+.table-wrap{max-height:520px;overflow:auto;border-radius:14px;border:1px solid #2d3342}
+.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px}
+.alert-box{background:#38280d;color:#ffd98f;padding:14px;border-radius:14px;margin-bottom:14px}.err-box{background:#3a1515;color:#ffd0d0;padding:14px;border-radius:14px;margin-bottom:14px}.ok-box{background:#123322;color:#b9f7cb;padding:14px;border-radius:14px;margin-bottom:14px}
+.login-wrap{display:flex;align-items:center;justify-content:center;height:100vh;padding:20px}.login-card{width:100%;max-width:420px;background:var(--card);border:1px solid #2d3342;border-radius:20px;padding:22px}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:9999;padding:14px}
+.modal{width:100%;max-width:560px;max-height:92vh;overflow:auto;background:var(--card);border:1px solid #2e3444;border-radius:22px;padding:20px}
+.modal-title{font-size:22px;font-weight:900;margin-bottom:18px}.modal-actions{display:flex;gap:10px;margin-top:10px}.modal-actions button{flex:1}
+.chat-layout{display:grid;grid-template-columns:330px 1fr;gap:14px;min-height:calc(100vh - 120px)}
+.chat-list{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.chat-list-head{padding:14px;border-bottom:1px solid var(--line);background:#202635}
+.chat-item{padding:12px;border-bottom:1px solid #2d3342;cursor:pointer}
+.chat-item:hover,.chat-item.active{background:#1c2230}
+.chat-item-title{display:flex;justify-content:space-between;gap:8px;font-weight:900}
+.chat-unread{background:#ff3b30;color:#fff;border-radius:999px;min-width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:12px}
+.chat-panel{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;display:flex;flex-direction:column}
+.chat-head{padding:14px;background:#202635;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px}
+.chat-body{flex:1;min-height:360px;max-height:calc(100vh - 260px);overflow-y:auto;padding:14px;background:#10131a}
+.chat-msg{max-width:78%;margin-bottom:10px;display:flex;flex-direction:column}
+.chat-msg.user{align-items:flex-start;margin-right:auto}.chat-msg.op{align-items:flex-end;margin-left:auto}
+.chat-bubble{padding:10px 12px;border-radius:16px;line-height:1.35;font-size:14px;word-break:break-word}
+.chat-msg.user .chat-bubble{background:#1d2939;color:#f4f7fb;border-bottom-left-radius:4px}
+.chat-msg.op .chat-bubble{background:linear-gradient(135deg,#3d5afe,#6d7dff);color:#fff;border-bottom-right-radius:4px}
+.chat-bubble img{width:100%;max-width:260px;border-radius:12px;margin-top:6px;display:block}
+.chat-meta{color:#98a2b3;font-size:11px;margin-top:4px;padding:0 4px}
+.chat-compose{padding:12px;border-top:1px solid var(--line);background:#151821}
+.chat-preview{display:none;align-items:center;justify-content:space-between;gap:10px;padding:8px;border-radius:14px;background:rgba(255,255,255,.08);margin-bottom:10px}
+.chat-preview.show{display:flex}.chat-preview img{width:58px;height:58px;object-fit:cover;border-radius:12px}
+.chat-row{display:grid;grid-template-columns:42px 1fr 46px;gap:8px;align-items:end}
+#chatInput{min-height:42px;max-height:110px;margin:0;padding:11px 12px;resize:none;border-radius:14px;font-size:15px;background:#fff;color:#111}
+.toast{position:fixed;top:20px;right:20px;background:var(--blue);color:#fff;padding:14px 18px;border-radius:14px;z-index:99999;font-weight:bold;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.mobile-top{display:none;background:#151821;border-bottom:1px solid #272b36;padding:12px;align-items:center;justify-content:space-between}.mobile-menu{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1200}.mobile-menu .sidebar{display:block;width:280px;height:100%;position:absolute;left:0;top:0}
+@media(max-width:900px){body{overflow:auto}.layout{display:block;height:auto;min-height:100vh}.sidebar{display:none}.main{padding:12px}.mobile-top{display:flex}.top-grid{grid-template-columns:repeat(2,1fr);gap:10px}.stat-value{font-size:21px}th,td{font-size:11px;padding:8px}.mobile-menu.open{display:block}.chat-layout{grid-template-columns:1fr}.chat-body{max-height:420px}}
 </style>
 </head>
 
 <body>
-
-<div class="wrap">
-
-  <img src= "logo-bet300.png" class="logo-img" alt="BET300">
-
-  <div class="card" id="registroCard">
-    <h1>Identificá tu cuenta</h1>
-    <p class="muted">Completá tus datos para continuar con la carga.</p>
-
-    <label>Usuario *</label>
-    <input id="regUsuario" placeholder="ej: maurito564">
-
-    <label>Nombre completo *</label>
-    <input id="regNombre" placeholder="ej: Mauro Pérez">
-
-    <label>WhatsApp *</label>
-    <input id="regTelefono" placeholder="ej: 1133344455">
-
-    <button id="btnContinuar" onclick="continuarRegistro()">Continuar</button>
-
-    <div id="registroMsg" class="result"></div>
+<div id="loginView" class="login-wrap">
+  <div class="login-card">
+    <img src="logo-nodo.png" class="logo" alt="NODO">
+    <h2 style="margin-bottom:6px">PANEL OPERATIVO LITE</h2>
+    <div class="small" style="margin-bottom:16px">Versión V3 · Login Supabase directo</div>
+    <label>Usuario</label>
+    <input id="loginUsuario" autocomplete="username">
+    <label>Clave</label>
+    <input id="loginClave" type="password" autocomplete="current-password">
+    <button class="btn btn-primary" onclick="login()">Ingresar</button>
+    <div id="loginMsg" style="margin-top:12px"></div>
   </div>
-
-  <div class="card hidden" id="cargaCard">
-    <h1>Cargar transferencia</h1>
-    <p class="muted">Transferí al dato indicado y luego enviá tu solicitud.</p>
-
-    <div class="card transfer-card">
-      <div class="gold-title">💳 Datos para transferir</div>
-
-      <span class="label">CBU / CVU / Alias</span>
-      <div class="data-row">
-        <div id="cvuBox" class="big-data">Cargando...</div>
-        <button class="copy-btn" onclick="copiarCvu()">Copiar</button>
-      </div>
-
-      <div class="line"><b>Titular:</b> <span id="titularBox">Cargando...</span></div>
-      <div class="line"><b>Banco:</b> <span id="bancoBox">Mercado Pago</span></div>
-      <div class="warn" id="montoMinimoTxt">⚠️ Carga mínima: $2.000</div>
-    </div>
-
-    <div id="datosUsuarioBox" class="ok">
-      Usuario identificado.
-    </div>
-
-    <button class="change-data" onclick="cambiarDatos()">Cambiar mis datos</button>
-
-    <label>Tipo de solicitud *</label>
-    <div class="tipo-solicitud-box">
-      <button id="tipoCargaBtn" class="tipo-option active" type="button" onclick="seleccionarTipoSolicitud('CARGA')">Cargar</button>
-      <button id="tipoRetiroBtn" class="tipo-option" type="button" onclick="seleccionarTipoSolicitud('RETIRO')">Retirar</button>
-    </div>
-
-    <label id="montoLabel">Monto a cargar *</label>
-    <input id="monto" type="number" placeholder="ej: 5000">
-
-    <button id="btnEnviar" onclick="crearSolicitud()">Enviar solicitud</button>
-
-    <div id="resultado" class="result"></div>
-
-    <div id="estadoEspera" class="step-box hidden">
-      <div id="step1" class="step done">
-        <div class="step-dot">✓</div>
-        <div>
-          <div class="step-title">Solicitud enviada</div>
-          <div class="step-text" id="step1Text">Recibimos tu solicitud.</div>
-        </div>
-      </div>
-
-      <div id="step2" class="step active">
-        <div class="step-dot">2</div>
-        <div>
-          <div class="step-title"><span class="loader"></span>Esperando verificación</div>
-          <div class="step-text" id="step2Text">Un operador está revisando tu solicitud.</div>
-        </div>
-      </div>
-
-      <div id="step3" class="step">
-        <div class="step-dot">3</div>
-        <div>
-          <div class="step-title" id="step3Title">Fichas acreditadas</div>
-          <div class="step-text" id="step3Text">Cuando se apruebe, te avisamos automáticamente.</div>
-        </div>
-      </div>
-
-      <div class="mini">
-        No cierres esta ventana. Si demora más de lo habitual, podés contactarnos por chat.
-      </div>
-    </div>
-
-    <div class="actions">
-      <a id="btnCrearUsuario" class="wa" target="_blank">👤 Crear usuario</a>
-      <button id="btnContactar" class="wa secondary" type="button" onclick="abrirChatLite()">💬 Chateá con nosotros</button>
-    </div>
-  </div>
-
-  <div class="mini">
-    Guardá el comprobante de transferencia hasta que se confirme la carga.
-  </div>
-
 </div>
 
+<div id="appView" class="hidden">
+  <div class="mobile-top">
+    <button class="mini-btn blue" onclick="abrirMenuMobile()">☰ Menú</button>
+    <b>NODO Operativo</b>
+    <button class="mini-btn red" onclick="cerrarSesion()">Salir</button>
+  </div>
 
-<button id="chatLiteOpenBtn" class="chat-lite-btn" type="button" onclick="abrirChatLite()">💬 Chateá con nosotros</button>
-<div id="chatLite" class="chat-lite hidden"><div class="chat-lite-head"><div class="chat-agent"><div class="chat-avatar">B</div><div><div class="chat-title">Soporte BET300</div><div id="chatLiteStatus" class="chat-status">Disponible para ayudarte</div></div></div><button class="chat-close" type="button" onclick="cerrarChatLite()">×</button></div><div id="chatLiteBody" class="chat-lite-body"><div class="chat-day">Chat de soporte</div><div class="chat-msg operator"><div class="chat-bubble">Hola 👋 Escribinos tu consulta o adjuntá el comprobante si necesitás ayuda con la carga.</div><div class="chat-meta">Soporte</div></div></div><div class="chat-lite-compose"><div id="chatLitePreview" class="chat-preview"><div style="display:flex;align-items:center;gap:10px"><img id="chatLitePreviewImg" src="" alt="Comprobante"><div><b>Imagen adjunta</b><div class="chat-meta">Lista para enviar</div></div></div><button type="button" onclick="quitarImagenChatLite()">×</button></div><div class="chat-input-row"><button class="chat-file-btn" type="button" onclick="document.getElementById('chatLiteFile').click()">📎</button><textarea id="chatLiteInput" rows="1" placeholder="Escribí tu mensaje..."></textarea><button class="chat-send-btn" type="button" onclick="enviarChatLite()">➤</button></div><input id="chatLiteFile" type="file" accept="image/*" style="display:none" onchange="tomarImagenChatLiteFile()"><div class="chat-hint">Podés adjuntar comprobante desde tu celular o pegar captura con Ctrl + V.</div></div></div>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+      <img src="logo-nodo.png" class="logo" alt="NODO">
+      <div class="card"><div id="operadorInfo"></div></div>
 
-<div id="successModal" class="success-modal hidden">
-  <div class="success-box">
-    <button class="close-modal" onclick="cerrarModalExito()">×</button>
-    <div class="success-icon">✅</div>
-    <h2>¡Fichas cargadas!</h2>
-    <p>Tu carga fue acreditada correctamente.</p>
-    <button onclick="irPlataforma()">🎮 INGRESAR A LA PLATAFORMA</button>
+      <button id="navInicio" class="nav-btn active" onclick="mostrarVista('inicio')">🏠 Inicio</button>
+      <button id="navSolicitudes" class="nav-btn" onclick="mostrarVista('solicitudes')">📋 Solicitudes <span id="badgeSolicitudes" class="badge-alert hidden">0</span></button>
+      <button id="navBilleteras" class="nav-btn" onclick="mostrarVista('billeteras')">💳 Billeteras</button>
+      <button id="navChat" class="nav-btn" onclick="mostrarVista('chat')">💬 Chat <span id="badgeChat" class="badge-alert badge-chat hidden">0</span></button>
+
+      <button class="nav-btn" onclick="cerrarSesion()">🚪 Cerrar sesión</button>
+    </aside>
+
+    <main class="main">
+      <section id="viewInicio">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+          <div>
+            <h1 style="font-size:26px">Inicio operativo</h1>
+            <div class="small">Solicitudes pendientes, chats y billetera activa de landing.</div>
+          </div>
+          <button class="mini-btn blue" onclick="refrescarTodo(true)">🔄 Actualizar</button>
+        </div>
+
+        <div id="alertas"></div>
+
+        <div class="top-grid">
+          <div class="stat-card"><div class="stat-title">Solicitudes pendientes</div><div class="stat-value" id="statPendientes">0</div><div class="stat-sub" id="statRetiros">Retiros: 0</div></div>
+          <div class="stat-card"><div class="stat-title">Solicitudes hoy</div><div class="stat-value" id="statSolicitudesHoy">0</div><div class="stat-sub" id="statSolicitudesTotalPc">Total PC: 0</div></div>
+          <div class="stat-card"><div class="stat-title">Chats sin leer</div><div class="stat-value" id="statChats">0</div><div class="stat-sub">Consultas landing</div></div>
+          <div class="stat-card"><div class="stat-title">Billetera en landing</div><div class="stat-value" id="statBilletera">-</div><div class="stat-sub" id="statBilleteraTipo">-</div></div>
+        </div>
+
+        <div class="card">
+          <h2 class="card-title">Solicitudes por turno · PC actual</h2>
+          <div id="resumenTurnosOperativo"></div>
+        </div>
+
+        <div class="card">
+          <h2 class="card-title">Solicitudes pendientes</h2>
+          <div id="tablaSolicitudesInicio"></div>
+        </div>
+      </section>
+
+      <section id="viewSolicitudes" class="hidden">
+        <div class="card">
+          <h2 class="card-title">📋 Solicitudes</h2>
+          <div class="filters">
+            <select id="filtroEstado" onchange="renderSolicitudes()">
+              <option value="">Todas</option>
+              <option value="PENDIENTE">Pendientes</option>
+              <option value="REALIZADAS">Realizadas</option>
+              <option value="RECHAZADA">Rechazadas</option>
+            </select>
+            <select id="filtroTipo" onchange="renderSolicitudes()">
+              <option value="">Todos los tipos</option>
+              <option value="CARGA">Carga</option>
+              <option value="RETIRO">Retiro</option>
+            </select>
+            <input id="filtroTexto" placeholder="Buscar usuario / nombre / billetera" oninput="renderSolicitudes()">
+          </div>
+          <div id="tablaSolicitudesCompleta"></div>
+        </div>
+      </section>
+
+      <section id="viewBilleteras" class="hidden">
+        <div class="card">
+          <h2 class="card-title">💳 Billeteras para landing</h2>
+          <div class="alert-box">Solo una billetera puede quedar marcada como <b>EN LANDING</b>. No se muestran montos en este panel.</div>
+          <div id="walletsGrid" class="wallet-grid"></div>
+        </div>
+      </section>
+
+      <section id="viewChat" class="hidden">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+          <div>
+            <h1 style="font-size:26px">Chat interno</h1>
+            <div class="small">Consultas desde landing. Podés pegar texto o imágenes con Ctrl + V.</div>
+          </div>
+          <button class="mini-btn blue" onclick="cargarChats(true)">🔄 Actualizar chats</button>
+        </div>
+
+        <div class="chat-layout">
+          <div class="chat-list">
+            <div class="chat-list-head">
+              <b>Chats activos</b>
+              <div class="small">Mensajes de usuarios desde landing</div>
+            </div>
+            <div id="chatList"></div>
+          </div>
+
+          <div class="chat-panel">
+            <div class="chat-head">
+              <div>
+                <b id="chatTitulo">Seleccioná un chat</b>
+                <div id="chatSubtitulo" class="small">Sin conversación abierta</div>
+              </div>
+              <span id="chatEstado" class="badge badge-muted">-</span>
+            </div>
+
+            <div id="chatBody" class="chat-body">
+              <div class="alert-box">Seleccioná un chat de la izquierda para responder.</div>
+            </div>
+
+            <div class="chat-compose">
+              <div id="chatPreview" class="chat-preview">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <img id="chatPreviewImg" src="" alt="Imagen">
+                  <div><b>Imagen lista</b><div class="chat-meta">Se enviará con el mensaje</div></div>
+                </div>
+                <button class="mini-btn red" onclick="quitarImagenChat()">×</button>
+              </div>
+
+              <div class="chat-row">
+                <button class="mini-btn gray" onclick="document.getElementById('chatFile').click()">📎</button>
+                <textarea id="chatInput" rows="1" placeholder="Responder..."></textarea>
+                <button class="mini-btn blue" onclick="enviarChat()">➤</button>
+              </div>
+              <input id="chatFile" type="file" accept="image/*" style="display:none" onchange="tomarImagenChatFile()">
+              <div class="small" style="text-align:center;margin-top:8px">Ctrl + V admite texto e imagen del portapapeles.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div id="mobileMenu" class="mobile-menu" onclick="cerrarMenuMobile(event)"></div>
+
+<div id="modalOverlay" class="modal-overlay hidden">
+  <div class="modal">
+    <div id="modalTitle" class="modal-title">Modal</div>
+    <div id="modalBody"></div>
+    <div class="modal-actions">
+      <button class="btn btn-gray" onclick="cerrarModal()">Cancelar</button>
+      <button id="modalSaveBtn" class="btn btn-primary">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div id="selectorPcOverlay" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-title">Seleccionar PC operativa</div>
+    <p class="small">Elegí la PC que cubrís hoy.</p>
+    <div id="pcSelectorGrid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:20px"></div>
   </div>
 </div>
 
@@ -509,68 +257,169 @@ const SUPABASE_URL = "https://pjvvyvfcwjoocjqvdror.supabase.co";
 const SUPABASE_KEY = "sb_publishable_NYqRoKptTgcL90VAVF2kqA_Gl06mEUF";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-console.log("Supabase conectado ✅");
+let operador=null, pcOperativa=null;
+let solicitudes=[], billeteras=[], chats=[], chatMensajes=[];
+let timersIniciados=false;
+let lastPendientesIds=new Set(), lastChatUnread=0;
+let chatActualId="", chatImagenBase64="", chatImagenNombre="";
 
-const WHATSAPP_POR_PC = {
-  P1: "5492235181171",
-  P2: "5491157718506",
-  P3: "5491127140155",
-  P4: "5492233391195",
-  P5: "5491166587968"
-};
 
-const LINKS_PLATAFORMA = {
-  P1: "https://www.bet-300.pw/",
-  P2: "https://www.bet-300.pw/",
-  P3: "https://www.bet-300.pw/",
-  P4: "https://www.bet-300.pw/",
-  P5: "https://www.bet-300.pw/"
-};
-
-const params = new URLSearchParams(window.location.search);
-
-const PC_ALIASES = {
-  CHINO: "P1",
-  ALV: "P2",
-  SAN: "P3",
-  EYF: "P4",
-  X: "P5"
-};
-
-function normalizarPC(valor) {
-  const raw = String(valor || "P1").trim().toUpperCase();
-  return PC_ALIASES[raw] || raw;
+function chatReadKey(id){
+  return "nodo_chat_read_" + pcOperativa + "_" + String(id || "");
 }
 
-const PC = normalizarPC(params.get("pc") || "P1");
+function getChatReadCount(id){
+  return Number(localStorage.getItem(chatReadKey(id)) || 0);
+}
 
-const LS_USER = "bet300_user_" + PC;
-const LS_SOLICITUD = "solicitud_actual_" + PC;
+function setChatReadCount(id, count){
+  localStorage.setItem(chatReadKey(id), String(Number(count || 0)));
+}
 
-let billeteraActiva = null;
-let solicitudActual = null;
-let intervaloEstado = null;
-let userData = null;
-let tipoSolicitudActual = "CARGA";
 
-window.onload = async () => {
-  prepararWhatsapp();
-  cargarUsuarioGuardado();
-  recuperarSolicitudPendiente();
-  await cargarBilletera();
-};
-
-async function api(params) {
-  const url = API_URL + "?" + new URLSearchParams(params).toString();
-  const res = await fetch(url);
-  const text = await res.text();
-
-  try {
-    return JSON.parse(text);
-  } catch (e) {
-    console.error(text);
-    return { ok: false, error: "Respuesta inválida de API" };
+window.addEventListener("load",()=>{
+  const saved=localStorage.getItem("nodo_operador_lite");
+  const pc=localStorage.getItem("nodo_pc_operativa_lite");
+  if(saved && pc){
+    try{
+      operador=JSON.parse(saved);
+      pcOperativa=pc;
+      finalizarLogin(false);
+    }catch(e){
+      localStorage.removeItem("nodo_operador_lite");
+      localStorage.removeItem("nodo_pc_operativa_lite");
+    }
   }
+});
+
+function money(v){return Number(v||0).toLocaleString("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0})}
+function normalizar(v){return String(v||"").trim().toUpperCase()}
+function setBox(id,html){const el=document.getElementById(id);if(el)el.innerHTML=html}
+function val(id){return document.getElementById(id)?.value||""}
+function toast(msg,type="blue"){const div=document.createElement("div");div.className="toast";div.style.background=type==="red"?"#f04438":type==="green"?"#12b76a":"#3d5afe";div.innerText=msg;document.body.appendChild(div);setTimeout(()=>div.remove(),3500)}
+function formatFecha(fechaRaw){
+
+  if(!fechaRaw) return "";
+
+  try{
+    const fecha = new Date(fechaRaw);
+
+    if(isNaN(fecha)){
+      return String(fechaRaw || "");
+    }
+
+    return fecha.toLocaleString("es-AR",{
+      timeZone:"America/Argentina/Buenos_Aires",
+      day:"2-digit",
+      month:"2-digit",
+      hour:"2-digit",
+      minute:"2-digit",
+      hour12:false
+    }).replace(",", " ·");
+
+  }catch(e){
+    return String(fechaRaw || "");
+  }
+}
+
+function formatearHoraChat(fechaRaw){
+
+  if(!fechaRaw) return "";
+
+  try{
+    const fecha = new Date(fechaRaw);
+
+    if(isNaN(fecha)){
+      return "";
+    }
+
+    return fecha.toLocaleTimeString("es-AR",{
+      timeZone:"America/Argentina/Buenos_Aires",
+      hour:"2-digit",
+      minute:"2-digit",
+      hour12:false
+    });
+
+  }catch(e){
+    return "";
+  }
+}
+
+function esPendiente(s){const e=normalizar(s.ESTADO);return e.includes("PENDIENTE")||e==="NUEVA"||e==="NUEVO"||e==="EN_REVISION"}
+function esRealizada(s){const e=normalizar(s.ESTADO);return ["APROBADA_MANUAL","APROBADA_MANUAL_OK","ACREDITADA","PAGADA","APROBADA"].includes(e)}
+function estadoBadge(e){const x=normalizar(e);if(esRealizada({ESTADO:e}))return`<span class="badge badge-ok">${e}</span>`;if(["RECHAZADA","ERROR"].includes(x))return`<span class="badge badge-danger">${e}</span>`;return`<span class="badge badge-pending">${e||"-"}</span>`}
+function escapeHtml(text){return String(text||"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
+
+async function api(data){
+  const fd=new FormData();
+  Object.keys(data).forEach(k=>fd.append(k,data[k]??""));
+  const res=await fetch(API_URL,{method:"POST",body:fd});
+  const text=await res.text();
+  try{return JSON.parse(text)}catch(e){console.error(text);return{ok:false,error:"Respuesta inválida de API"}}
+}
+
+
+
+function mapSolicitudSupabase(s){
+  return {
+    ID: s.id,
+    SOLICITUD_ID: s.id,
+    FECHA_CREACION: s.created_at,
+    FECHA: s.created_at,
+    TIPO_SOLICITUD: s.tipo,
+    TIPO: s.tipo,
+    USUARIO: s.usuario,
+    USUARIO_JUGADOR: s.usuario,
+    NOMBRE_COMPLETO: s.nombre_completo,
+    TELEFONO: s.telefono,
+    PC: s.pc_codigo,
+    MONTO_DECLARADO: s.monto,
+    MONTO_REAL: s.monto,
+    ESTADO: s.estado,
+    BILLETERA_NOMBRE: s.billetera_nombre || "",
+    ID_BILLETERA: s.billetera_id || "",
+    CHAT_ID: s.chat_id || "",
+    OPERADOR: s.operador_usuario || "",
+    UPDATED_AT: s.updated_at || s.update_at || "",
+    TURNO: turnoDeFecha(s.created_at)
+  };
+}
+
+async function cargarSolicitudesSupabase(){
+  const { data, error } = await supabaseClient
+    .from("solicitudes")
+    .select("*")
+    .eq("pc_codigo", pcOperativa)
+    .order("created_at", { ascending:false });
+
+  if(error){
+    console.error("Error solicitudes Supabase:", error);
+    return { ok:false, error:error.message || "Error cargando solicitudes" };
+  }
+
+  return {
+    ok:true,
+    solicitudes:(data || []).map(mapSolicitudSupabase)
+  };
+}
+
+async function actualizarSolicitudSupabase(id, cambios){
+  const { data, error } = await supabaseClient
+    .from("solicitudes")
+    .update(cambios)
+    .eq("id", id)
+    .select()
+    .single();
+
+  if(error){
+    console.error("Error actualizando solicitud:", error);
+    return { ok:false, error:error.message || "No se pudo actualizar la solicitud" };
+  }
+
+  return {
+    ok:true,
+    solicitud:mapSolicitudSupabase(data)
+  };
 }
 
 
@@ -617,553 +466,677 @@ function comprimirImagenChat(file, cb){
   reader.readAsDataURL(file);
 }
 
-function getWhatsappNumero() {
-  return WHATSAPP_POR_PC[PC] || WHATSAPP_POR_PC.P1;
-}
+async function obtenerPcsDisponiblesOperador(op){
+  const rol = normalizar(op.rol || op.ROL);
+  const tipo = normalizar(op.tipo || op.tipoOperador || "");
+  const pcRaw = String(op.pc_codigo || op.pc || op.PC || "").trim();
 
-function prepararWhatsapp() {
-  const numero = getWhatsappNumero();
+  if(rol === "ADMIN" || rol === "ENCARGADO" || tipo === "FRANQUERO" || tipo === "FRAMQUERO"){
+    const { data, error } = await supabaseClient
+      .from("pcs")
+      .select("codigo,nombre,activa")
+      .or("activa.is.true,activa.is.null")
+      .order("codigo", { ascending:true });
 
-  const crearTxt = encodeURIComponent("Hola, quiero crear usuario.");
-  const ayudaTxt = encodeURIComponent("Hola, necesito ayuda para cargar.");
-
-  document.getElementById("btnCrearUsuario").href =
-    `https://wa.me/${numero}?text=${crearTxt}`;
-
-
-}
-
-function cargarUsuarioGuardado() {
-  const raw = localStorage.getItem(LS_USER);
-
-  if (!raw) return;
-
-  try {
-    userData = JSON.parse(raw);
-
-    if (userData.usuario && userData.nombre && userData.telefono) {
-      mostrarCarga();
+    if(error){
+      console.error("Error cargando PCs para login:", error);
+      return ["P1","P2","P3","P4","P5"];
     }
-  } catch (e) {}
+
+    const lista = (data || [])
+      .map(p => String(p.codigo || p.nombre || "").trim().toUpperCase())
+      .filter(Boolean);
+
+    return lista.length ? lista : ["P1","P2","P3","P4","P5"];
+  }
+
+  if(pcRaw){
+    return pcRaw.split(/[;,]/).map(x => x.trim().toUpperCase()).filter(Boolean);
+  }
+
+  return ["P1","P2","P3","P4","P5"];
 }
 
-function mostrarCarga() {
-  document.getElementById("registroCard").classList.add("hidden");
-  document.getElementById("cargaCard").classList.remove("hidden");
+async function login(){
+  const usuario = val("loginUsuario").trim();
+  const clave = val("loginClave").trim();
 
-  document.getElementById("datosUsuarioBox").innerHTML = `
-    <b>Usuario:</b> ${userData.usuario}<br>
-    <b>Nombre:</b> ${userData.nombre}<br>
-    <b>WhatsApp:</b> ${userData.telefono}
-  `;
-}
-
-function cambiarDatos() {
-  localStorage.removeItem(LS_USER);
-  userData = null;
-
-  document.getElementById("registroCard").classList.remove("hidden");
-  document.getElementById("cargaCard").classList.add("hidden");
-
-  document.getElementById("regUsuario").value = "";
-  document.getElementById("regNombre").value = "";
-  document.getElementById("regTelefono").value = "";
-}
-
-async function continuarRegistro() {
-  const usuario = document.getElementById("regUsuario").value.trim();
-  const nombre = document.getElementById("regNombre").value.trim();
-  const telefono = document.getElementById("regTelefono").value.trim();
-
-  if (!usuario || !nombre || !telefono) {
-    mostrarRegistroMsg("Completá usuario, nombre y WhatsApp.", false);
+  if(!usuario || !clave){
+    setBox("loginMsg",`<div class="alert-box">Completá usuario y clave.</div>`);
     return;
   }
 
-  if (telefono.replace(/\D/g, "").length < 8) {
-    mostrarRegistroMsg("Revisá el número de WhatsApp.", false);
+  setBox("loginMsg",`<div class="alert-box">Ingresando por Supabase...</div>`);
+
+  const { data, error } = await supabaseClient
+    .from("operadores")
+    .select("*");
+
+  if(error){
+    console.error("Error login Supabase:", error);
+    setBox("loginMsg",`<div class="err-box">Error consultando operadores en Supabase: ${escapeHtml(error.message || "")}</div>`);
     return;
   }
 
-  document.getElementById("btnContinuar").disabled = true;
-  document.getElementById("btnContinuar").innerText = "Guardando...";
+  const op = (data || []).find(x =>
+    String(x.usuario || "").trim().toLowerCase() === usuario.toLowerCase()
+  );
 
-  const r = await api({
-    action: "registrarcontacto",
-    pc: PC,
-    usuarioJugador: usuario,
-    nombreCompleto: nombre,
-    telefono
+  if(!op){
+    console.warn("Operadores recibidos:", data);
+    setBox("loginMsg",`<div class="err-box">Usuario no encontrado en Supabase. Revisá operadores.usuario.</div>`);
+    return;
+  }
+
+  const activoOk = op.activo === true || String(op.activo).toLowerCase() === "true" || String(op.activo).toUpperCase() === "SI" || op.activo === 1;
+  if(!activoOk){
+    setBox("loginMsg",`<div class="err-box">Usuario encontrado, pero está inactivo.</div>`);
+    return;
+  }
+
+  const claveIngresada = String(clave).trim();
+  const clavesValidas = [op.clave, op.password]
+    .filter(v => v !== null && v !== undefined && String(v).trim() !== "")
+    .map(v => String(v).trim());
+
+  if(!clavesValidas.includes(claveIngresada)){
+    console.warn("Usuario encontrado pero clave no coincide:", { usuario: op.usuario, clavesValidas });
+    setBox("loginMsg",`<div class="err-box">Usuario encontrado, pero la clave no coincide con operadores.clave ni operadores.password.</div>`);
+    return;
+  }
+
+  operador = {
+    ...op,
+    usuario: op.usuario,
+    nombre: op.nombre || op.usuario,
+    rol: op.rol || "OPERADOR",
+    tipoOperador: op.tipo || op.rol || "OPERADOR",
+    pc: op.pc_codigo || "",
+    PC: op.pc_codigo || ""
+  };
+
+  const pcsDisponibles = await obtenerPcsDisponiblesOperador(op);
+  const rol = normalizar(op.rol);
+  const tipo = normalizar(op.tipo);
+
+  if(rol === "ADMIN" || rol === "ENCARGADO" || tipo === "FRANQUERO" || tipo === "FRAMQUERO" || pcsDisponibles.length !== 1){
+    abrirSelectorPc(pcsDisponibles);
+    return;
+  }
+
+  pcOperativa = pcsDisponibles[0];
+  finalizarLogin(true);
+}
+
+function abrirSelectorPc(lista){
+  const grid=document.getElementById("pcSelectorGrid");
+  grid.innerHTML="";
+  [...new Set(lista.map(x=>String(x).trim().toUpperCase()).filter(Boolean))].forEach(pc=>{
+    grid.innerHTML+=`<button class="btn btn-primary" onclick="seleccionarPcOperativa('${pc}')">${pc}</button>`;
+  });
+  document.getElementById("selectorPcOverlay").classList.remove("hidden");
+}
+function seleccionarPcOperativa(pc){pcOperativa=pc;document.getElementById("selectorPcOverlay").classList.add("hidden");finalizarLogin(true)}
+
+function finalizarLogin(guardar=true){
+  if(guardar){
+    localStorage.setItem("nodo_operador_lite",JSON.stringify(operador));
+    localStorage.setItem("nodo_pc_operativa_lite",pcOperativa);
+  }
+  document.getElementById("loginView").classList.add("hidden");
+  document.getElementById("appView").classList.remove("hidden");
+  setBox("operadorInfo",`
+    <b>${operador.nombre||operador.NOMBRE}</b><br>
+    <span class="badge badge-blue">Rol: ${operador.rol||operador.ROL}</span>
+    <span class="badge badge-muted">Tipo: ${operador.tipoOperador||"-"}</span>
+    <span class="badge badge-ok">PC: ${pcOperativa}</span>
+  `);
+  refrescarTodo(false);
+  iniciarRealtimeSolicitudes();
+  if(!timersIniciados){
+    timersIniciados=true;
+    setInterval(()=>cargarSolicitudes(true),4500);
+    setInterval(()=>cargarChats(true),4500);
+    setInterval(()=>cargarBilleteras(false),20000);
+    setInterval(()=>{ if(chatActualId) cargarChatActual(true); },3500);
+  }
+}
+
+
+let supabaseSolicitudesChannel = null;
+
+function iniciarRealtimeSolicitudes(){
+
+  if(supabaseSolicitudesChannel){
+    supabaseClient.removeChannel(supabaseSolicitudesChannel);
+  }
+
+  supabaseSolicitudesChannel = supabaseClient
+    .channel("operativo_" + pcOperativa)
+
+    .on(
+      "postgres_changes",
+      {
+        event:"*",
+        schema:"public",
+        table:"solicitudes",
+        filter:"pc_codigo=eq." + pcOperativa
+      },
+      payload => {
+
+        cargarSolicitudes(true);
+
+        if(payload.eventType === "INSERT"){
+          toast("🔔 Nueva solicitud");
+          sonido("solicitud");
+        }
+
+      }
+    )
+
+    .on(
+      "postgres_changes",
+      {
+        event:"INSERT",
+        schema:"public",
+        table:"chat_sesiones",
+        filter:"pc_codigo=eq." + pcOperativa
+      },
+      payload => {
+        cargarChats(true);
+      }
+    )
+
+    .on(
+      "postgres_changes",
+      {
+        event:"INSERT",
+        schema:"public",
+        table:"chat_mensajes"
+      },
+      payload => {
+
+        const nuevo = payload.new || {};
+
+        if(String(nuevo.tipo_emisor || "").toUpperCase() === "USUARIO"){
+          toast("💬 Nuevo mensaje de chat");
+          sonido("chat");
+        }
+
+        cargarChats(true);
+
+        if(chatActualId && String(nuevo.chat_id) === String(chatActualId)){
+          cargarChatActual();
+        }
+
+      }
+    )
+
+    .subscribe(status => {
+      console.log("Realtime operativo:", status);
+    });
+}
+
+function mostrarVista(vista){
+  ["Inicio","Solicitudes","Billeteras","Chat"].forEach(v=>{
+    document.getElementById("view"+v)?.classList.add("hidden");
+    document.getElementById("nav"+v)?.classList.remove("active");
+  });
+  const cap=vista.charAt(0).toUpperCase()+vista.slice(1);
+  document.getElementById("view"+cap)?.classList.remove("hidden");
+  document.getElementById("nav"+cap)?.classList.add("active");
+  if(vista==="solicitudes")renderSolicitudes();
+  if(vista==="billeteras")cargarBilleteras();
+  if(vista==="chat")cargarChats();
+  cerrarMenuMobile();
+}
+
+async function refrescarTodo(showToast=true){
+  await cargarSolicitudes(false);
+  await cargarBilleteras(false);
+  await cargarChats(false);
+  renderInicio();
+  if(showToast)toast("Panel actualizado","green");
+}
+async function cargarSolicitudes(silencioso=false){
+  const r = await cargarSolicitudesSupabase();
+
+  if(!r.ok){
+    toast(r.error || "Error solicitudes Supabase","red");
+    return;
+  }
+
+  solicitudes = (r.solicitudes || []);
+
+  renderSolicitudes();
+  renderInicio();
+  verificarSolicitudes(silencioso);
+}
+function mapBilleteraSupabase(b){
+  return {
+    ID_BILLETERA: b.id,
+    BILLETERA_NOMBRE: b.nombre_visible || "",
+    NOMBRE_VISIBLE: b.nombre_visible || "",
+    TITULAR: b.titular || "",
+    ALIAS: b.alias || "",
+    CVU_CBU: b.cbu || "",
+    TIPO: b.banco || "",
+    PC: b.pc_codigo || "",
+    ACTIVA: b.activa ? "SI" : "NO",
+    SELECCIONADA_MANUAL: b.seleccionada_manual ? "SI" : "NO",
+    ESTADO: b.estado || "",
+    PRIORIDAD: b.prioridad || 0,
+    ORDEN: b.orden || 0,
+    OBSERVACIONES: b.observaciones || ""
+  };
+}
+
+async function cargarBilleteras(render=true){
+  const { data, error } = await supabaseClient
+    .from("billeteras")
+    .select("*")
+    .eq("pc_codigo", pcOperativa)
+    .order("prioridad", { ascending:false })
+    .order("orden", { ascending:true });
+
+  if(error){
+    console.error("Error cargando billeteras Supabase:", error);
+    toast("Error billeteras: " + (error.message || ""), "red");
+    return;
+  }
+
+  billeteras = (data || []).map(mapBilleteraSupabase);
+  if(render)renderBilleteras();
+  renderInicio();
+}
+async function cargarChats(silencioso=false){
+
+  const { data: sesiones, error } = await supabaseClient
+    .from("chat_sesiones")
+    .select("*")
+    .eq("pc_codigo", pcOperativa)
+    .order("created_at",{ascending:false});
+
+  if(error){
+    console.error("Error cargando chat_sesiones:", error);
+    return;
+  }
+
+  const ids = (sesiones || []).map(c => c.chat_id).filter(Boolean);
+
+  let mensajes = [];
+
+  if(ids.length){
+    const { data: mensajesData, error: errorMensajes } = await supabaseClient
+      .from("chat_mensajes")
+      .select("*")
+      .in("chat_id", ids)
+      .order("created_at",{ascending:true});
+
+    if(errorMensajes){
+      console.error("Error cargando chat_mensajes:", errorMensajes);
+    }else{
+      mensajes = mensajesData || [];
+    }
+  }
+
+  chats = (sesiones || []).map(c => {
+
+    const ms = mensajes.filter(m => String(m.chat_id) === String(c.chat_id));
+    const ultimo = ms.length ? ms[ms.length - 1] : null;
+
+    const userCount = ms.filter(m =>
+      String(m.tipo_emisor || "").toUpperCase() === "USUARIO"
+    ).length;
+
+    const readCount = getChatReadCount(c.chat_id);
+    const sinLeer = Math.max(0, userCount - readCount);
+
+    return {
+      ID_CHAT: c.chat_id,
+      chat_id: c.chat_id,
+      USUARIO: c.usuario || "Usuario",
+      NOMBRE_COMPLETO: c.usuario || "",
+      TELEFONO: c.telefono || "",
+      FECHA: c.created_at,
+      FECHA_ULTIMO: ultimo?.created_at || c.created_at,
+      ULTIMO_MENSAJE: ultimo?.mensaje || (ultimo?.imagen_url ? "Imagen adjunta" : ""),
+      SIN_LEER: sinLeer,
+      USER_COUNT: userCount,
+      SOLICITUD_ID: c.solicitud_id || "",
+      ESTADO: c.estado || "ABIERTO"
+    };
+
   });
 
-  document.getElementById("btnContinuar").disabled = false;
-  document.getElementById("btnContinuar").innerText = "Continuar";
+  renderChatList();
+  verificarChats(true);
+  renderInicio();
 
-  if (!r.ok) {
-    mostrarRegistroMsg(r.error || "No se pudo registrar.", false);
+  if(!silencioso){
+    console.log("Chats cargados:", chats.length);
+  }
+}
+
+function turnoDeFecha(fechaRaw){
+  if(!fechaRaw) return "SIN TURNO";
+  const fecha = new Date(fechaRaw);
+  if(isNaN(fecha)) return "SIN TURNO";
+  const hora = Number(fecha.toLocaleString("en-US",{
+    timeZone:"America/Argentina/Buenos_Aires",
+    hour:"2-digit",
+    hour12:false
+  }));
+  if(hora >= 6 && hora < 14) return "TM";
+  if(hora >= 14 && hora < 22) return "TT";
+  return "TN";
+}
+
+function fechaBAKey(fechaRaw){
+  const fecha = fechaRaw ? new Date(fechaRaw) : new Date();
+  if(isNaN(fecha)) return "";
+  return fecha.toLocaleDateString("en-CA",{timeZone:"America/Argentina/Buenos_Aires"});
+}
+
+function esMismoDiaBA(fechaRaw){
+  return fechaBAKey(fechaRaw) === fechaBAKey(new Date());
+}
+
+function resumenTurnosOperativoHTML(lista){
+  const hoy = lista.filter(s=>esMismoDiaBA(s.FECHA_CREACION||s.FECHA));
+  const turnos = ["TM","TT","TN"];
+  let html = `<div class="table-wrap"><table><thead><tr><th>Turno</th><th>Total hoy</th><th>Pendientes</th><th>Realizadas</th><th>Retiros</th></tr></thead><tbody>`;
+  turnos.forEach(t=>{
+    const rows = hoy.filter(s=>turnoDeFecha(s.FECHA_CREACION||s.FECHA) === t);
+    html += `<tr>
+      <td><b>${t}</b></td>
+      <td>${rows.length}</td>
+      <td>${rows.filter(esPendiente).length}</td>
+      <td>${rows.filter(esRealizada).length}</td>
+      <td>${rows.filter(s=>normalizar(s.TIPO_SOLICITUD||s.TIPO)==="RETIRO").length}</td>
+    </tr>`;
+  });
+  html += `<tr>
+    <td><b>TOTAL PC ${pcOperativa || ""}</b></td>
+    <td><b>${hoy.length}</b></td>
+    <td><b>${hoy.filter(esPendiente).length}</b></td>
+    <td><b>${hoy.filter(esRealizada).length}</b></td>
+    <td><b>${hoy.filter(s=>normalizar(s.TIPO_SOLICITUD||s.TIPO)==="RETIRO").length}</b></td>
+  </tr>`;
+  html += `</tbody></table></div>`;
+  return html;
+}
+
+function renderInicio(){
+  const pendientes=solicitudes.filter(esPendiente);
+  const retiros=pendientes.filter(s=>normalizar(s.TIPO_SOLICITUD||s.TIPO)==="RETIRO");
+  const unread=chats.reduce((a,c)=>a+Number(c.SIN_LEER||0),0);
+  const bil=billeteras.find(b=>normalizar(b.SELECCIONADA_MANUAL)==="SI") || billeteras.find(b=>normalizar(b.ACTIVA)==="SI") || {};
+  const hoy = solicitudes.filter(s=>esMismoDiaBA(s.FECHA_CREACION||s.FECHA));
+  setBox("statPendientes",pendientes.length);
+  setBox("statRetiros",`Retiros: ${retiros.length}`);
+  setBox("statSolicitudesHoy",hoy.length);
+  setBox("statSolicitudesTotalPc",`Total PC: ${solicitudes.length}`);
+  setBox("statChats",unread);
+  setBox("statBilletera",bil.NOMBRE_VISIBLE||bil.BILLETERA_NOMBRE||"-");
+  setBox("statBilleteraTipo",bil.TIPO?`${bil.TIPO} · ${bil.PC||pcOperativa}`:"-");
+  setBox("alertas",`
+    ${pendientes.length?`<div class="alert-box">🔔 Hay ${pendientes.length} solicitud/es pendiente/s.</div>`:""}
+    ${unread?`<div class="alert-box">💬 Hay ${unread} mensaje/s de chat sin leer.</div>`:""}
+  `);
+  setBox("resumenTurnosOperativo",resumenTurnosOperativoHTML(solicitudes));
+  setBox("tablaSolicitudesInicio",tablaSolicitudesHTML(pendientes.slice(0,40)));
+}
+function renderSolicitudes(){
+  let lista=solicitudes.slice();
+  const estado=val("filtroEstado"), tipo=val("filtroTipo"), texto=normalizar(val("filtroTexto"));
+  if(estado==="PENDIENTE")lista=lista.filter(esPendiente);
+  if(estado==="REALIZADAS")lista=lista.filter(esRealizada);
+  if(estado==="RECHAZADA")lista=lista.filter(s=>normalizar(s.ESTADO)==="RECHAZADA");
+  if(tipo)lista=lista.filter(s=>normalizar(s.TIPO_SOLICITUD||s.TIPO)===tipo);
+  if(texto)lista=lista.filter(s=>normalizar(`${s.USUARIO||""} ${s.NOMBRE_COMPLETO||""} ${s.BILLETERA_NOMBRE||""} ${s.ID||""}`).includes(texto));
+  setBox("tablaSolicitudesCompleta",tablaSolicitudesHTML(lista));
+}
+function tablaSolicitudesHTML(lista){
+  if(!lista.length)return`<div class="alert-box">No hay solicitudes para mostrar.</div>`;
+  let html=`<div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Usuario</th><th>Billetera</th><th>Monto</th><th>Estado</th><th>Acción</th></tr></thead><tbody>`;
+  lista.forEach(s=>{
+    const id=s.ID||s.SOLICITUD_ID||s.ID_SOLICITUD||"";
+    const tipo=normalizar(s.TIPO_SOLICITUD||s.TIPO);
+    html+=`<tr>
+      <td>${formatFecha(s.FECHA_CREACION||s.FECHA)}</td>
+      <td>${tipo}</td>
+      <td><b>${s.USUARIO||s.USUARIO_JUGADOR||"-"}</b><br><span class="small">${s.NOMBRE_COMPLETO||""}</span></td>
+      <td>${s.BILLETERA_NOMBRE||s.NOMBRE_BILLETERA||s.ID_BILLETERA||"-"}</td>
+      <td>${money(s.MONTO_REAL||s.MONTO_DECLARADO||s.MONTO||0)}</td>
+      <td>${estadoBadge(s.ESTADO)}</td>
+      <td>
+        ${esPendiente(s)?`
+          <button class="mini-btn blue" onclick="tomarSolicitud('${id}')">Tomar</button>
+          ${tipo==="RETIRO"?`<button class="mini-btn green" onclick="abrirCerrarRetiro('${id}')">Cerrar retiro</button>`:`<button class="mini-btn green" onclick="abrirAprobarSolicitud('${id}')">Aprobar</button>`}
+          <button class="mini-btn red" onclick="abrirRechazarSolicitud('${id}')">Rechazar</button>
+        `:"-"}
+      </td>
+    </tr>`;
+  });
+  html+=`</tbody></table></div>`;
+  return html;
+}
+
+function renderBilleteras(){
+  if(!billeteras.length){setBox("walletsGrid",`<div class="alert-box">No hay billeteras configuradas.</div>`);return}
+  let html="";
+  billeteras.forEach(b=>{
+    const activa=normalizar(b.ACTIVA)==="SI";
+    const seleccionada=normalizar(b.SELECCIONADA_MANUAL)==="SI";
+    html+=`<div class="wallet-card ${activa?"ok":"paused"} ${seleccionada?"selected":""}">
+      <div class="wallet-name">💳 ${b.NOMBRE_VISIBLE||b.BILLETERA_NOMBRE||b.ID_BILLETERA}</div>
+      <div class="wallet-type">${b.TIPO||""} · ${b.PC||pcOperativa}</div>
+      <div style="margin-top:12px">
+        ${activa?'<span class="badge badge-ok">ACTIVA</span>':'<span class="badge badge-danger">PAUSADA</span>'}
+        ${seleccionada?'<span class="badge badge-blue">EN LANDING</span>':''}
+      </div>
+      <div class="wallet-actions">
+        <button class="mini-btn blue" onclick="seleccionarBilletera('${b.ID_BILLETERA}')">Poner en landing</button>
+        <button class="mini-btn green" onclick="cambiarEstadoBilletera('${b.ID_BILLETERA}','SI')">Activar</button>
+        <button class="mini-btn red" onclick="cambiarEstadoBilletera('${b.ID_BILLETERA}','NO')">Pausar</button>
+      </div>
+    </div>`;
+  });
+  setBox("walletsGrid",html);
+}
+
+async function tomarSolicitud(id){
+  const r = await actualizarSolicitudSupabase(id, {
+    operador_usuario: operador.usuario || operador.nombre || "",
+    estado: "PENDIENTE"
+  });
+
+  if(!r.ok){
+    alert(r.error || "Error");
     return;
   }
 
-  userData = { usuario, nombre, telefono };
-  localStorage.setItem(LS_USER, JSON.stringify(userData));
-  mostrarCarga();
+  toast("Solicitud tomada","green");
+  await refrescarTodo(false);
 }
+function abrirAprobarSolicitud(id){
+  const s = solicitudes.find(x=>String(x.ID||x.SOLICITUD_ID)===String(id));
 
-function mostrarRegistroMsg(texto, ok) {
-  const box = document.getElementById("registroMsg");
-  box.innerHTML = texto;
-  box.className = "result " + (ok ? "ok" : "err");
-}
+  if(!s) return;
 
-async function cargarBilletera() {
-  const r = await api({ action: "getbilleteras", pc: PC });
+  abrirModal("Aprobar carga",`
+    <div class="ok-box"><b>${s.USUARIO||""}</b> · ${money(s.MONTO_DECLARADO||s.MONTO_REAL||0)}</div>
+    <label>Monto real</label>
+    <input id="apMonto" type="number" value="${s.MONTO_REAL||s.MONTO_DECLARADO||""}">
+    <label>Observaciones</label>
+    <textarea id="apObs"></textarea>
+    <div class="alert-box">Al aprobar, la landing mostrará el modal de fichas cargadas y el botón para ingresar a la plataforma.</div>
+  `,async()=>{
 
-  if (!r.ok || !r.billeteras || r.billeteras.length === 0) {
-    document.getElementById("cvuBox").innerText = "No disponible";
-    document.getElementById("titularBox").innerText = "Consultar por WhatsApp";
-    billeteraActiva = null;
-    return;
-  }
+    const r = await actualizarSolicitudSupabase(id, {
+      estado:"APROBADA_MANUAL_OK",
+      monto:Number(val("apMonto") || s.MONTO_DECLARADO || 0),
+      operador_usuario:operador.usuario || operador.nombre || "",
+      observaciones:val("apObs") || ""
+    });
 
-  const billeteras = r.billeteras.filter(b =>
-    String(b.ACTIVA || "").toUpperCase() === "SI"
-  );
-
-  if (billeteras.length === 0) {
-    document.getElementById("cvuBox").innerText = "No disponible";
-    document.getElementById("titularBox").innerText = "Consultar por WhatsApp";
-    billeteraActiva = null;
-    return;
-  }
-
-  billeteraActiva =
-    billeteras.find(b => String(b.SELECCIONADA_MANUAL || "").toUpperCase() === "SI") ||
-    billeteras[0];
-
-  document.getElementById("cvuBox").innerText =
-    billeteraActiva.CVU_CBU || billeteraActiva.ALIAS || "Consultar";
-
-  document.getElementById("titularBox").innerText =
-    billeteraActiva.TITULAR || billeteraActiva.NOMBRE_VISIBLE || "Consultar";
-
-  document.getElementById("bancoBox").innerText =
-    String(billeteraActiva.TIPO || "").includes("MP")
-      ? "Mercado Pago"
-      : billeteraActiva.TIPO || "Billetera";
-}
-
-function copiarCvu() {
-  const texto = document.getElementById("cvuBox").innerText;
-  navigator.clipboard.writeText(texto);
-  mostrarResultado("Copiado correctamente.", true);
-}
-
-
-function seleccionarTipoSolicitud(tipo){
-  tipoSolicitudActual = String(tipo || "CARGA").toUpperCase();
-  const esRetiro = tipoSolicitudActual === "RETIRO";
-
-  document.getElementById("tipoCargaBtn").classList.toggle("active", !esRetiro);
-  document.getElementById("tipoRetiroBtn").classList.toggle("active", esRetiro);
-
-  document.getElementById("montoLabel").innerText = esRetiro ? "Monto a retirar *" : "Monto a cargar *";
-  document.getElementById("monto").placeholder = esRetiro ? "mínimo: 5000" : "ej: 5000";
-  document.getElementById("btnEnviar").innerText = esRetiro ? "Enviar solicitud de retiro" : "Enviar solicitud";
-
-  const minTxt = document.getElementById("montoMinimoTxt");
-  if(minTxt){
-    minTxt.innerText = esRetiro ? "⚠️ Retiro mínimo: $5.000" : "⚠️ Carga mínima: $2.000";
-  }
-}
-
-
-
-async function puedeSolicitarRetiro(){
-  const desde = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-
-  const { data, error } = await supabaseClient
-    .from("solicitudes")
-    .select("id, created_at, estado")
-    .eq("usuario", userData.usuario)
-    .eq("tipo", "RETIRO")
-    .gte("created_at", desde)
-    .order("created_at", { ascending:false })
-    .limit(1);
-
-  if(error){
-    console.error("Error validando retiro 24hs:", error);
-    return { ok:false, error:"No pudimos validar el último retiro. Contactanos por chat." };
-  }
-
-  if(data && data.length){
-    const ultima = new Date(data[0].created_at);
-    const proxima = new Date(ultima.getTime() + 24 * 60 * 60 * 1000);
-    return {
-      ok:false,
-      error:`Ya tenés una solicitud de retiro dentro de las últimas 24 hs. Podés volver a solicitar desde ${proxima.toLocaleString("es-AR",{timeZone:"America/Argentina/Buenos_Aires",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false})}. Si necesitás ayuda, escribinos por chat.`
-    };
-  }
-
-  return { ok:true };
-}
-
-async function crearSolicitud() {
-  const monto = Number(document.getElementById("monto").value || 0);
-  const tipo = String(tipoSolicitudActual || "CARGA").toUpperCase();
-  const esRetiro = tipo === "RETIRO";
-
-  if (!userData || !userData.usuario || !userData.nombre || !userData.telefono) {
-    mostrarResultado("Primero completá tus datos.", false);
-    return;
-  }
-
-  if (!monto) {
-    mostrarResultado(esRetiro ? "Completá el monto a retirar." : "Completá el monto a cargar.", false);
-    return;
-  }
-
-  if (!esRetiro && monto < 2000) {
-    mostrarResultado("El monto mínimo de carga es $2.000.", false);
-    return;
-  }
-
-  if (esRetiro && monto < 5000) {
-    mostrarResultado("El monto mínimo de retiro es $5.000.", false);
-    return;
-  }
-
-  if (esRetiro) {
-    const validacionRetiro = await puedeSolicitarRetiro();
-    if(!validacionRetiro.ok){
-      mostrarResultado(validacionRetiro.error || "No se puede solicitar otro retiro todavía. Contactanos por chat.", false);
-      return;
-    }
-  }
-
-  if (!esRetiro && !billeteraActiva) {
-    mostrarResultado("No hay billetera disponible. Contactanos por chat.", false);
-    return;
-  }
-
-  document.getElementById("btnEnviar").disabled = true;
-  document.getElementById("btnEnviar").innerText = "Enviando...";
-
-  const r = await crearSolicitudSupabase(monto, tipo);
-
-  document.getElementById("btnEnviar").disabled = false;
-  document.getElementById("btnEnviar").innerText = esRetiro ? "Enviar solicitud de retiro" : "Enviar solicitud";
-
-  if (!r.ok) {
-    mostrarResultado(r.error || "No se pudo crear la solicitud.", false);
-    return;
-  }
-
-  solicitudActual = r.solicitud.id;
-  localStorage.setItem(LS_SOLICITUD, solicitudActual);
-  vincularChatLiteASolicitud(solicitudActual);
-
-  mostrarResultado(
-    `✅ Solicitud enviada correctamente.<br><br>
-    <b>ID:</b> ${r.solicitud.id}<br>
-    <b>Tipo:</b> ${tipo}<br>
-    <b>Estado:</b> ${r.solicitud.estado}<br><br>
-    ${esRetiro ? "Estamos revisando tu retiro." : "Estamos verificando tu transferencia."}`,
-    true
-  );
-
-  mostrarEstadoEspera(r.solicitud.estado || "PENDIENTE");
-  iniciarEscuchaEstado();
-
-  document.getElementById("monto").value = "";
-}
-
-function mostrarEstadoEspera(estado="PENDIENTE") {
-  document.getElementById("estadoEspera").classList.remove("hidden");
-  renderProgresoSolicitud(estado);
-}
-
-function completarEstado() {
-  renderProgresoSolicitud("ACREDITADA");
-}
-
-
-function renderProgresoSolicitud(estado){
-  const e = String(estado || "PENDIENTE").toUpperCase();
-  const tipo = String(tipoSolicitudActual || "CARGA").toUpperCase();
-  const esRetiro = tipo === "RETIRO";
-
-  const esFinalOk = ["APROBADA","APROBADA_MANUAL","APROBADA_MANUAL_OK","ACREDITADA","PAGADA"].includes(e);
-  const esRechazada = ["RECHAZADA","ERROR"].includes(e);
-
-  document.getElementById("estadoEspera").classList.remove("hidden");
-
-  const step1Text = document.getElementById("step1Text");
-  const step2Text = document.getElementById("step2Text");
-  const step3Title = document.getElementById("step3Title");
-  const step3Text = document.getElementById("step3Text");
-
-  if(step1Text) step1Text.innerText = esRetiro ? "Recibimos tu solicitud de retiro." : "Recibimos tu pedido de carga.";
-  if(step2Text) step2Text.innerText = esRetiro ? "Un operador está revisando tu retiro." : "Un operador está revisando la transferencia.";
-  if(step3Title) step3Title.innerText = esRetiro ? "Retiro aprobado/pagado" : "Fichas acreditadas";
-  if(step3Text) step3Text.innerText = esRetiro ? "Cuando se apruebe, te avisamos automáticamente." : "Cuando se apruebe, te avisamos automáticamente.";
-
-  document.getElementById("step1").className = "step done";
-
-  if(esFinalOk){
-    document.getElementById("step2").className = "step done";
-    document.getElementById("step3").className = "step done";
-  }else if(esRechazada){
-    document.getElementById("step2").className = "step";
-    document.getElementById("step3").className = "step";
-  }else{
-    document.getElementById("step2").className = "step active";
-    document.getElementById("step3").className = "step";
-  }
-}
-
-
-function recuperarSolicitudPendiente() {
-  const guardada = localStorage.getItem(LS_SOLICITUD);
-
-  if (guardada) {
-    solicitudActual = guardada;
-    mostrarEstadoEspera("PENDIENTE");
-    iniciarEscuchaEstado();
-  }
-}
-
-function iniciarEscuchaEstado() {
-  if (intervaloEstado) clearInterval(intervaloEstado);
-
-  intervaloEstado = setInterval(async () => {
-    if (!solicitudActual) return;
-
-    const { data, error } = await supabaseClient
-      .from("solicitudes")
-      .select("*")
-      .eq("id", solicitudActual)
-      .maybeSingle();
-
-    if(error || !data) return;
-
-    const estado = String(data.estado || "");
-    const tipo = String(data.tipo || tipoSolicitudActual || "CARGA").toUpperCase();
-    const esRetiro = tipo === "RETIRO";
-
-    tipoSolicitudActual = tipo;
-    renderProgresoSolicitud(estado);
-
-    if (
-      estado === "APROBADA" ||
-      estado === "APROBADA_MANUAL" ||
-      estado === "APROBADA_MANUAL_OK" ||
-      estado === "ACREDITADA" ||
-      estado === "PAGADA"
-    ) {
-      clearInterval(intervaloEstado);
-      completarEstado();
-
-      if(esRetiro){
-        mostrarResultado("✅ Tu retiro fue marcado como pagado/aprobado.", true);
-        setTimeout(() => {
-          resetLandingEstado();
-          location.reload();
-        }, 2600);
-      }else{
-        document.getElementById("successModal").classList.remove("hidden");
-        setTimeout(() => {
-          resetLandingEstado();
-          location.reload();
-        }, 4500);
-      }
-
-      if (navigator.vibrate) navigator.vibrate([160, 80, 160]);
+    if(!r.ok){
+      alert(r.error || "Error");
       return;
     }
 
-    if (estado === "RECHAZADA" || estado === "ERROR") {
-      clearInterval(intervaloEstado);
-      mostrarResultado("La solicitud no pudo ser aprobada. Contactanos por chat.", false);
-      setTimeout(() => {
-        resetLandingEstado();
-        location.reload();
-      }, 3200);
-    }
-  }, 3500);
+    cerrarModal();
+    toast("Carga aprobada","green");
+    await refrescarTodo(false);
+
+  },"Aprobar");
 }
+function abrirCerrarRetiro(id){
+  const s = solicitudes.find(x=>String(x.ID||x.SOLICITUD_ID)===String(id));
 
-function irPlataforma() {
-  const url = LINKS_PLATAFORMA[PC] || LINKS_PLATAFORMA.P1;
-  resetLandingEstado();
+  if(!s) return;
 
-  if (url) {
-    window.location.href = url;
-  }
-}
+  abrirModal("Cerrar retiro",`
+    <div class="ok-box"><b>${s.USUARIO||""}</b> · ${money(s.MONTO_DECLARADO||s.MONTO_REAL||0)}</div>
+    <label>Monto final</label>
+    <input id="retMonto" type="number" value="${s.MONTO_REAL||s.MONTO_DECLARADO||""}">
+    <label>Observaciones</label>
+    <textarea id="retObs"></textarea>
+    <div class="alert-box">Al cerrar, la landing avisará que el retiro fue aprobado/pagado.</div>
+  `,async()=>{
 
-function cerrarModalExito() {
-  document.getElementById("successModal").classList.add("hidden");
-  resetLandingEstado();
-  setTimeout(() => location.reload(), 300);
-}
+    const r = await actualizarSolicitudSupabase(id, {
+      estado:"PAGADA",
+      monto:Number(val("retMonto") || s.MONTO_DECLARADO || 0),
+      operador_usuario:operador.usuario || operador.nombre || "",
+      observaciones:val("retObs") || ""
+    });
 
-function mostrarResultado(texto, ok) {
-  const box = document.getElementById("resultado");
-  box.innerHTML = texto;
-  box.className = "result " + (ok ? "ok" : "err");
-}
-async function crearSolicitudSupabase(monto, tipo="CARGA"){
-
-  const esRetiro = String(tipo || "CARGA").toUpperCase() === "RETIRO";
-
-  const payload = {
-    usuario: userData.usuario,
-    nombre_completo: userData.nombre,
-    telefono: userData.telefono,
-    pc_codigo: PC,
-    tipo: esRetiro ? "RETIRO" : "CARGA",
-    monto: Number(monto),
-    estado: "PENDIENTE",
-    chat_id: chatSessionId || null
-  };
-
-  if(!esRetiro){
-    payload.billetera_nombre = billeteraActiva?.NOMBRE_VISIBLE || billeteraActiva?.BILLETERA_NOMBRE || "";
-  }
-
-  const { data, error } = await supabaseClient
-    .from("solicitudes")
-    .insert(payload)
-    .select()
-    .single();
-
-  if(error){
-    console.error("Error creando solicitud Supabase:", error);
-    return {
-      ok:false,
-      error:error.message || "No se pudo crear la solicitud."
-    };
-  }
-
-  solicitudActual = data.id;
-
-  return {
-    ok:true,
-    solicitud:data
-  };
-}
-
- function resetLandingEstado(){
-  solicitudActual = null;
-
-  if(intervaloEstado){
-    clearInterval(intervaloEstado);
-    intervaloEstado = null;
-  }
-
-  localStorage.removeItem(LS_SOLICITUD);
-
-  const progreso = document.getElementById("estadoEspera");
-  if(progreso) progreso.classList.add("hidden");
-
-  const modal = document.getElementById("successModal");
-  if(modal) modal.classList.add("hidden");
-
-  const resultado = document.getElementById("resultado");
-  if(resultado){
-    resultado.innerHTML = "";
-    resultado.className = "result";
-  }
-
-  const monto = document.getElementById("monto");
-  if(monto) monto.value = "";
-
-  seleccionarTipoSolicitud("CARGA");
-} 
-/* === CHAT LITE PRO === */
-const LS_CHAT="bet300_chat_"+PC;let chatSessionId=localStorage.getItem(LS_CHAT)||"";let chatLiteImagenBase64="";let chatLiteImagenNombre="";let chatLiteTimer=null;let chatLiteMensajesCount=0;
-async function asegurarChatLite(){
-
-  if(chatSessionId){
-
-    const { data: existente, error } = await supabaseClient
-      .from("chat_sesiones")
-      .select("chat_id")
-      .eq("chat_id", chatSessionId)
-      .maybeSingle();
-
-    if(existente && !error){
-      iniciarRealtimeChatLanding();
-      return chatSessionId;
+    if(!r.ok){
+      alert(r.error || "Error");
+      return;
     }
 
-    localStorage.removeItem(LS_CHAT);
-    chatSessionId = "";
-  }
+    cerrarModal();
+    toast("Retiro cerrado","green");
+    await refrescarTodo(false);
 
-  const nuevoChatId = crypto.randomUUID();
+  },"Cerrar retiro");
+}
+function abrirRechazarSolicitud(id){
+  abrirModal("Rechazar solicitud",`
+    <label>Motivo</label>
+    <textarea id="rechObs"></textarea>
+  `,async()=>{
 
-  const payload = {
-    chat_id: nuevoChatId,
-    usuario: userData?.usuario || "",
-    telefono: userData?.telefono || "",
-    pc_codigo: PC,
-    estado: "ABIERTO",
-    solicitud_id: solicitudActual || null
-  };
+    const r = await actualizarSolicitudSupabase(id, {
+      estado:"RECHAZADA",
+      operador_usuario:operador.usuario || operador.nombre || ""
+    });
 
-  const { data, error } = await supabaseClient
-    .from("chat_sesiones")
-    .insert(payload)
-    .select()
-    .single();
+    if(!r.ok){
+      alert(r.error || "Error");
+      return;
+    }
+
+    cerrarModal();
+    toast("Solicitud rechazada","red");
+    await refrescarTodo(false);
+
+  },"Rechazar");
+}
+
+async function seleccionarBilletera(id){
+  await supabaseClient.from("billeteras").update({ seleccionada_manual:false });
+
+  const { error } = await supabaseClient
+    .from("billeteras")
+    .update({ seleccionada_manual:true, activa:true, estado:"activa", updated_at:new Date().toISOString() })
+    .eq("id", id);
 
   if(error){
-    console.error("Error creando chat_sesiones:", error);
-    throw new Error("No se pudo iniciar el chat.");
+    alert(error.message || "Error seleccionando billetera");
+    return;
   }
 
-  chatSessionId = data.chat_id;
-  localStorage.setItem(LS_CHAT, chatSessionId);
-
-  iniciarRealtimeChatLanding();
-
-  return chatSessionId;
+  toast("Billetera puesta en landing","green");
+  await cargarBilleteras();
 }
-async function abrirChatLite(){if(!userData||!userData.usuario||!userData.nombre||!userData.telefono){mostrarRegistroMsg("Primero completá tus datos para iniciar el chat.",false);document.getElementById("registroCard").scrollIntoView({behavior:"smooth"});return}document.getElementById("chatLite").classList.remove("hidden");try{await asegurarChatLite();await cargarChatLite();iniciarTimerChatLite()}catch(e){document.getElementById("chatLiteStatus").innerText="No se pudo conectar"}}
-function cerrarChatLite(){document.getElementById("chatLite").classList.add("hidden")}
-function iniciarTimerChatLite(){if(chatLiteTimer)clearInterval(chatLiteTimer);chatLiteTimer=setInterval(cargarChatLite,2500)}
-async function cargarChatLite(){
+async function cambiarEstadoBilletera(id,estado){
+  const activa = String(estado || "").toUpperCase() === "SI";
 
-  if(!chatSessionId) return;
+  const { error } = await supabaseClient
+    .from("billeteras")
+    .update({ activa, estado: activa ? "activa" : "inactiva", updated_at:new Date().toISOString() })
+    .eq("id", id);
+
+  if(error){
+    alert(error.message || "Error actualizando billetera");
+    return;
+  }
+
+  await cargarBilleteras();
+}
+
+function renderChatList(){
+  if(!chats.length){
+    setBox("chatList",`<div class="alert-box" style="margin:12px">No hay chats activos.</div>`);
+    return;
+  }
+
+  let html="";
+
+  chats.forEach(c=>{
+    const id = c.ID_CHAT || c.chat_id || "";
+    const unread=Number(c.SIN_LEER||0);
+
+    html+=`<div class="chat-item ${String(id)===String(chatActualId)?"active":""}" onclick="abrirChat('${id}')">
+      <div class="chat-item-title">
+        <span>${escapeHtml(c.USUARIO||"Usuario landing")}</span>
+        ${unread?`<span class="chat-unread">${unread}</span>`:""}
+      </div>
+      <div class="small">${escapeHtml(c.NOMBRE_COMPLETO||"")} ${c.TELEFONO ? "· "+escapeHtml(c.TELEFONO) : ""}</div>
+      <div class="small">${formatFecha(c.FECHA_ULTIMO||c.FECHA||"")}</div>
+      <div class="small">${escapeHtml(c.ULTIMO_MENSAJE||"")}</div>
+    </div>`;
+  });
+
+  setBox("chatList",html);
+}
+async function abrirChat(id){
+  chatActualId=id;
+  await cargarChatActual(false);
+
+  const userCount = chatMensajes.filter(m =>
+    String(m.tipo_emisor || m.TIPO_EMISOR || "").toUpperCase() === "USUARIO"
+  ).length;
+
+  setChatReadCount(id, userCount);
+
+  await cargarChats(true);
+  renderChatList();
+  renderChatMensajes();
+}
+async function cargarChatActual(){
+
+  if(!chatActualId) return;
 
   const { data, error } = await supabaseClient
     .from("chat_mensajes")
     .select("*")
-    .eq("chat_id", chatSessionId)
+    .eq("chat_id", chatActualId)
     .order("created_at",{ascending:true});
 
   if(error){
-    console.error("Error cargando chat:", error);
+    console.error("Error cargando mensajes del chat:", error);
     return;
   }
 
-  const mensajes = (data || []).map(m=>({
-    TIPO_EMISOR:m.tipo_emisor,
-    MENSAJE:m.mensaje,
-    IMAGEN_URL:m.imagen_url,
-    FECHA:m.created_at,
-    LEIDO:"SI"
-  }));
+  chatMensajes = data || [];
 
-  chatLiteMensajesCount = mensajes.length;
-
-  renderChatLite(mensajes);
+  renderChatMensajes();
 }
-
-
-  
-
 
 function normalizarImagenUrl(url){
   const u = String(url || "");
@@ -1174,180 +1147,187 @@ function normalizarImagenUrl(url){
   return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w1000` : u;
 }
 
-function renderChatLite(mensajes){const box=document.getElementById("chatLiteBody");let html=`<div class="chat-day">Chat de soporte</div>`;if(!mensajes.length){html+=`<div class="chat-msg operator"><div class="chat-bubble">Hola 👋 Escribinos tu consulta o adjuntá el comprobante si necesitás ayuda con la carga.</div><div class="chat-meta">Soporte</div></div>`}mensajes.forEach(m=>{const tipo=String(m.TIPO_EMISOR||"").toUpperCase();const esUsuario=tipo==="USUARIO";const cls=esUsuario?"user":"operator";const hora=formatearHoraChat(m.FECHA);const leido=String(m.LEIDO||"").toUpperCase()==="SI";html+=`<div class="chat-msg ${cls}"><div class="chat-bubble">${escapeHtml(m.MENSAJE||"")}${m.IMAGEN_URL?`<img src="${normalizarImagenUrl(m.IMAGEN_URL)}" alt="Imagen adjunta">`:""}</div><div class="chat-meta">${esUsuario?estadoMensajeChat(leido):"Soporte"} · ${hora}</div></div>`});box.innerHTML=html;box.scrollTop=box.scrollHeight}
-function estadoMensajeChat(leido){return leido?"✓✓ recibido":"✓ enviado"}
-function formatFecha(fechaRaw){
+function renderChatMensajes(){
+  const chat=chats.find(c=>String(c.ID_CHAT||c.chat_id)===String(chatActualId))||{};
 
-  if(!fechaRaw) return "";
+  setBox("chatTitulo",chat.USUARIO||"Chat landing");
+  setBox("chatSubtitulo",`${chat.NOMBRE_COMPLETO||""} ${chat.TELEFONO? "· "+chat.TELEFONO:""}`);
+  setBox("chatEstado",chat.SOLICITUD_ID?`Solicitud: ${chat.SOLICITUD_ID}`:"Sin solicitud");
 
-  try{
-
-    const fecha = new Date(fechaRaw);
-
-    if(isNaN(fecha)){
-      return String(fechaRaw || "");
-    }
-
-    return fecha.toLocaleString("es-AR",{
-      timeZone:"America/Argentina/Buenos_Aires",
-      day:"2-digit",
-      month:"2-digit",
-      hour:"2-digit",
-      minute:"2-digit",
-      second:"2-digit",
-      hour12:false
-    }).replace(",", " ·");
-
-  }catch(e){
-
-    return String(fechaRaw || "");
-
-  }
-}
-
-function formatearHoraChat(fechaRaw){
-
-  if(!fechaRaw) return "";
-
-  try{
-
-    const fecha = new Date(fechaRaw);
-
-    if(isNaN(fecha)){
-      return "";
-    }
-
-    return fecha.toLocaleTimeString("es-AR",{
-      timeZone:"America/Argentina/Buenos_Aires",
-      hour:"2-digit",
-      minute:"2-digit",
-      second:"2-digit",
-      hour12:false
-    });
-
-  }catch(e){
-
-    return "";
-
-  }
-}
-
-function escapeHtml(text){return String(text||"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
-async function enviarChatLite(){
-
-  const input = document.getElementById("chatLiteInput");
-  const mensaje = input.value.trim();
-
-  if(!mensaje && !chatLiteImagenBase64){
+  if(!chatMensajes.length){
+    setBox("chatBody",`<div class="alert-box">Sin mensajes todavía.</div>`);
     return;
   }
 
-  try{
-    await asegurarChatLite();
-  }catch(e){
-    alert(e.message || "No se pudo iniciar el chat.");
-    return;
-  }
+  let html="";
 
-  const box = document.getElementById("chatLiteBody");
+  chatMensajes.forEach(m=>{
+    const tipo=normalizar(m.tipo_emisor || m.TIPO_EMISOR);
+    const esUser=tipo==="USUARIO";
+    const mensaje = m.mensaje || m.MENSAJE || "";
+    const imagen = m.imagen_url || m.IMAGEN_URL || "";
+    const fecha = m.created_at || m.FECHA || "";
 
-  box.insertAdjacentHTML("beforeend", `
-    <div class="chat-msg user">
+    html+=`<div class="chat-msg ${esUser?"user":"op"}">
       <div class="chat-bubble">
         ${escapeHtml(mensaje)}
-        ${chatLiteImagenBase64 ? `<img src="${chatLiteImagenBase64}" alt="Imagen adjunta">` : ""}
+        ${imagen?`<img src="${normalizarImagenUrl(imagen)}" alt="Imagen">`:""}
       </div>
-      <div class="chat-meta">✓ enviando...</div>
-    </div>
-  `);
+      <div class="chat-meta">${esUser?"Usuario":"Operador"} · ${formatFecha(fecha)}</div>
+    </div>`;
+  });
 
-  box.scrollTop = box.scrollHeight;
-  input.value = "";
+  const box=document.getElementById("chatBody");
+  box.innerHTML=html;
+  box.scrollTop=box.scrollHeight;
+}
+async function enviarChat(){
+  if(!chatActualId){
+    alert("Seleccioná un chat primero.");
+    return;
+  }
+
+  const input = document.getElementById("chatInput");
+  const mensaje = input.value.trim();
+
+  if(!mensaje && !chatImagenBase64) return;
+
+  agregarMensajeLocalPanel(mensaje, chatImagenBase64 || "");
 
   const { error } = await supabaseClient
     .from("chat_mensajes")
     .insert({
-      chat_id: chatSessionId,
-      tipo_emisor: "USUARIO",
-      emisor: userData?.usuario || "Usuario",
+      chat_id: chatActualId,
+      tipo_emisor: "OPERADOR",
+      emisor: operador.nombre || operador.usuario || "Operador",
       mensaje: mensaje || "",
-      imagen_url: chatLiteImagenBase64 || ""
+      imagen_url: chatImagenBase64 || ""
     });
 
   if(error){
-    console.error("Error enviando chat:", error);
+    console.error("Error enviando mensaje operador:", error);
     alert("No se pudo enviar el mensaje.");
     return;
   }
 
-  marcarUltimoMensajeChatLiteEnviado();
-  quitarImagenChatLite();
+  input.value="";
+  quitarImagenChat();
+  marcarUltimoMensajePanelEnviado();
 
-  setTimeout(cargarChatLite, 400);
-  setTimeout(cargarChatLite, 1200);
+  setTimeout(()=>cargarChatActual(),400);
+  setTimeout(()=>cargarChats(true),700);
 }
 
-let realtimeChatChannel = null;
-
-function iniciarRealtimeChatLanding(){
-
-  if(!chatSessionId) return;
-
-  if(realtimeChatChannel){
-    supabaseClient.removeChannel(realtimeChatChannel);
-  }
-
-  realtimeChatChannel = supabaseClient
-    .channel("chat_landing_" + chatSessionId)
-    .on(
-      "postgres_changes",
-      {
-        event:"INSERT",
-        schema:"public",
-        table:"chat_mensajes",
-        filter:"chat_id=eq." + chatSessionId
-      },
-      payload => {
-        const m = payload.new;
-
-        if(String(m.tipo_emisor || "").toUpperCase() === "OPERADOR"){
-          cargarChatLite();
-        }
-      }
-    )
-    .subscribe();
+function agregarMensajeLocalPanel(mensaje, imagen){
+  const box = document.getElementById("chatBody");
+  box.insertAdjacentHTML("beforeend", `
+    <div class="chat-msg op">
+      <div class="chat-bubble">
+        ${escapeHtml(mensaje || "")}
+        ${imagen ? `<img src="${imagen}" alt="Imagen">` : ""}
+      </div>
+      <div class="chat-meta">Operador · enviando...</div>
+    </div>
+  `);
+  box.scrollTop = box.scrollHeight;
 }
-
-function marcarUltimoMensajeChatLiteEnviado(){
-  const metas = document.querySelectorAll("#chatLiteBody .chat-msg.user .chat-meta");
+function marcarUltimoMensajePanelEnviado(){
+  const metas = document.querySelectorAll("#chatBody .chat-msg.op .chat-meta");
   const last = metas[metas.length - 1];
-  if(last) last.innerText = "✓ enviado · ahora";
+  if(last && last.innerText.includes("enviando")) last.innerText = "Operador · enviado";
 }
-function tomarImagenChatLiteFile(){const file=document.getElementById("chatLiteFile").files[0];if(file)leerImagenChatLite(file)}
-function leerImagenChatLite(file){if(!file.type.startsWith("image/")){alert("Adjuntá una imagen válida.");return}comprimirImagenChat(file,base64=>{chatLiteImagenBase64=base64;chatLiteImagenNombre=(file.name||"comprobante.jpg").replace(/\.[^.]+$/,".jpg");document.getElementById("chatLitePreviewImg").src=chatLiteImagenBase64;document.getElementById("chatLitePreview").classList.add("show")})}
-function quitarImagenChatLite(){chatLiteImagenBase64="";chatLiteImagenNombre="";document.getElementById("chatLiteFile").value="";document.getElementById("chatLitePreviewImg").src="";document.getElementById("chatLitePreview").classList.remove("show")}
-document.addEventListener("paste",e=>{const chatVisible=!document.getElementById("chatLite").classList.contains("hidden");if(!chatVisible)return;const items=e.clipboardData?.items||[];for(const item of items){if(item.type&&item.type.startsWith("image/")){const file=item.getAsFile();if(file){leerImagenChatLite(file);e.preventDefault();return}}}});
-setTimeout(()=>{document.getElementById("chatLiteInput")?.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();enviarChatLite()}})},0);
-async function vincularChatLiteASolicitud(idSolicitud){
-  if(!idSolicitud) return;
-
-  try{
-    if(!chatSessionId && userData?.usuario){
-      await asegurarChatLite();
-    }
-
-    if(!chatSessionId) return;
-
-    await supabaseClient
-      .from("chat_sesiones")
-      .update({ solicitud_id: Number(idSolicitud) })
-      .eq("chat_id", chatSessionId);
-
-  }catch(e){
-    console.warn("No se pudo vincular chat a solicitud:", e);
+function tomarImagenChatFile(){
+  const file=document.getElementById("chatFile").files[0];
+  if(file)leerImagenChat(file);
+}
+function leerImagenChat(file){
+  if(!file.type.startsWith("image/")){
+    alert("Pegá o adjuntá una imagen válida.");
+    return;
   }
+
+  comprimirImagenChat(file, base64 => {
+    chatImagenBase64 = base64;
+    chatImagenNombre = (file.name || "captura.jpg").replace(/\.[^.]+$/, ".jpg");
+    document.getElementById("chatPreviewImg").src = chatImagenBase64;
+    document.getElementById("chatPreview").classList.add("show");
+  });
+}
+function quitarImagenChat(){
+  chatImagenBase64="";
+  chatImagenNombre="";
+  document.getElementById("chatFile").value="";
+  document.getElementById("chatPreviewImg").src="";
+  document.getElementById("chatPreview").classList.remove("show");
+}
+document.addEventListener("paste",e=>{
+  const visible=!document.getElementById("viewChat").classList.contains("hidden");
+  if(!visible)return;
+  const items=e.clipboardData?.items||[];
+  let hayImagen=false;
+  for(const item of items){
+    if(item.type&&item.type.startsWith("image/")){
+      const file=item.getAsFile();
+      if(file){leerImagenChat(file);e.preventDefault();hayImagen=true;return}
+    }
+  }
+});
+document.getElementById("chatInput")?.addEventListener("keydown",e=>{
+  if(e.key==="Enter"&&!e.shiftKey){
+    e.preventDefault();
+    enviarChat();
+  }
+});
+
+function verificarSolicitudes(silencioso=false){
+  const pendientes=solicitudes.filter(esPendiente);
+  const ids=new Set(pendientes.map(s=>String(s.ID||s.SOLICITUD_ID||"")).filter(Boolean));
+  const badge=document.getElementById("badgeSolicitudes");
+  if(pendientes.length){badge.classList.remove("hidden");badge.innerText=pendientes.length}else badge.classList.add("hidden");
+  let nuevas=0;ids.forEach(id=>{if(!lastPendientesIds.has(id))nuevas++});
+  if(!silencioso||lastPendientesIds.size===0){lastPendientesIds=ids;return}
+  if(nuevas>0){toast(`🔔 ${nuevas} nueva/s solicitud/es`);sonido("solicitud")}
+  lastPendientesIds=ids;
+}
+function verificarChats(silencioso=false){
+  const unread=chats.reduce((a,c)=>a+Number(c.SIN_LEER||0),0);
+  const badge=document.getElementById("badgeChat");
+
+  if(unread){
+    badge.classList.remove("hidden");
+    badge.innerText=unread;
+  }else{
+    badge.classList.add("hidden");
+  }
+
+  if(silencioso && unread>lastChatUnread){
+    toast("💬 Nuevo mensaje de chat");
+    sonido("chat");
+  }
+
+  lastChatUnread=unread;
+}
+function sonido(tipo="msg"){
+  try{
+    const ctx=new(window.AudioContext||window.webkitAudioContext)();
+    const osc=ctx.createOscillator();
+    const gain=ctx.createGain();
+    osc.connect(gain);gain.connect(ctx.destination);
+    osc.type="sine";osc.frequency.value=tipo==="chat"?660:520;gain.gain.value=.08;
+    osc.start();setTimeout(()=>{osc.stop();ctx.close()},220);
+  }catch(e){}
 }
 
+function abrirModal(title,body,saveFn,saveText="Guardar"){
+  setBox("modalTitle",title);setBox("modalBody",body);
+  const btn=document.getElementById("modalSaveBtn");btn.innerText=saveText;btn.onclick=saveFn;
+  document.getElementById("modalOverlay").classList.remove("hidden");
+}
+function cerrarModal(){document.getElementById("modalOverlay").classList.add("hidden")}
+
+function abrirMenuMobile(){const menu=document.getElementById("mobileMenu");menu.classList.add("open");menu.innerHTML="";const clone=document.getElementById("sidebar").cloneNode(true);clone.style.display="block";menu.appendChild(clone)}
+function cerrarMenuMobile(e){if(!e||e.target.id==="mobileMenu"){const menu=document.getElementById("mobileMenu");menu.classList.remove("open");menu.innerHTML=""}}
+function cerrarSesion(){localStorage.removeItem("nodo_operador_lite");localStorage.removeItem("nodo_pc_operativa_lite");location.reload()}
 </script>
 </body>
 </html>
