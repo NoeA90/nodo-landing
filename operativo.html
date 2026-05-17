@@ -1655,7 +1655,7 @@ function escapeAttr(text){
   return String(text || "").replaceAll("&","&amp;").replaceAll("'","&#039;").replaceAll('"',"&quot;").replaceAll("<","&lt;").replaceAll(">","&gt;");
 }
 
-async async function enviarTarjetaTransferencia(){
+async function enviarTarjetaTransferencia(){
   if(!chatActualId){alert("Seleccioná un chat primero.");return;}
   const id = document.getElementById("chatWalletSelect")?.value || "";
   if(!id){alert("Elegí una billetera para enviar.");return;}
