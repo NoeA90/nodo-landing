@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>NODO · ADMIN RPC V15</title>
+<title>NODO · ADMIN RPC V15.2</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
 /* =========================================================
    FIX ADMIN V15.1
@@ -121,6 +121,86 @@ async function loadWorkerLogs(jobId){
   return data||[];
 }
 
+
+/* =========================================================
+   FIX ADMIN V15.2
+   Filtros PC/Estado:
+   - El selector de PC se arma con fallback desde pcs, solicitudes,
+     billeteras, worker_jobs y operadores.
+   - Agrega filtro por estado de solicitud.
+========================================================= */
+
+function getAllPcCodes(){
+  const raw=[
+    ...pcs.map(p=>p.codigo||p.nombre),
+    ...solicitudes.map(s=>s.pc_codigo),
+    ...billeteras.map(b=>b.pc_codigo),
+    ...workerJobs.map(w=>w.pc_codigo),
+    ...operadores.map(o=>o.pc_codigo)
+  ].filter(Boolean).map(x=>String(x).trim().toUpperCase()).filter(x=>x && x!=="TODAS");
+
+  return [...new Set(raw)].sort((a,b)=>{
+    const na=Number(String(a).replace(/\D/g,""));
+    const nb=Number(String(b).replace(/\D/g,""));
+    if(!isNaN(na)&&!isNaN(nb)&&na!==nb)return na-nb;
+    return String(a).localeCompare(String(b));
+  });
+}
+
+function fillPcSelects(){
+  let cods=getAllPcCodes();
+
+  if(adminScope && !adminScope.puede_todas && adminScope.pc_codigo){
+    cods=[String(adminScope.pc_codigo).toUpperCase()];
+  }
+
+  const opts=['<option value="">Seleccionar</option>'].concat(cods.map(c=>`<option value="${attr(c)}">${safe(c)}</option>`)).join("");
+  const filt=['<option value="">Todas las PCs</option>'].concat(cods.map(c=>`<option value="${attr(c)}">${safe(c)}</option>`)).join("");
+
+  ["op_pc_codigo","bi_pc_codigo"].forEach(id=>{
+    const el=$(id);
+    if(el){
+      const v=el.value;
+      el.innerHTML=opts;
+      el.value=cods.includes(String(v).toUpperCase())?v:"";
+    }
+  });
+
+  ["op_filter_pc","bi_filter_pc","globalPc","wk_filter_pc"].forEach(id=>{
+    const el=$(id);
+    if(el){
+      const v=el.value;
+      el.innerHTML=filt;
+      if(cods.includes(String(v).toUpperCase()) || v==="")el.value=v;
+    }
+  });
+
+  if(adminScope && !adminScope.puede_todas){
+    ["globalPc","op_filter_pc","bi_filter_pc","wk_filter_pc"].forEach(id=>{
+      const el=$(id);
+      if(el){
+        el.value=String(adminScope.pc_codigo||"").toUpperCase();
+        if(id==="globalPc")el.disabled=true;
+      }
+    });
+  }
+}
+
+function renderDashboard(){
+  const sol=listaFiltradaPc(solicitudes).filter(s=>esHoy(s.created_at));
+  const chats=listaFiltradaPc(chatSesiones).filter(c=>esHoy(c.created_at));
+  setText({
+    stSolHoy:sol.length,
+    stPend:sol.filter(esPendiente).length,
+    stReal:sol.filter(esRealizada).length,
+    stRet:sol.filter(s=>esPendiente(s)&&norm(s.tipo)==="retiro").length,
+    stChats:chats.length
+  });
+  $("dashTurnos").innerHTML=resumenTurnosHTML(sol);
+  $("dashPcs").innerHTML=resumenPcsHTML(solicitudes.filter(s=>esHoy(s.created_at)).filter(s=>coincideEstadoSolicitud(s,estadoSeleccionado())));
+  $("ultimasSolicitudes").innerHTML=(listaFiltradaPc(solicitudes).slice(0,80).map(s=>`<tr><td>${fecha(s.created_at)}</td><td>${safe(s.pc_codigo)}</td><td>${turnoDe(s.created_at)}</td><td>${safe(s.tipo)}</td><td><strong>${safe(s.usuario)}</strong><br><span class="muted">${safe(s.nombre_completo)}</span></td><td>${money(s.monto)}</td><td>${estado(s.estado)}</td><td>${workerSolicitudBadge(s)}</td><td>${safe(s.operador_usuario)}</td></tr>`).join("")||`<tr><td colspan="9" class="empty">No hay solicitudes para ese filtro.</td></tr>`);
+}
+
 </script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
@@ -187,7 +267,18 @@ button{border:0;border-radius:12px;padding:11px 14px;cursor:pointer;font-weight:
   </div>
 </aside>
 <main>
-<div class="top"><div><h2 id="pageTitle">Dashboard</h2><p id="pageSub">Resumen general navegable por PC.</p></div><div class="top-actions"><select id="globalPc" onchange="reloadAll()"><option value="">Todas las PCs</option></select><button class="blue" onclick="reloadAll()">Actualizar todo</button><button class="logout-btn" onclick="adminLogout()">Cerrar sesión</button></div></div>
+<div class="top"><div><h2 id="pageTitle">Dashboard</h2><p id="pageSub">Resumen general navegable por PC.</p></div><div class="top-actions"><select id="globalPc" onchange="reloadAll()"><option value="">Todas las PCs</option></select>
+<select id="globalEstado" onchange="renderAll()">
+  <option value="">Todos los estados</option>
+  <option value="PENDIENTE">Pendiente</option>
+  <option value="ACREDITADA">Acreditada</option>
+  <option value="PAGADA">Pagada</option>
+  <option value="RECHAZADA">Rechazada</option>
+  <option value="CANCELADO">Cancelado</option>
+  <option value="REQUIERE_MANUAL">Requiere manual</option>
+  <option value="APROBADA_MANUAL">Aprobada manual / enviada worker</option>
+</select>
+<button class="blue" onclick="reloadAll()">Actualizar todo</button><button class="logout-btn" onclick="adminLogout()">Cerrar sesión</button></div></div>
 
 <section id="section-dashboard" class="section active">
   <div class="notice">Selector superior: elegí una PC para ver el dashboard filtrado o dejá “Todas las PCs” para la vista general.</div>
@@ -527,7 +618,23 @@ async function loadWorkerLogs(jobId){
 }
 function renderAll(){fillPcSelects();renderDashboard();renderMetricas();renderWorker();renderOperadores();renderBilleteras();renderPcs();renderCfg();badges()}
 
-function pcSeleccionada(){return val("globalPc")}function listaFiltradaPc(arr,campo="pc_codigo"){const pc=pcSeleccionada();return pc?arr.filter(x=>String(x[campo]||"")===pc):arr}
+function pcSeleccionada(){return val("globalPc")}
+function estadoSeleccionado(){return val("globalEstado")}
+function coincideEstadoSolicitud(s, filtro){
+  if(!filtro)return true;
+  const e=String(s.estado||s.ESTADO||"").toUpperCase();
+  if(filtro==="PENDIENTE")return ["PENDIENTE","NUEVA","NUEVO","EN_REVISION"].includes(e);
+  if(filtro==="APROBADA_MANUAL")return ["APROBADA_MANUAL","PREPARANDO_COLA","EN_COLA_WORKER"].includes(e) || e.includes("APROBADA");
+  if(filtro==="REQUIERE_MANUAL")return e.includes("REQUIERE_MANUAL") || e.includes("MANUAL");
+  return e===filtro || e.includes(filtro);
+}
+function listaFiltradaPc(arr,campo="pc_codigo"){
+  const pc=pcSeleccionada();
+  const estado=estadoSeleccionado();
+  let out=pc?arr.filter(x=>String(x[campo]||"")===pc):arr;
+  if(arr===solicitudes && estado)out=out.filter(s=>coincideEstadoSolicitud(s,estado));
+  return out;
+}
 function hoyBA(fecha){const d=fecha?new Date(fecha):new Date();return d.toLocaleDateString("en-CA",{timeZone:"America/Argentina/Buenos_Aires"})}
 function esHoy(fecha){return hoyBA(fecha)===hoyBA(new Date())}
 function turnoDe(fecha){const h=Number(new Date(fecha||Date.now()).toLocaleString("en-US",{timeZone:"America/Argentina/Buenos_Aires",hour:"2-digit",hour12:false}));if(h>=6&&h<14)return"TM";if(h>=14&&h<22)return"TT";return"TN"}
@@ -981,6 +1088,86 @@ async function loadWorkerLogs(jobId){
   });
   if(error){console.error("admin_get_worker_logs",error);toast("No pude leer worker_logs: "+error.message,"err");return[]}
   return data||[];
+}
+
+
+/* =========================================================
+   FIX ADMIN V15.2
+   Filtros PC/Estado:
+   - El selector de PC se arma con fallback desde pcs, solicitudes,
+     billeteras, worker_jobs y operadores.
+   - Agrega filtro por estado de solicitud.
+========================================================= */
+
+function getAllPcCodes(){
+  const raw=[
+    ...pcs.map(p=>p.codigo||p.nombre),
+    ...solicitudes.map(s=>s.pc_codigo),
+    ...billeteras.map(b=>b.pc_codigo),
+    ...workerJobs.map(w=>w.pc_codigo),
+    ...operadores.map(o=>o.pc_codigo)
+  ].filter(Boolean).map(x=>String(x).trim().toUpperCase()).filter(x=>x && x!=="TODAS");
+
+  return [...new Set(raw)].sort((a,b)=>{
+    const na=Number(String(a).replace(/\D/g,""));
+    const nb=Number(String(b).replace(/\D/g,""));
+    if(!isNaN(na)&&!isNaN(nb)&&na!==nb)return na-nb;
+    return String(a).localeCompare(String(b));
+  });
+}
+
+function fillPcSelects(){
+  let cods=getAllPcCodes();
+
+  if(adminScope && !adminScope.puede_todas && adminScope.pc_codigo){
+    cods=[String(adminScope.pc_codigo).toUpperCase()];
+  }
+
+  const opts=['<option value="">Seleccionar</option>'].concat(cods.map(c=>`<option value="${attr(c)}">${safe(c)}</option>`)).join("");
+  const filt=['<option value="">Todas las PCs</option>'].concat(cods.map(c=>`<option value="${attr(c)}">${safe(c)}</option>`)).join("");
+
+  ["op_pc_codigo","bi_pc_codigo"].forEach(id=>{
+    const el=$(id);
+    if(el){
+      const v=el.value;
+      el.innerHTML=opts;
+      el.value=cods.includes(String(v).toUpperCase())?v:"";
+    }
+  });
+
+  ["op_filter_pc","bi_filter_pc","globalPc","wk_filter_pc"].forEach(id=>{
+    const el=$(id);
+    if(el){
+      const v=el.value;
+      el.innerHTML=filt;
+      if(cods.includes(String(v).toUpperCase()) || v==="")el.value=v;
+    }
+  });
+
+  if(adminScope && !adminScope.puede_todas){
+    ["globalPc","op_filter_pc","bi_filter_pc","wk_filter_pc"].forEach(id=>{
+      const el=$(id);
+      if(el){
+        el.value=String(adminScope.pc_codigo||"").toUpperCase();
+        if(id==="globalPc")el.disabled=true;
+      }
+    });
+  }
+}
+
+function renderDashboard(){
+  const sol=listaFiltradaPc(solicitudes).filter(s=>esHoy(s.created_at));
+  const chats=listaFiltradaPc(chatSesiones).filter(c=>esHoy(c.created_at));
+  setText({
+    stSolHoy:sol.length,
+    stPend:sol.filter(esPendiente).length,
+    stReal:sol.filter(esRealizada).length,
+    stRet:sol.filter(s=>esPendiente(s)&&norm(s.tipo)==="retiro").length,
+    stChats:chats.length
+  });
+  $("dashTurnos").innerHTML=resumenTurnosHTML(sol);
+  $("dashPcs").innerHTML=resumenPcsHTML(solicitudes.filter(s=>esHoy(s.created_at)).filter(s=>coincideEstadoSolicitud(s,estadoSeleccionado())));
+  $("ultimasSolicitudes").innerHTML=(listaFiltradaPc(solicitudes).slice(0,80).map(s=>`<tr><td>${fecha(s.created_at)}</td><td>${safe(s.pc_codigo)}</td><td>${turnoDe(s.created_at)}</td><td>${safe(s.tipo)}</td><td><strong>${safe(s.usuario)}</strong><br><span class="muted">${safe(s.nombre_completo)}</span></td><td>${money(s.monto)}</td><td>${estado(s.estado)}</td><td>${workerSolicitudBadge(s)}</td><td>${safe(s.operador_usuario)}</td></tr>`).join("")||`<tr><td colspan="9" class="empty">No hay solicitudes para ese filtro.</td></tr>`);
 }
 
 </script>
