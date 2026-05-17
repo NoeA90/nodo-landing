@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>NODO · OPERATIVO LITE</title>
+<title>NODO · OPERATIVO RPC</title>
 
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
@@ -355,7 +355,10 @@ const SUPABASE_URL = "https://pjvvyvfcwjoocjqvdror.supabase.co";
 const SUPABASE_KEY = "sb_publishable_NYqRoKptTgcL90VAVF2kqA_Gl06mEUF";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-let operador=null, pcOperativa=null;
+let operador=null, pcOperativa=null, panelSessionToken="";
+const LS_OPERADOR="nodo_operador_lite";
+const LS_PC="nodo_pc_operativa_lite";
+const LS_TOKEN="nodo_panel_session_token_lite";
 let solicitudes=[], billeteras=[], billeterasTodas=[], chats=[], chatMensajes=[];
 let timersIniciados=false;
 let lastPendientesIds=new Set(), lastChatUnread=0;
@@ -375,20 +378,61 @@ function setChatReadCount(id, count){
 }
 
 
-window.addEventListener("load",()=>{
-  const saved=localStorage.getItem("nodo_operador_lite");
-  const pc=localStorage.getItem("nodo_pc_operativa_lite");
-  if(saved && pc){
-    try{
-      operador=JSON.parse(saved);
-      pcOperativa=pc;
-      finalizarLogin(false);
-    }catch(e){
-      localStorage.removeItem("nodo_operador_lite");
-      localStorage.removeItem("nodo_pc_operativa_lite");
-    }
+window.addEventListener("load", async ()=>{
+  const token=localStorage.getItem(LS_TOKEN);
+  const pc=localStorage.getItem(LS_PC);
+
+  if(token && pc){
+    const ok = await validarSesionGuardada(token, pc);
+    if(ok) return;
   }
+
+  localStorage.removeItem(LS_OPERADOR);
+  localStorage.removeItem(LS_PC);
+  localStorage.removeItem(LS_TOKEN);
 });
+
+async function validarSesionGuardada(token, pc){
+  const { data, error } = await supabaseClient.rpc("panel_validar_session", {
+    p_session_token: token
+  });
+
+  if(error){
+    console.warn("Sesión guardada inválida:", error.message);
+    return false;
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+
+  if(!row || row.ok !== true){
+    return false;
+  }
+
+  panelSessionToken = token;
+  operador = {
+    id: row.operador_id,
+    usuario: row.usuario,
+    nombre: row.nombre || row.usuario,
+    rol: row.rol || "OPERADOR",
+    tipo: row.tipo || "",
+    tipoOperador: row.tipo || "",
+    pc: row.pc_codigo || "",
+    PC: row.pc_codigo || "",
+    pc_codigo: row.pc_codigo || ""
+  };
+
+  pcOperativa = String(pc || row.pc_codigo || "").toUpperCase();
+
+  finalizarLogin(false);
+  return true;
+}
+
+function requireSessionToken(){
+  if(!panelSessionToken){
+    throw new Error("Sesión no iniciada. Volvé a ingresar.");
+  }
+  return panelSessionToken;
+}
 
 function money(v){return Number(v||0).toLocaleString("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0})}
 function normalizar(v){return String(v||"").trim().toUpperCase()}
@@ -503,24 +547,27 @@ function mapSolicitudSupabase(s){
   };
 }
 
-async function cargarSolicitudesSupabase(){
-  const { data, error } = await supabaseClient
-    .from("solicitudes")
-    .select("*")
-    .eq("pc_codigo", pcOperativa)
-    .order("created_at", { ascending:false });
+async async function cargarSolicitudesSupabase(){
+  try{
+    const { data, error } = await supabaseClient.rpc("panel_operativo_get_solicitudes", {
+      p_session_token: requireSessionToken(),
+      p_pc_codigo: pcOperativa,
+      p_limit: 300
+    });
 
-  if(error){
-    console.error("Error solicitudes Supabase:", error);
-    return { ok:false, error:error.message || "Error cargando solicitudes" };
+    if(error){
+      console.error("Error solicitudes RPC:", error);
+      return { ok:false, error:error.message || "Error cargando solicitudes" };
+    }
+
+    return {
+      ok:true,
+      solicitudes:(data || []).map(mapSolicitudSupabase)
+    };
+  }catch(e){
+    return { ok:false, error:e.message || "Sesión inválida" };
   }
-
-  return {
-    ok:true,
-    solicitudes:(data || []).map(mapSolicitudSupabase)
-  };
 }
-
 
 function workerBadge(s){
   const estado = normalizar(s.ESTADO_WORKER || "SIN_WORKER");
@@ -545,35 +592,21 @@ function workerBadge(s){
 }
 
 async function crearWorkerJobSolicitud(id){
-  const operadorNombre = operador?.usuario || operador?.nombre || "operador";
-
-  const { data, error } = await supabaseClient.rpc(
-    "crear_worker_job_desde_solicitud",
-    {
-      p_solicitud_id: Number(id),
-      p_aprobada_por: operadorNombre
-    }
-  );
-
-  if(error){
-    console.error("Error creando worker job:", error);
-    return { ok:false, error:error.message || "No se pudo crear el trabajo del worker." };
-  }
-
-  return { ok:true, job_id:data };
+  // Ya no se usa en el flujo nuevo.
+  // panel_operativo_aprobar_solicitud aprueba y crea el job en una sola RPC.
+  return { ok:false, error:"Función reemplazada por panel_operativo_aprobar_solicitud." };
 }
 
 async function cargarWorkerLogs(jobId){
   if(!jobId) return [];
 
-  const { data, error } = await supabaseClient
-    .from("worker_logs")
-    .select("*")
-    .eq("job_id", jobId)
-    .order("created_at", { ascending:true });
+  const { data, error } = await supabaseClient.rpc("panel_operativo_get_worker_logs", {
+    p_session_token: requireSessionToken(),
+    p_worker_job_id: Number(jobId)
+  });
 
   if(error){
-    console.error("Error cargando logs worker:", error);
+    console.error("Error cargando logs worker RPC:", error);
     return [];
   }
 
@@ -602,16 +635,10 @@ async function reintentarWorker(jobId){
     return;
   }
 
-  const { error } = await supabaseClient
-    .from("worker_jobs")
-    .update({
-      estado:"REINTENTAR",
-      error_mensaje:null,
-      locked_at:null,
-      locked_by:null,
-      updated_at:new Date().toISOString()
-    })
-    .eq("id", jobId);
+  const { error } = await supabaseClient.rpc("panel_operativo_reintentar_worker", {
+    p_session_token: requireSessionToken(),
+    p_worker_job_id: Number(jobId)
+  });
 
   if(error){
     alert("Error reintentando worker: " + error.message);
@@ -623,24 +650,10 @@ async function reintentarWorker(jobId){
 }
 
 async function actualizarSolicitudSupabase(id, cambios){
-  const { data, error } = await supabaseClient
-    .from("solicitudes")
-    .update(cambios)
-    .eq("id", id)
-    .select()
-    .single();
-
-  if(error){
-    console.error("Error actualizando solicitud:", error);
-    return { ok:false, error:error.message || "No se pudo actualizar la solicitud" };
-  }
-
-  return {
-    ok:true,
-    solicitud:mapSolicitudSupabase(data)
-  };
+  // Compatibilidad mínima. Las acciones sensibles se migraron a RPC específicas.
+  console.warn("actualizarSolicitudSupabase directo deshabilitado", id, cambios);
+  return { ok:false, error:"Acción directa deshabilitada. Usá RPC de panel." };
 }
-
 
 async function apiPostNoCors(data){
   await fetch(API_URL, {
@@ -690,23 +703,9 @@ async function obtenerPcsDisponiblesOperador(op){
   const tipo = normalizar(op.tipo || op.tipoOperador || "");
   const pcRaw = String(op.pc_codigo || op.pc || op.PC || "").trim();
 
-  if(rol === "ADMIN" || rol === "ENCARGADO" || tipo === "FRANQUERO" || tipo === "FRAMQUERO"){
-    const { data, error } = await supabaseClient
-      .from("pcs")
-      .select("codigo,nombre,activa")
-      .or("activa.is.true,activa.is.null")
-      .order("codigo", { ascending:true });
-
-    if(error){
-      console.error("Error cargando PCs para login:", error);
-      return ["P1","P2","P3","P4","P5"];
-    }
-
-    const lista = (data || [])
-      .map(p => String(p.codigo || p.nombre || "").trim().toUpperCase())
-      .filter(Boolean);
-
-    return lista.length ? lista : ["P1","P2","P3","P4","P5"];
+  if(rol === "ADMIN" || rol === "ENCARGADO" || rol === "SUPERVISOR" || rol === "SUPERADMIN" || tipo === "FRANQUERO" || tipo === "FRAMQUERO"){
+    // Temporal: hasta migrar el catálogo de PCs a RPC de panel.
+    return ["P1","P2","P3","P4","P5"];
   }
 
   if(pcRaw){
@@ -725,60 +724,47 @@ async function login(){
     return;
   }
 
-  setBox("loginMsg",`<div class="alert-box">Ingresando por Supabase...</div>`);
+  setBox("loginMsg",`<div class="alert-box">Ingresando con sesión segura...</div>`);
 
-  const { data, error } = await supabaseClient
-    .from("operadores")
-    .select("*");
+  const { data, error } = await supabaseClient.rpc("panel_login", {
+    p_usuario: usuario,
+    p_clave: clave,
+    p_ip: null,
+    p_user_agent: navigator.userAgent || "operativo"
+  });
 
   if(error){
-    console.error("Error login Supabase:", error);
-    setBox("loginMsg",`<div class="err-box">Error consultando operadores en Supabase: ${escapeHtml(error.message || "")}</div>`);
+    console.error("Error panel_login:", error);
+    setBox("loginMsg",`<div class="err-box">Error de login: ${escapeHtml(error.message || "")}</div>`);
     return;
   }
 
-  const op = (data || []).find(x =>
-    String(x.usuario || "").trim().toLowerCase() === usuario.toLowerCase()
-  );
+  const row = Array.isArray(data) ? data[0] : data;
 
-  if(!op){
-    console.warn("Operadores recibidos:", data);
-    setBox("loginMsg",`<div class="err-box">Usuario no encontrado en Supabase. Revisá operadores.usuario.</div>`);
+  if(!row || row.ok !== true){
+    setBox("loginMsg",`<div class="err-box">${escapeHtml(row?.mensaje || "Usuario o clave incorrectos")}</div>`);
     return;
   }
 
-  const activoOk = op.activo === true || String(op.activo).toLowerCase() === "true" || String(op.activo).toUpperCase() === "SI" || op.activo === 1;
-  if(!activoOk){
-    setBox("loginMsg",`<div class="err-box">Usuario encontrado, pero está inactivo.</div>`);
-    return;
-  }
-
-  const claveIngresada = String(clave).trim();
-  const clavesValidas = [op.clave, op.password]
-    .filter(v => v !== null && v !== undefined && String(v).trim() !== "")
-    .map(v => String(v).trim());
-
-  if(!clavesValidas.includes(claveIngresada)){
-    console.warn("Usuario encontrado pero clave no coincide:", { usuario: op.usuario, clavesValidas });
-    setBox("loginMsg",`<div class="err-box">Usuario encontrado, pero la clave no coincide con operadores.clave ni operadores.password.</div>`);
-    return;
-  }
+  panelSessionToken = row.session_token;
 
   operador = {
-    ...op,
-    usuario: op.usuario,
-    nombre: op.nombre || op.usuario,
-    rol: op.rol || "OPERADOR",
-    tipoOperador: op.tipo || op.rol || "OPERADOR",
-    pc: op.pc_codigo || "",
-    PC: op.pc_codigo || ""
+    id: row.operador_id,
+    usuario: row.usuario,
+    nombre: row.nombre || row.usuario,
+    rol: row.rol || "OPERADOR",
+    tipo: row.tipo || "",
+    tipoOperador: row.tipo || "",
+    pc: row.pc_codigo || "",
+    PC: row.pc_codigo || "",
+    pc_codigo: row.pc_codigo || ""
   };
 
-  const pcsDisponibles = await obtenerPcsDisponiblesOperador(op);
-  const rol = normalizar(op.rol);
-  const tipo = normalizar(op.tipo);
+  const pcsDisponibles = await obtenerPcsDisponiblesOperador(operador);
+  const rol = normalizar(operador.rol);
+  const tipo = normalizar(operador.tipo || operador.tipoOperador);
 
-  if(rol === "ADMIN" || rol === "ENCARGADO" || tipo === "FRANQUERO" || tipo === "FRAMQUERO" || pcsDisponibles.length !== 1){
+  if(rol === "ADMIN" || rol === "ENCARGADO" || rol === "SUPERVISOR" || rol === "SUPERADMIN" || tipo === "FRANQUERO" || tipo === "FRAMQUERO" || pcsDisponibles.length !== 1){
     abrirSelectorPc(pcsDisponibles);
     return;
   }
@@ -799,8 +785,9 @@ function seleccionarPcOperativa(pc){pcOperativa=pc;document.getElementById("sele
 
 function finalizarLogin(guardar=true){
   if(guardar){
-    localStorage.setItem("nodo_operador_lite",JSON.stringify(operador));
-    localStorage.setItem("nodo_pc_operativa_lite",pcOperativa);
+    localStorage.setItem(LS_OPERADOR,JSON.stringify(operador));
+    localStorage.setItem(LS_PC,pcOperativa);
+    localStorage.setItem(LS_TOKEN,panelSessionToken);
   }
   document.getElementById("loginView").classList.add("hidden");
   document.getElementById("appView").classList.remove("hidden");
@@ -825,75 +812,10 @@ function finalizarLogin(guardar=true){
 let supabaseSolicitudesChannel = null;
 
 function iniciarRealtimeSolicitudes(){
-
-  if(supabaseSolicitudesChannel){
-    supabaseClient.removeChannel(supabaseSolicitudesChannel);
-  }
-
-  supabaseSolicitudesChannel = supabaseClient
-    .channel("operativo_" + pcOperativa)
-
-    .on(
-      "postgres_changes",
-      {
-        event:"*",
-        schema:"public",
-        table:"solicitudes",
-        filter:"pc_codigo=eq." + pcOperativa
-      },
-      payload => {
-
-        cargarSolicitudes(true);
-
-        if(payload.eventType === "INSERT"){
-          toast("🔔 Nueva solicitud");
-          sonido("solicitud");
-        }
-
-      }
-    )
-
-    .on(
-      "postgres_changes",
-      {
-        event:"INSERT",
-        schema:"public",
-        table:"chat_sesiones",
-        filter:"pc_codigo=eq." + pcOperativa
-      },
-      payload => {
-        cargarChats(true);
-      }
-    )
-
-    .on(
-      "postgres_changes",
-      {
-        event:"INSERT",
-        schema:"public",
-        table:"chat_mensajes"
-      },
-      payload => {
-
-        const nuevo = payload.new || {};
-
-        if(String(nuevo.tipo_emisor || "").toUpperCase() === "USUARIO"){
-          toast("💬 Nuevo mensaje de chat");
-          sonido("chat");
-        }
-
-        cargarChats(true);
-
-        if(chatActualId && String(nuevo.chat_id) === String(chatActualId)){
-          cargarChatActual();
-        }
-
-      }
-    )
-
-    .subscribe(status => {
-      console.log("Realtime operativo:", status);
-    });
+  // Blindaje RPC:
+  // Evitamos suscripciones directas a tablas públicas.
+  // El panel se actualiza por polling con RPC de sesión.
+  return;
 }
 
 function mostrarVista(vista){
@@ -951,15 +873,13 @@ function mapBilleteraSupabase(b){
 }
 
 async function cargarBilleteras(render=true){
-  const { data, error } = await supabaseClient
-    .from("billeteras")
-    .select("*")
-    .order("pc_codigo", { ascending:true })
-    .order("prioridad", { ascending:false })
-    .order("orden", { ascending:true });
+  const { data, error } = await supabaseClient.rpc("panel_operativo_get_billeteras", {
+    p_session_token: requireSessionToken(),
+    p_pc_codigo: pcOperativa
+  });
 
   if(error){
-    console.error("Error cargando billeteras Supabase:", error);
+    console.error("Error cargando billeteras RPC:", error);
     toast("Error billeteras: " + (error.message || ""), "red");
     return;
   }
@@ -1213,13 +1133,13 @@ function renderBilleteras(){
 }
 
 async function tomarSolicitud(id){
-  const r = await actualizarSolicitudSupabase(id, {
-    operador_usuario: operador.usuario || operador.nombre || "",
-    estado: "PENDIENTE"
+  const { data, error } = await supabaseClient.rpc("panel_operativo_tomar_solicitud", {
+    p_session_token: requireSessionToken(),
+    p_solicitud_id: Number(id)
   });
 
-  if(!r.ok){
-    alert(r.error || "Error");
+  if(error){
+    alert(error.message || "Error tomando solicitud");
     return;
   }
 
@@ -1385,30 +1305,24 @@ function abrirAprobarSolicitud(id){
       return;
     }
 
-    const r = await actualizarSolicitudSupabase(id, {
-      estado:"APROBADA_MANUAL",
-      estado_worker:"PREPARANDO_COLA",
-      monto:montoFinal,
-      operador_usuario:operadorNombre,
-      aprobada_por:operadorNombre,
-      aprobada_at:new Date().toISOString(),
-      observaciones:val("apObs") || ""
+    const { data, error } = await supabaseClient.rpc("panel_operativo_aprobar_solicitud", {
+      p_session_token: requireSessionToken(),
+      p_solicitud_id: Number(id),
+      p_monto: montoFinal,
+      p_observaciones: val("apObs") || "",
+      p_retiro_alias_cbu: null,
+      p_retiro_titular: null
     });
 
-    if(!r.ok){
-      alert(r.error || "Error aprobando solicitud");
+    if(error){
+      alert(error.message || "Error aprobando solicitud");
       return;
     }
 
-    const job = await crearWorkerJobSolicitud(id);
-
-    if(!job.ok){
-      alert("La solicitud fue aprobada, pero NO se pudo crear el job del worker: " + job.error);
-      return;
-    }
+    const row = Array.isArray(data) ? data[0] : data;
 
     cerrarModal();
-    toast("Carga aprobada y enviada al worker. Job #" + job.job_id, "green");
+    toast("Carga aprobada y enviada al worker. Job #" + (row?.worker_job_id || ""), "green");
     await refrescarTodo(false);
 
   },"Enviar al worker");
@@ -1540,32 +1454,24 @@ function abrirCerrarRetiro(id){
       return;
     }
 
-    const r = await actualizarSolicitudSupabase(id, {
-      estado:"APROBADA_MANUAL",
-      estado_worker:"PREPARANDO_COLA",
-      monto:montoFinal,
-      retiro_alias_cbu:val("retDestino"),
-      retiro_titular:val("retTitular"),
-      operador_usuario:operadorNombre,
-      aprobada_por:operadorNombre,
-      aprobada_at:new Date().toISOString(),
-      observaciones:val("retObs") || ""
+    const { data, error } = await supabaseClient.rpc("panel_operativo_aprobar_solicitud", {
+      p_session_token: requireSessionToken(),
+      p_solicitud_id: Number(id),
+      p_monto: montoFinal,
+      p_observaciones: val("retObs") || "",
+      p_retiro_alias_cbu: val("retDestino"),
+      p_retiro_titular: val("retTitular")
     });
 
-    if(!r.ok){
-      alert(r.error || "Error aprobando retiro");
+    if(error){
+      alert(error.message || "Error aprobando retiro");
       return;
     }
 
-    const job = await crearWorkerJobSolicitud(id);
-
-    if(!job.ok){
-      alert("El retiro fue aprobado, pero NO se pudo crear el job del worker: " + job.error);
-      return;
-    }
+    const row = Array.isArray(data) ? data[0] : data;
 
     cerrarModal();
-    toast("Retiro aprobado y enviado al worker. Job #" + job.job_id, "green");
+    toast("Retiro aprobado y enviado al worker. Job #" + (row?.worker_job_id || ""), "green");
     await refrescarTodo(false);
 
   },"Enviar al worker");
@@ -1577,13 +1483,14 @@ function abrirRechazarSolicitud(id){
     <textarea id="rechObs"></textarea>
   `,async()=>{
 
-    const r = await actualizarSolicitudSupabase(id, {
-      estado:"RECHAZADA",
-      operador_usuario:operador.usuario || operador.nombre || ""
+    const { error } = await supabaseClient.rpc("panel_operativo_rechazar_solicitud", {
+      p_session_token: requireSessionToken(),
+      p_solicitud_id: Number(id),
+      p_motivo: val("rechObs") || ""
     });
 
-    if(!r.ok){
-      alert(r.error || "Error");
+    if(error){
+      alert(error.message || "Error");
       return;
     }
 
@@ -1979,7 +1886,17 @@ function cerrarModal(){document.getElementById("modalOverlay").classList.add("hi
 
 function abrirMenuMobile(){const menu=document.getElementById("mobileMenu");menu.classList.add("open");menu.innerHTML="";const clone=document.getElementById("sidebar").cloneNode(true);clone.style.display="block";menu.appendChild(clone)}
 function cerrarMenuMobile(e){if(!e||e.target.id==="mobileMenu"){const menu=document.getElementById("mobileMenu");menu.classList.remove("open");menu.innerHTML=""}}
-function cerrarSesion(){localStorage.removeItem("nodo_operador_lite");localStorage.removeItem("nodo_pc_operativa_lite");location.reload()}
+async function cerrarSesion(){
+  try{
+    if(panelSessionToken){
+      await supabaseClient.rpc("panel_logout", { p_session_token: panelSessionToken });
+    }
+  }catch(e){}
+  localStorage.removeItem(LS_OPERADOR);
+  localStorage.removeItem(LS_PC);
+  localStorage.removeItem(LS_TOKEN);
+  location.reload();
+}
 </script>
 </body>
 </html>
