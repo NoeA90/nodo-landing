@@ -414,10 +414,16 @@ button:disabled{
     <div class="card transfer-card">
       <div class="gold-title">💳 Datos para transferir</div>
 
-      <span class="label">CBU / CVU / Alias</span>
+      <span class="label">Alias</span>
       <div class="data-row">
-        <div id="cvuBox" class="big-data">Cargando...</div>
-        <button class="copy-btn" onclick="copiarCvu()">Copiar</button>
+  <     div id="aliasBox" class="big-data">Cargando...</div>
+        <button class="copy-btn" onclick="copiarAlias()">Copiar</button>
+      </div >  
+
+      <span class="label">CBU / CVU</span>
+      <div class="data-row">
+        <div id="cbuBox" class="big-data">Cargando...</div>
+        <button class="copy-btn" onclick="copiarCbu()">Copiar</button>
       </div>
 
       <div class="line"><b>Titular:</b> <span id="titularBox">Cargando...</span></div>
@@ -747,43 +753,45 @@ function mostrarRegistroMsg(texto, ok) {
 }
 
 async function cargarBilletera() {
-  const pcs = pcCandidatos(PC);
+  const pcsCompatibles = [PC];
+
+  if (PC.startsWith("P") && !PC.startsWith("PC")) {
+    pcsCompatibles.push("PC" + PC.replace("P", ""));
+  }
+
+  if (PC.startsWith("PC")) {
+    pcsCompatibles.push("P" + PC.replace("PC", ""));
+  }
 
   const { data, error } = await supabaseClient
     .from("billeteras")
     .select("*")
-    .in("pc_codigo", pcs)
+    .in("pc_codigo", pcsCompatibles)
     .eq("activa", true)
-    .order("seleccionada_manual", { ascending:false })
-    .order("prioridad", { ascending:false })
-    .order("orden", { ascending:true })
-    .order("id", { ascending:true });
+    .order("seleccionada_manual", { ascending: false })
+    .order("prioridad", { ascending: false })
+    .order("orden", { ascending: true });
 
   if (error) {
-    console.error("Error cargando billetera Supabase:", error);
-    document.getElementById("cvuBox").innerText = "No disponible";
-    document.getElementById("titularBox").innerText = "Consultar por chat";
-    document.getElementById("bancoBox").innerText = "Consultar";
-    billeteraActiva = null;
+    console.error("Error cargando billetera:", error);
+    mostrarBilleteraNoDisponible();
     return;
   }
 
-  const disponibles = (data || []).filter(b => String(b.estado || "activa").toLowerCase() !== "caida");
-
-  if (!disponibles.length) {
-    document.getElementById("cvuBox").innerText = "No disponible";
-    document.getElementById("titularBox").innerText = "Consultar por chat";
-    document.getElementById("bancoBox").innerText = "Consultar";
-    billeteraActiva = null;
+  if (!data || data.length === 0) {
+    mostrarBilleteraNoDisponible();
     return;
   }
 
   billeteraActiva =
-    disponibles.find(b => b.seleccionada_manual === true) ||
-    disponibles[0];
+    data.find(b => b.seleccionada_manual === true) ||
+    data[0];
 
-  document.getElementById("cvuBox").innerText =
-    billeteraActiva.alias || billeteraActiva.cbu || "Consultar";
+  document.getElementById("aliasBox").innerText =
+    billeteraActiva.alias || "Consultar";
+
+  document.getElementById("cbuBox").innerText =
+    billeteraActiva.cbu || "Consultar";
 
   document.getElementById("titularBox").innerText =
     billeteraActiva.titular || billeteraActiva.nombre_visible || "Consultar";
@@ -792,10 +800,37 @@ async function cargarBilletera() {
     billeteraActiva.banco || "Billetera";
 }
 
-function copiarCvu() {
-  const texto = document.getElementById("cvuBox").innerText;
+function mostrarBilleteraNoDisponible() {
+  billeteraActiva = null;
+
+  document.getElementById("aliasBox").innerText = "No disponible";
+  document.getElementById("cbuBox").innerText = "No disponible";
+  document.getElementById("titularBox").innerText = "Consultar por chat";
+  document.getElementById("bancoBox").innerText = "Consultar";
+}
+function copiarTextoDato(id, nombreDato) {
+  const texto = document.getElementById(id)?.innerText || "";
+
+  if (!texto || texto === "Consultar" || texto === "No disponible") {
+    mostrarResultado(`${nombreDato} no disponible. Contactanos por chat.`, false);
+    return;
+  }
+
   navigator.clipboard.writeText(texto);
-  mostrarResultado("Copiado correctamente.", true);
+  mostrarResultado(`${nombreDato} copiado correctamente.`, true);
+}
+
+function copiarAlias() {
+  copiarTextoDato("aliasBox", "Alias");
+}
+
+function copiarCbu() {
+  copiarTextoDato("cbuBox", "CBU / CVU");
+}
+
+/* Compatibilidad por si quedó algún botón viejo llamando copiarCvu */
+function copiarCvu() {
+  copiarAlias();
 }
 
 
