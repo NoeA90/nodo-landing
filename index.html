@@ -1015,7 +1015,7 @@ function renderProgresoSolicitud(estado){
   const tipo = String(tipoSolicitudActual || "CARGA").toUpperCase();
   const esRetiro = tipo === "RETIRO";
 
-  const esFinalOk = ["APROBADA","APROBADA_MANUAL","APROBADA_MANUAL_OK","ACREDITADA","PAGADA"].includes(e);
+  const esFinalOk = ["ACREDITADA","PAGADA"].includes(e);
   const esRechazada = ["RECHAZADA","ERROR"].includes(e);
 
   document.getElementById("estadoEspera").classList.remove("hidden");
@@ -1077,9 +1077,6 @@ function iniciarEscuchaEstado() {
     renderProgresoSolicitud(estado);
 
     if (
-      estado === "APROBADA" ||
-      estado === "APROBADA_MANUAL" ||
-      estado === "APROBADA_MANUAL_OK" ||
       estado === "ACREDITADA" ||
       estado === "PAGADA"
     ) {
