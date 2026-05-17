@@ -433,6 +433,20 @@ button:disabled{
   line-height:1.35;
 }
 
+.retiro-data-box{
+  margin-top:12px;
+  padding:13px;
+  border:1px solid rgba(245,158,11,.35);
+  background:rgba(245,158,11,.08);
+  border-radius:14px;
+}
+.retiro-data-box .hint{
+  color:#f9d36b;
+  font-size:12px;
+  line-height:1.35;
+  margin-bottom:10px;
+}
+
 </style>
 </head>
 
@@ -498,6 +512,16 @@ button:disabled{
 
     <label id="montoLabel">Monto a cargar *</label>
     <input id="monto" type="number" placeholder="ej: 5000">
+
+    <div id="retiroDatosBox" class="retiro-data-box hidden">
+      <div class="hint">Para retiros, indicá la cuenta donde querés recibir el dinero. Estos datos los revisa el operador antes de aprobar.</div>
+
+      <label>CBU / CVU / Alias de destino *</label>
+      <input id="retiroAliasCbu" placeholder="ej: alias.mp o CVU/CBU completo">
+
+      <label>Titular de la cuenta *</label>
+      <input id="retiroTitular" placeholder="Nombre y apellido del titular">
+    </div>
 
     <button id="btnEnviar" onclick="crearSolicitud()">Enviar solicitud</button>
 
@@ -893,6 +917,11 @@ function seleccionarTipoSolicitud(tipo){
   document.getElementById("monto").placeholder = esRetiro ? "mínimo: 5000" : "ej: 5000";
   document.getElementById("btnEnviar").innerText = esRetiro ? "Enviar solicitud de retiro" : "Enviar solicitud";
 
+  const retiroBox = document.getElementById("retiroDatosBox");
+  if(retiroBox){
+    retiroBox.classList.toggle("hidden", !esRetiro);
+  }
+
   const minTxt = document.getElementById("montoMinimoTxt");
   if(minTxt){
     minTxt.innerText = esRetiro ? "⚠️ Retiro mínimo: $5.000" : "⚠️ Carga mínima: $2.000";
@@ -956,6 +985,21 @@ async function crearSolicitud() {
   }
 
   if (esRetiro) {
+    const destino = (document.getElementById("retiroAliasCbu")?.value || "").trim();
+    const titular = (document.getElementById("retiroTitular")?.value || "").trim();
+
+    if(!destino){
+      mostrarResultado("Completá el CBU/CVU o alias donde querés recibir el retiro.", false);
+      return;
+    }
+
+    if(!titular){
+      mostrarResultado("Completá el titular de la cuenta de destino.", false);
+      return;
+    }
+  }
+
+  if (esRetiro) {
     const validacionRetiro = await puedeSolicitarRetiro();
     if(!validacionRetiro.ok){
       mostrarResultado(validacionRetiro.error || "No se puede solicitar otro retiro todavía. Contactanos por chat.", false);
@@ -998,6 +1042,12 @@ async function crearSolicitud() {
   iniciarEscuchaEstado();
 
   document.getElementById("monto").value = "";
+  if(esRetiro){
+    const destinoInput = document.getElementById("retiroAliasCbu");
+    const titularInput = document.getElementById("retiroTitular");
+    if(destinoInput) destinoInput.value = "";
+    if(titularInput) titularInput.value = "";
+  }
 }
 
 function mostrarEstadoEspera(estado="PENDIENTE") {
@@ -1150,6 +1200,11 @@ async function crearSolicitudSupabase(monto, tipo="CARGA"){
   if(!esRetiro && billeteraActiva){
     payload.billetera_nombre = billeteraActiva.nombre_visible || "";
     payload.billetera_id = billeteraActiva.id || null;
+  }
+
+  if(esRetiro){
+    payload.retiro_alias_cbu = (document.getElementById("retiroAliasCbu")?.value || "").trim();
+    payload.retiro_titular = (document.getElementById("retiroTitular")?.value || "").trim();
   }
 
   const { data, error } = await supabaseClient
