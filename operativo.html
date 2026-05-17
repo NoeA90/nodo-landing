@@ -290,7 +290,7 @@ table{width:100%;border-collapse:collapse}th,td{padding:11px;border-bottom:1px s
                   <select id="chatWalletSelect"></select>
                   <button class="mini-btn yellow" onclick="enviarTarjetaTransferencia()">Enviar tarjeta</button>
                 </div>
-                <div class="small" style="margin-top:6px">Toma todas las billeteras del sistema, incluso si no están activas en landing.</div>
+                <div class="small" style="margin-top:6px">Solo muestra billeteras activas/disponibles de la PC operativa actual.</div>
               </div>
               <input id="chatFile" type="file" accept="image/*" style="display:none" onchange="tomarImagenChatFile()">
               <div class="small" style="text-align:center;margin-top:8px">Ctrl + V admite texto e imagen del portapapeles.</div>
@@ -1564,16 +1564,33 @@ function renderTransferCardChat(card){
   </div>`;
 }
 
+function billeterasDisponiblesChat(){
+  const all = billeterasTodas && billeterasTodas.length ? billeterasTodas : billeteras;
+
+  return (all || []).filter(b => {
+    const pcOk = String(b.PC || "").trim().toUpperCase() === String(pcOperativa || "").trim().toUpperCase();
+    const activaOk = normalizar(b.ACTIVA) === "SI" || b.activa === true;
+    const estado = normalizar(b.ESTADO || b.estado || "ACTIVA");
+    const estadoOk = !["CAIDA", "CAÍDA", "PAUSADA", "INACTIVA", "BAJA", "NO"].includes(estado);
+    const tieneDato = String(b.ALIAS || b.CVU_CBU || "").trim() !== "";
+
+    return pcOk && activaOk && estadoOk && tieneDato;
+  });
+}
+
 function renderWalletSelectChat(){
   const sel = document.getElementById("chatWalletSelect");
   if(!sel) return;
-  const all = billeterasTodas && billeterasTodas.length ? billeterasTodas : billeteras;
-  if(!all.length){
-    sel.innerHTML = '<option value="">No hay billeteras cargadas</option>';
+
+  const disponibles = billeterasDisponiblesChat();
+
+  if(!disponibles.length){
+    sel.innerHTML = '<option value="">No hay billeteras disponibles para esta PC</option>';
     return;
   }
-  sel.innerHTML = '<option value="">Elegir billetera...</option>' + all.map(b=>{
-    const nombre = `${b.PC || "SIN PC"} · ${b.NOMBRE_VISIBLE || b.BILLETERA_NOMBRE || b.ID_BILLETERA} · ${b.TIPO || ""}${normalizar(b.ACTIVA)==="SI" ? "" : " · pausada"}`;
+
+  sel.innerHTML = '<option value="">Elegir billetera disponible...</option>' + disponibles.map(b=>{
+    const nombre = `${b.NOMBRE_VISIBLE || b.BILLETERA_NOMBRE || b.ID_BILLETERA} · ${b.TIPO || "Billetera"} · ${b.ALIAS || b.CVU_CBU || ""}`;
     return `<option value="${escapeAttr(b.ID_BILLETERA)}">${escapeHtml(nombre)}</option>`;
   }).join("");
 }
@@ -1586,8 +1603,8 @@ async function enviarTarjetaTransferencia(){
   if(!chatActualId){alert("Seleccioná un chat primero.");return;}
   const id = document.getElementById("chatWalletSelect")?.value || "";
   if(!id){alert("Elegí una billetera para enviar.");return;}
-  const b = (billeterasTodas.length ? billeterasTodas : billeteras).find(x => String(x.ID_BILLETERA) === String(id));
-  if(!b){alert("No se encontró la billetera seleccionada.");return;}
+  const b = billeterasDisponiblesChat().find(x => String(x.ID_BILLETERA) === String(id));
+  if(!b){alert("No se encontró la billetera disponible para esta PC. Actualizá billeteras y reintentá.");return;}
 
   const mensaje = buildTransferCardMessageFromWallet(b);
   agregarMensajeLocalPanel(mensaje, "");
