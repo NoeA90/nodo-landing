@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>NODO · ADMIN RPC V15.2</title>
+<title>NODO · ADMIN RPC V15.3</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
 /* =========================================================
    FIX ADMIN V15.1
@@ -199,6 +199,41 @@ function renderDashboard(){
   $("dashTurnos").innerHTML=resumenTurnosHTML(sol);
   $("dashPcs").innerHTML=resumenPcsHTML(solicitudes.filter(s=>esHoy(s.created_at)).filter(s=>coincideEstadoSolicitud(s,estadoSeleccionado())));
   $("ultimasSolicitudes").innerHTML=(listaFiltradaPc(solicitudes).slice(0,80).map(s=>`<tr><td>${fecha(s.created_at)}</td><td>${safe(s.pc_codigo)}</td><td>${turnoDe(s.created_at)}</td><td>${safe(s.tipo)}</td><td><strong>${safe(s.usuario)}</strong><br><span class="muted">${safe(s.nombre_completo)}</span></td><td>${money(s.monto)}</td><td>${estado(s.estado)}</td><td>${workerSolicitudBadge(s)}</td><td>${safe(s.operador_usuario)}</td></tr>`).join("")||`<tr><td colspan="9" class="empty">No hay solicitudes para ese filtro.</td></tr>`);
+}
+
+
+/* =========================================================
+   ADMIN V15 FIX3 · VISTAS
+   Mejora render de PCs detectadas y mensajes vacíos.
+========================================================= */
+
+function renderPcs(){
+  if(!pcs.length)return empty("pcsBody",6,"No hay PCs cargadas ni detectadas desde solicitudes/billeteras/operadores.");
+  $("pcsBody").innerHTML=pcs.map(p=>{
+    const esReal=!!p.id;
+    return `<tr>
+      <td>${esReal?safe(p.id):'<span class="muted">detectada</span>'}</td>
+      <td><strong>${safe(p.codigo)}</strong></td>
+      <td>${safe(p.nombre || p.codigo)}</td>
+      <td>${safe(p.descripcion || (esReal?'':'Detectada automáticamente'))}</td>
+      <td>${p.activa?pill('Activa','ok'):pill('Inactiva','off')}</td>
+      <td><div class="rowActions">
+        ${esReal?`<button class="small blue" onclick="editPc('${p.id}')">Editar</button><button class="small danger" onclick="deleteRow('${TABLES.pcs}','${p.id}',loadPcs,'PC')">Eliminar</button>`:'<span class="muted">Sin ficha en tabla PCs</span>'}
+      </div></td>
+    </tr>`;
+  }).join("");
+}
+
+function renderBilleteras(){
+  const q=norm(val("bi_search")),banco=val("bi_filter_banco"),pc=val("bi_filter_pc"),act=val("bi_filter_activa");
+  let rows=billeteras.filter(b=>
+    (!q||norm([b.id,b.pc_codigo,b.nombre_visible,b.titular,b.alias,b.cbu,b.banco,b.estado].join(" ")).includes(q))&&
+    (!banco||b.banco===banco)&&
+    (!pc||b.pc_codigo===pc)&&
+    (act===""||String(!!b.activa)===act)
+  );
+  if(!rows.length)return empty("billeterasBody",11,"No hay billeteras para el filtro actual. Revisá PC/estado o actualizá.");
+  $("billeterasBody").innerHTML=rows.map(b=>`<tr><td>${safe(b.id)}</td><td>${safe(b.pc_codigo)}</td><td><strong>${safe(b.nombre_visible)}</strong></td><td>${safe(b.titular)}</td><td>${safe(b.banco)}</td><td>${safe(b.alias)}</td><td>${estadoBi(b)}</td><td>${mpBadge(b)}</td><td>${safe(b.prioridad||0)}</td><td>${b.seleccionada_manual?pill('Manual','warn'):'<span class="muted">No</span>'}</td><td><div class="rowActions"><button class="small blue" onclick="editBilletera('${b.id}')">Editar</button><button class="small ${b.activa?'warning':'primary'}" onclick="toggleBilletera('${b.id}',${!b.activa})">${b.activa?'Pausar':'Activar'}</button><button class="small violet" onclick="setManual('${b.id}')">Manual</button><button class="small danger" onclick="deleteRow('${TABLES.billeteras}','${b.id}',loadBilleteras,'billetera')">Eliminar</button></div></td></tr>`).join("");
 }
 
 </script>
@@ -1168,6 +1203,41 @@ function renderDashboard(){
   $("dashTurnos").innerHTML=resumenTurnosHTML(sol);
   $("dashPcs").innerHTML=resumenPcsHTML(solicitudes.filter(s=>esHoy(s.created_at)).filter(s=>coincideEstadoSolicitud(s,estadoSeleccionado())));
   $("ultimasSolicitudes").innerHTML=(listaFiltradaPc(solicitudes).slice(0,80).map(s=>`<tr><td>${fecha(s.created_at)}</td><td>${safe(s.pc_codigo)}</td><td>${turnoDe(s.created_at)}</td><td>${safe(s.tipo)}</td><td><strong>${safe(s.usuario)}</strong><br><span class="muted">${safe(s.nombre_completo)}</span></td><td>${money(s.monto)}</td><td>${estado(s.estado)}</td><td>${workerSolicitudBadge(s)}</td><td>${safe(s.operador_usuario)}</td></tr>`).join("")||`<tr><td colspan="9" class="empty">No hay solicitudes para ese filtro.</td></tr>`);
+}
+
+
+/* =========================================================
+   ADMIN V15 FIX3 · VISTAS
+   Mejora render de PCs detectadas y mensajes vacíos.
+========================================================= */
+
+function renderPcs(){
+  if(!pcs.length)return empty("pcsBody",6,"No hay PCs cargadas ni detectadas desde solicitudes/billeteras/operadores.");
+  $("pcsBody").innerHTML=pcs.map(p=>{
+    const esReal=!!p.id;
+    return `<tr>
+      <td>${esReal?safe(p.id):'<span class="muted">detectada</span>'}</td>
+      <td><strong>${safe(p.codigo)}</strong></td>
+      <td>${safe(p.nombre || p.codigo)}</td>
+      <td>${safe(p.descripcion || (esReal?'':'Detectada automáticamente'))}</td>
+      <td>${p.activa?pill('Activa','ok'):pill('Inactiva','off')}</td>
+      <td><div class="rowActions">
+        ${esReal?`<button class="small blue" onclick="editPc('${p.id}')">Editar</button><button class="small danger" onclick="deleteRow('${TABLES.pcs}','${p.id}',loadPcs,'PC')">Eliminar</button>`:'<span class="muted">Sin ficha en tabla PCs</span>'}
+      </div></td>
+    </tr>`;
+  }).join("");
+}
+
+function renderBilleteras(){
+  const q=norm(val("bi_search")),banco=val("bi_filter_banco"),pc=val("bi_filter_pc"),act=val("bi_filter_activa");
+  let rows=billeteras.filter(b=>
+    (!q||norm([b.id,b.pc_codigo,b.nombre_visible,b.titular,b.alias,b.cbu,b.banco,b.estado].join(" ")).includes(q))&&
+    (!banco||b.banco===banco)&&
+    (!pc||b.pc_codigo===pc)&&
+    (act===""||String(!!b.activa)===act)
+  );
+  if(!rows.length)return empty("billeterasBody",11,"No hay billeteras para el filtro actual. Revisá PC/estado o actualizá.");
+  $("billeterasBody").innerHTML=rows.map(b=>`<tr><td>${safe(b.id)}</td><td>${safe(b.pc_codigo)}</td><td><strong>${safe(b.nombre_visible)}</strong></td><td>${safe(b.titular)}</td><td>${safe(b.banco)}</td><td>${safe(b.alias)}</td><td>${estadoBi(b)}</td><td>${mpBadge(b)}</td><td>${safe(b.prioridad||0)}</td><td>${b.seleccionada_manual?pill('Manual','warn'):'<span class="muted">No</span>'}</td><td><div class="rowActions"><button class="small blue" onclick="editBilletera('${b.id}')">Editar</button><button class="small ${b.activa?'warning':'primary'}" onclick="toggleBilletera('${b.id}',${!b.activa})">${b.activa?'Pausar':'Activar'}</button><button class="small violet" onclick="setManual('${b.id}')">Manual</button><button class="small danger" onclick="deleteRow('${TABLES.billeteras}','${b.id}',loadBilleteras,'billetera')">Eliminar</button></div></td></tr>`).join("");
 }
 
 </script>
