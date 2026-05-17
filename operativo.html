@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>NODO · OPERATIVO RPC</title>
+<title>NODO · OPERATIVO RPC V9</title>
 
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
@@ -75,54 +75,6 @@ table{width:100%;border-collapse:collapse}th,td{padding:11px;border-bottom:1px s
 .toast{position:fixed;top:20px;right:20px;background:var(--blue);color:#fff;padding:14px 18px;border-radius:14px;z-index:99999;font-weight:bold;box-shadow:0 10px 30px rgba(0,0,0,.35)}
 .mobile-top{display:none;background:#151821;border-bottom:1px solid #272b36;padding:12px;align-items:center;justify-content:space-between}.mobile-menu{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1200}.mobile-menu .sidebar{display:block;width:280px;height:100%;position:absolute;left:0;top:0}
 @media(max-width:900px){body{overflow:auto}.layout{display:block;height:auto;min-height:100vh}.sidebar{display:none}.main{padding:12px}.mobile-top{display:flex}.top-grid{grid-template-columns:repeat(2,1fr);gap:10px}.stat-value{font-size:21px}th,td{font-size:11px;padding:8px}.mobile-menu.open{display:block}.chat-layout{grid-template-columns:1fr}.chat-body{max-height:420px}}
-
-
-/* === CHAT LISTA LIMPIA + COPIAR USUARIO === */
-.chat-title-main{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  min-width:0;
-}
-.chat-title-main .chat-user-name{
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-}
-.chat-copy-user{
-  border:none;
-  border-radius:999px;
-  padding:4px 8px;
-  font-size:11px;
-  font-weight:900;
-  cursor:pointer;
-  background:#2d3443;
-  color:#fff;
-  white-space:nowrap;
-}
-.chat-copy-user:hover{background:#3d5afe}
-.chat-last-preview{
-  margin-top:5px;
-  color:#98a2b3;
-  line-height:1.25;
-  max-height:34px;
-  overflow:hidden;
-}
-.chat-last-preview.card{
-  color:#ffd98f;
-}
-.chat-head-actions{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  flex-wrap:wrap;
-  justify-content:flex-end;
-}
-.chat-user-chip{
-  display:inline-flex;
-  align-items:center;
-  gap:8px;
-}
 
 .transfer-send-box{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
 .transfer-send-grid{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end}
@@ -213,6 +165,12 @@ table{width:100%;border-collapse:collapse}th,td{padding:11px;border-bottom:1px s
   .verify-grid{grid-template-columns:1fr}
 }
 
+
+.chat-user-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.chat-copy-btn{border:none;border-radius:8px;padding:5px 8px;background:#2d3443;color:#fff;font-size:11px;font-weight:800;cursor:pointer}
+.chat-copy-btn:hover{background:#3a4354}
+.chat-preview-transfer{color:#fdb022;font-weight:800}
+
 </style>
 </head>
 
@@ -221,7 +179,7 @@ table{width:100%;border-collapse:collapse}th,td{padding:11px;border-bottom:1px s
   <div class="login-card">
     <img src="logo-nodo.png" class="logo" alt="NODO">
     <h2 style="margin-bottom:6px">PANEL OPERATIVO LITE</h2>
-    <div class="small" style="margin-bottom:16px">Versión V7 · Login seguro por sesión</div>
+    <div class="small" style="margin-bottom:16px">Versión V9 · Chat RPC + sesión segura</div>
     <label>Usuario</label>
     <input id="loginUsuario" autocomplete="username">
     <label>Clave</label>
@@ -941,33 +899,26 @@ async function cargarBilleteras(render=true){
 }
 async function cargarChats(silencioso=false){
 
-  const { data: sesiones, error } = await supabaseClient
-    .from("chat_sesiones")
-    .select("*")
-    .eq("pc_codigo", pcOperativa)
-    .order("created_at",{ascending:false});
+  const { data: sesiones, error } = await supabaseClient.rpc("panel_operativo_get_chat_sesiones", {
+    p_session_token: requireSessionToken(),
+    p_pc_codigo: pcOperativa
+  });
 
   if(error){
-    console.error("Error cargando chat_sesiones:", error);
+    console.error("Error cargando chat_sesiones RPC:", error);
     return;
   }
 
-  const ids = (sesiones || []).map(c => c.chat_id).filter(Boolean);
+  const { data: mensajesData, error: errorMensajes } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes_pc", {
+    p_session_token: requireSessionToken(),
+    p_pc_codigo: pcOperativa,
+    p_limit: 1500
+  });
 
-  let mensajes = [];
+  const mensajes = errorMensajes ? [] : (mensajesData || []);
 
-  if(ids.length){
-    const { data: mensajesData, error: errorMensajes } = await supabaseClient
-      .from("chat_mensajes")
-      .select("*")
-      .in("chat_id", ids)
-      .order("created_at",{ascending:true});
-
-    if(errorMensajes){
-      console.error("Error cargando chat_mensajes:", errorMensajes);
-    }else{
-      mensajes = mensajesData || [];
-    }
+  if(errorMensajes){
+    console.error("Error cargando chat_mensajes RPC:", errorMensajes);
   }
 
   chats = (sesiones || []).map(c => {
@@ -989,9 +940,8 @@ async function cargarChats(silencioso=false){
       NOMBRE_COMPLETO: c.usuario || "",
       TELEFONO: c.telefono || "",
       FECHA: c.created_at,
-      FECHA_ULTIMO: ultimo?.created_at || c.created_at,
-      ULTIMO_MENSAJE: ultimo?.mensaje || "",
-      ULTIMA_IMAGEN: ultimo?.imagen_url || "",
+      FECHA_ULTIMO: ultimo?.created_at || c.ultimo_mensaje || c.created_at,
+      ULTIMO_MENSAJE: resumenMensajeChatPreview(ultimo?.mensaje || "", ultimo?.imagen_url || ""),
       SIN_LEER: sinLeer,
       USER_COUNT: userCount,
       SOLICITUD_ID: c.solicitud_id || "",
@@ -1005,7 +955,7 @@ async function cargarChats(silencioso=false){
   renderInicio();
 
   if(!silencioso){
-    console.log("Chats cargados:", chats.length);
+    console.log("Chats cargados por RPC:", chats.length);
   }
 }
 
@@ -1582,57 +1532,6 @@ async function cambiarEstadoBilletera(id,estado){
   await cargarBilleteras();
 }
 
-
-function previewMensajeChat(mensaje, imagen=""){
-  const raw = String(mensaje || "").trim();
-
-  if(parseTransferCardMessage(raw)){
-    return { texto:"📄 Tarjeta de transferencia enviada", esTarjeta:true };
-  }
-
-  if(raw){
-    const corto = raw.length > 58 ? raw.slice(0,58) + "..." : raw;
-    return { texto:corto, esTarjeta:false };
-  }
-
-  if(imagen){
-    return { texto:"🖼️ Imagen adjunta", esTarjeta:false };
-  }
-
-  return { texto:"Sin mensajes todavía", esTarjeta:false };
-}
-
-function copiarUsuarioChat(usuario, ev){
-  if(ev){
-    ev.preventDefault();
-    ev.stopPropagation();
-  }
-
-  const u = String(usuario || "").trim();
-  if(!u){
-    toast("Usuario no disponible","red");
-    return;
-  }
-
-  navigator.clipboard.writeText(u).then(()=>{
-    toast("Usuario copiado: " + u, "green");
-  }).catch(()=>{
-    const tmp = document.createElement("textarea");
-    tmp.value = u;
-    document.body.appendChild(tmp);
-    tmp.select();
-    document.execCommand("copy");
-    document.body.removeChild(tmp);
-    toast("Usuario copiado: " + u, "green");
-  });
-}
-
-function copiarUsuarioChatActual(){
-  const chat = chats.find(c=>String(c.ID_CHAT||c.chat_id)===String(chatActualId)) || {};
-  copiarUsuarioChat(chat.USUARIO || "");
-}
-
-
 function renderChatList(){
   if(!chats.length){
     setBox("chatList",`<div class="alert-box" style="margin:12px">No hay chats activos.</div>`);
@@ -1645,19 +1544,19 @@ function renderChatList(){
     const id = c.ID_CHAT || c.chat_id || "";
     const unread=Number(c.SIN_LEER||0);
     const usuario = c.USUARIO || "Usuario landing";
-    const preview = previewMensajeChat(c.ULTIMO_MENSAJE || "", c.ULTIMA_IMAGEN || "");
+    const preview = c.ULTIMO_MENSAJE || "";
 
     html+=`<div class="chat-item ${String(id)===String(chatActualId)?"active":""}" onclick="abrirChat('${id}')">
       <div class="chat-item-title">
-        <span class="chat-title-main">
-          <span class="chat-user-name">${escapeHtml(usuario)}</span>
-          <button class="chat-copy-user" type="button" onclick="copiarUsuarioChat('${escapeAttr(usuario)}', event)">Copiar</button>
-        </span>
+        <span>${escapeHtml(usuario)}</span>
         ${unread?`<span class="chat-unread">${unread}</span>`:""}
       </div>
-      <div class="small">${c.TELEFONO ? "📱 "+escapeHtml(c.TELEFONO) : ""}</div>
+      <div class="small">${escapeHtml(c.NOMBRE_COMPLETO||"")} ${c.TELEFONO ? "· "+escapeHtml(c.TELEFONO) : ""}</div>
       <div class="small">${formatFecha(c.FECHA_ULTIMO||c.FECHA||"")}</div>
-      <div class="chat-last-preview ${preview.esTarjeta?"card":""}">${escapeHtml(preview.texto)}</div>
+      <div class="chat-user-row">
+        <div class="small ${preview.startsWith("📄") ? "chat-preview-transfer" : ""}">${escapeHtml(preview)}</div>
+        <button class="chat-copy-btn" onclick="event.stopPropagation();copiarTextoOperativo('${escapeAttr(usuario)}','Usuario')">Copiar usuario</button>
+      </div>
     </div>`;
   });
 
@@ -1699,6 +1598,15 @@ function parseTransferCardMessage(text){
   if(!raw.startsWith(TRANSFER_CARD_PREFIX)) return null;
   try{return JSON.parse(raw.slice(TRANSFER_CARD_PREFIX.length));}
   catch(e){console.warn("Tarjeta inválida", e);return null;}
+}
+
+
+function resumenMensajeChatPreview(texto, imagenUrl=""){
+  const card = parseTransferCardMessage(texto || "");
+  if(card) return "📄 Tarjeta de transferencia enviada";
+  if(texto) return texto;
+  if(imagenUrl) return "Imagen adjunta";
+  return "";
 }
 
 function renderTransferCardChat(card){
@@ -1747,7 +1655,7 @@ function escapeAttr(text){
   return String(text || "").replaceAll("&","&amp;").replaceAll("'","&#039;").replaceAll('"',"&quot;").replaceAll("<","&lt;").replaceAll(">","&gt;");
 }
 
-async function enviarTarjetaTransferencia(){
+async async function enviarTarjetaTransferencia(){
   if(!chatActualId){alert("Seleccioná un chat primero.");return;}
   const id = document.getElementById("chatWalletSelect")?.value || "";
   if(!id){alert("Elegí una billetera para enviar.");return;}
@@ -1757,18 +1665,15 @@ async function enviarTarjetaTransferencia(){
   const mensaje = buildTransferCardMessageFromWallet(b);
   agregarMensajeLocalPanel(mensaje, "");
 
-  const { error } = await supabaseClient
-    .from("chat_mensajes")
-    .insert({
-      chat_id: chatActualId,
-      tipo_emisor: "OPERADOR",
-      emisor: operador.nombre || operador.usuario || "Operador",
-      mensaje,
-      imagen_url: ""
-    });
+  const { error } = await supabaseClient.rpc("panel_operativo_enviar_chat", {
+    p_session_token: requireSessionToken(),
+    p_chat_id: chatActualId,
+    p_mensaje: mensaje,
+    p_imagen_url: ""
+  });
 
   if(error){
-    console.error("Error enviando tarjeta transferencia:", error);
+    console.error("Error enviando tarjeta transferencia RPC:", error);
     alert("No se pudo enviar la tarjeta.");
     return;
   }
@@ -1783,14 +1688,13 @@ async function cargarChatActual(){
 
   if(!chatActualId) return;
 
-  const { data, error } = await supabaseClient
-    .from("chat_mensajes")
-    .select("*")
-    .eq("chat_id", chatActualId)
-    .order("created_at",{ascending:true});
+  const { data, error } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes", {
+    p_session_token: requireSessionToken(),
+    p_chat_id: chatActualId
+  });
 
   if(error){
-    console.error("Error cargando mensajes del chat:", error);
+    console.error("Error cargando mensajes del chat RPC:", error);
     return;
   }
 
@@ -1812,13 +1716,9 @@ function renderChatMensajes(){
   renderWalletSelectChat();
   const chat=chats.find(c=>String(c.ID_CHAT||c.chat_id)===String(chatActualId))||{};
 
-  setBox("chatTitulo",`
-    <span class="chat-user-chip">
-      ${escapeHtml(chat.USUARIO||"Chat landing")}
-      ${chat.USUARIO ? `<button class="chat-copy-user" type="button" onclick="copiarUsuarioChatActual()">Copiar usuario</button>` : ""}
-    </span>
-  `);
-  setBox("chatSubtitulo",`${chat.TELEFONO? "📱 "+escapeHtml(chat.TELEFONO):""}`);
+  const usuarioChat = chat.USUARIO || "Chat landing";
+  setBox("chatTitulo",`${escapeHtml(usuarioChat)} <button class="chat-copy-btn" onclick="copiarTextoOperativo('${escapeAttr(usuarioChat)}','Usuario')">Copiar usuario</button>`);
+  setBox("chatSubtitulo",`${chat.NOMBRE_COMPLETO||""} ${chat.TELEFONO? "· "+chat.TELEFONO:""}`);
   setBox("chatEstado",chat.SOLICITUD_ID?`Solicitud: ${chat.SOLICITUD_ID}`:"Sin solicitud");
 
   if(!chatMensajes.length){
@@ -1862,18 +1762,15 @@ async function enviarChat(){
 
   agregarMensajeLocalPanel(mensaje, chatImagenBase64 || "");
 
-  const { error } = await supabaseClient
-    .from("chat_mensajes")
-    .insert({
-      chat_id: chatActualId,
-      tipo_emisor: "OPERADOR",
-      emisor: operador.nombre || operador.usuario || "Operador",
-      mensaje: mensaje || "",
-      imagen_url: chatImagenBase64 || ""
-    });
+  const { error } = await supabaseClient.rpc("panel_operativo_enviar_chat", {
+    p_session_token: requireSessionToken(),
+    p_chat_id: chatActualId,
+    p_mensaje: mensaje || "",
+    p_imagen_url: chatImagenBase64 || ""
+  });
 
   if(error){
-    console.error("Error enviando mensaje operador:", error);
+    console.error("Error enviando mensaje operador RPC:", error);
     alert("No se pudo enviar el mensaje.");
     return;
   }
