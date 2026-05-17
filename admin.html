@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>NODO · ADMIN</title>
+<title>NODO · ADMIN RPC V15</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
@@ -33,24 +33,44 @@ button{border:0;border-radius:12px;padding:11px 14px;cursor:pointer;font-weight:
 .mp-status-card{background:rgba(2,6,23,.45);border:1px solid var(--line);border-radius:10px;padding:9px;font-size:12px;color:var(--muted)}
 .mp-status-card b{display:block;color:#fff;margin-top:3px}
 
+
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:22px}
+.login-card{width:min(430px,94vw);background:rgba(17,24,39,.98);border:1px solid var(--line);border-radius:20px;padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.4)}
+.login-card h2{font-size:24px;margin-bottom:6px}
+.admin-user-box{margin-top:14px;padding:10px;border:1px solid var(--line);border-radius:13px;background:rgba(2,6,23,.35);font-size:13px;color:#d1d5db}
+.logout-btn{background:var(--red)}
+
 </style>
 </head>
 <body>
-<div class="app">
-<aside><div class="brand"><h1>NODO ADMIN</h1><p>Panel general. Administrás operadores, billeteras, PCs y estadísticas.</p></div>
+<div id="loginView" class="login-wrap">
+  <div class="login-card">
+    <h2>NODO ADMIN</h2>
+    <p class="muted" style="margin-bottom:16px">Ingreso seguro con sesión.</p>
+    <label>Usuario</label>
+    <input id="adminLoginUsuario" autocomplete="username">
+    <label>Clave</label>
+    <input id="adminLoginClave" type="password" autocomplete="current-password">
+    <button class="primary" style="width:100%;margin-top:8px" onclick="adminLogin()">Ingresar</button>
+    <div id="adminLoginMsg" style="margin-top:12px"></div>
+  </div>
+</div>
+
+<div id="appView" class="app hidden">
+<aside><div class="brand"><h1>NODO ADMIN</h1><p>Panel admin con sesión segura y permisos por rol.</p></div>
+  <div id="adminInfo" class="admin-user-box hidden"></div>
   <div class="nav">
     <button class="navBtn active" data-section="dashboard" onclick="showSection('dashboard')">Dashboard <span class="badge" id="badgeDashboard">0</span></button>
     <button class="navBtn" data-section="metricas" onclick="showSection('metricas')">Métricas <span class="badge" id="badgeMetricas">0</span></button>
     <button class="navBtn" data-section="worker" onclick="showSection('worker')">Worker <span class="badge" id="badgeWorker">0</span></button>
     <button class="navBtn" data-section="operadores" onclick="showSection('operadores')">Operadores <span class="badge" id="badgeOperadores">0</span></button>
     <button class="navBtn" data-section="billeteras" onclick="showSection('billeteras')">Billeteras <span class="badge" id="badgeBilleteras">0</span></button>
-    <button class="navBtn" data-section="retiroCuentas" onclick="showSection('retiroCuentas')">Cuentas retiro <span class="badge" id="badgeRetiroCuentas">0</span></button>
     <button class="navBtn" data-section="pcs" onclick="showSection('pcs')">PCs <span class="badge" id="badgePcs">0</span></button>
     <button class="navBtn" data-section="config" onclick="showSection('config')">Configuración <span class="badge" id="badgeConfig">0</span></button>
   </div>
 </aside>
 <main>
-<div class="top"><div><h2 id="pageTitle">Dashboard</h2><p id="pageSub">Resumen general navegable por PC.</p></div><div class="top-actions"><select id="globalPc" onchange="renderAll()"><option value="">Todas las PCs</option></select><button class="blue" onclick="reloadAll()">Actualizar todo</button></div></div>
+<div class="top"><div><h2 id="pageTitle">Dashboard</h2><p id="pageSub">Resumen general navegable por PC.</p></div><div class="top-actions"><select id="globalPc" onchange="reloadAll()"><option value="">Todas las PCs</option></select><button class="blue" onclick="reloadAll()">Actualizar todo</button><button class="logout-btn" onclick="adminLogout()">Cerrar sesión</button></div></div>
 
 <section id="section-dashboard" class="section active">
   <div class="notice">Selector superior: elegí una PC para ver el dashboard filtrado o dejá “Todas las PCs” para la vista general.</div>
@@ -231,69 +251,6 @@ button{border:0;border-radius:12px;padding:11px 14px;cursor:pointer;font-weight:
   <div class="card"><div class="card-h"><h3>Billeteras</h3><button class="blue small" onclick="loadBilleteras()">Actualizar</button></div><div class="filters"><input id="bi_search" oninput="renderBilleteras()" placeholder="Buscar..."><select id="bi_filter_banco" onchange="renderBilleteras()"><option value="">Todos bancos</option><option>MP</option><option>UALA</option><option>NJX</option><option>PERSONAL PAY</option><option>BRUBANK</option><option>PREX</option><option>OTRO</option></select><select id="bi_filter_pc" onchange="renderBilleteras()"></select><select id="bi_filter_activa" onchange="renderBilleteras()"><option value="">Todas</option><option value="true">Activas</option><option value="false">Inactivas</option></select><button onclick="clearBiFilters()">Reset</button></div><div class="tableWrap"><table><thead><tr><th>ID</th><th>PC</th><th>Nombre</th><th>Titular</th><th>Banco</th><th>Alias</th><th>Estado</th><th>MP</th><th>Prioridad</th><th>Manual</th><th>Acciones</th></tr></thead><tbody id="billeterasBody"></tbody></table></div></div>
 </div></section>
 
-
-<section id="section-retiroCuentas" class="section">
-  <div class="notice">
-    Control antifraude de cuentas de retiro. Desde acá podés verificar, bloquear o revisar solicitudes de cambio.
-  </div>
-
-  <div class="stats">
-    <div class="stat"><small>Pendientes verificación</small><strong id="rcPend">0</strong></div>
-    <div class="stat"><small>Verificadas</small><strong id="rcVer">0</strong></div>
-    <div class="stat"><small>Bloqueadas</small><strong id="rcBloq">0</strong></div>
-    <div class="stat"><small>Cambios pendientes</small><strong id="rcCambios">0</strong></div>
-    <div class="stat"><small>Total cuentas</small><strong id="rcTotal">0</strong></div>
-  </div>
-
-  <div class="card">
-    <div class="card-h">
-      <h3>Cuentas de retiro</h3>
-      <button class="blue small" onclick="loadRetiroCuentas()">Actualizar</button>
-    </div>
-    <div class="filters">
-      <input id="rc_search" oninput="renderRetiroCuentas()" placeholder="Buscar usuario, DNI, alias, titular...">
-      <select id="rc_filter_estado" onchange="renderRetiroCuentas()">
-        <option value="">Todos estados</option>
-        <option value="PENDIENTE_VERIFICACION">PENDIENTE_VERIFICACION</option>
-        <option value="VERIFICADA">VERIFICADA</option>
-        <option value="REQUIERE_REVISION">REQUIERE_REVISION</option>
-        <option value="BLOQUEADA">BLOQUEADA</option>
-        <option value="REEMPLAZADA">REEMPLAZADA</option>
-      </select>
-      <select id="rc_filter_pc" onchange="renderRetiroCuentas()"></select>
-      <select id="rc_filter_dummy"><option>Cuenta fija por usuario</option></select>
-      <button onclick="clearRetiroCuentasFilters()">Reset</button>
-    </div>
-    <div class="tableWrap">
-      <table>
-        <thead>
-          <tr>
-            <th>ID</th><th>PC</th><th>Usuario</th><th>DNI</th><th>Titular</th><th>Alias/CBU</th><th>Estado</th><th>Verificada</th><th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody id="retiroCuentasBody"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-h">
-      <h3>Solicitudes de cambio de cuenta</h3>
-      <button class="blue small" onclick="loadRetiroCambios()">Actualizar cambios</button>
-    </div>
-    <div class="tableWrap">
-      <table>
-        <thead>
-          <tr>
-            <th>ID</th><th>PC</th><th>Usuario</th><th>Actual</th><th>Nueva</th><th>Estado</th><th>Resolución</th><th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody id="retiroCambiosBody"></tbody>
-      </table>
-    </div>
-  </div>
-</section>
-
 <section id="section-pcs" class="section"><div class="grid2"><div class="card"><div class="card-h"><h3 id="pcFormTitle">Crear PC</h3><button class="small" onclick="resetPcForm()">Limpiar</button></div><div class="card-b"><form id="pcForm"><input type="hidden" id="pc_id"><div class="row"><label>Código</label><input id="pc_codigo" required placeholder="P1"></div><div class="row"><label>Nombre</label><input id="pc_nombre"></div><div class="row"><label>Descripción</label><textarea id="pc_descripcion"></textarea></div><div class="row"><label>Activa</label><select id="pc_activa"><option value="true">Sí</option><option value="false">No</option></select></div><div class="actions"><button class="primary" type="submit">Guardar PC</button><button type="button" onclick="resetPcForm()">Cancelar</button></div></form></div></div><div class="card"><div class="card-h"><h3>PCs</h3><button class="blue small" onclick="loadPcs()">Actualizar</button></div><div class="tableWrap"><table><thead><tr><th>ID</th><th>Código</th><th>Nombre</th><th>Descripción</th><th>Activa</th><th>Acciones</th></tr></thead><tbody id="pcsBody"></tbody></table></div></div></div></section>
 
 <section id="section-config" class="section"><div class="grid2"><div class="card"><div class="card-h"><h3 id="cfgFormTitle">Crear configuración</h3><button class="small" onclick="resetCfgForm()">Limpiar</button></div><div class="card-b"><form id="cfgForm"><input type="hidden" id="cfg_id"><div class="row"><label>Clave</label><input id="cfg_clave" required></div><div class="row"><label>Valor</label><input id="cfg_valor"></div><div class="row"><label>Descripción</label><textarea id="cfg_descripcion"></textarea></div><div class="actions"><button class="primary" type="submit">Guardar</button><button type="button" onclick="resetCfgForm()">Cancelar</button></div></form></div></div><div class="card"><div class="card-h"><h3>Configuración</h3><button class="blue small" onclick="loadConfig()">Actualizar</button></div><div class="tableWrap"><table><thead><tr><th>ID</th><th>Clave</th><th>Valor</th><th>Descripción</th><th>Acciones</th></tr></thead><tbody id="cfgBody"></tbody></table></div></div></div></section>
@@ -306,68 +263,152 @@ const SUPABASE_URL = "https://pjvvyvfcwjoocjqvdror.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_NYqRoKptTgcL90VAVF2kqA_Gl06mEUF";
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const TABLES={operadores:"operadores",billeteras:"billeteras",pcs:"pcs",config:"configuracion",solicitudes:"solicitudes",chatSesiones:"chat_sesiones",chatMensajes:"chat_mensajes",workerJobs:"worker_jobs",workerLogs:"worker_logs"};
-let operadores=[],billeteras=[],pcs=[],configuracion=[],solicitudes=[],chatSesiones=[],chatMensajes=[],workerJobs=[],workerLogs=[],retiroCuentas=[],retiroCambios=[];
+let operadores=[],billeteras=[],pcs=[],configuracion=[],solicitudes=[],chatSesiones=[],chatMensajes=[],workerJobs=[],workerLogs=[];
+let adminSessionToken="";
+let adminScope=null;
+const LS_ADMIN_TOKEN="nodo_admin_session_token";
 const $=id=>document.getElementById(id);
 
-document.addEventListener("DOMContentLoaded",()=>{$("operadorForm").addEventListener("submit",saveOperador);$("billeteraForm").addEventListener("submit",saveBilletera);$("pcForm").addEventListener("submit",savePc);$("cfgForm").addEventListener("submit",saveCfg);reloadAll();});
+
+document.addEventListener("DOMContentLoaded",()=>{
+  $("operadorForm").addEventListener("submit",saveOperador);
+  $("billeteraForm").addEventListener("submit",saveBilletera);
+  $("pcForm").addEventListener("submit",savePc);
+  $("cfgForm").addEventListener("submit",saveCfg);
+  initAdminSession();
+});
+
+async function initAdminSession(){
+  const token=localStorage.getItem(LS_ADMIN_TOKEN);
+  if(token){
+    const ok=await validarAdminToken(token);
+    if(ok)return;
+  }
+  localStorage.removeItem(LS_ADMIN_TOKEN);
+  $("loginView").classList.remove("hidden");
+  $("appView").classList.add("hidden");
+}
+
+async function adminLogin(){
+  const usuario=val("adminLoginUsuario").trim();
+  const clave=val("adminLoginClave").trim();
+
+  if(!usuario||!clave){
+    $("adminLoginMsg").innerHTML='<div class="notice">Completá usuario y clave.</div>';
+    return;
+  }
+
+  $("adminLoginMsg").innerHTML='<div class="notice">Validando acceso...</div>';
+
+  const {data,error}=await supabaseClient.rpc("panel_login",{
+    p_usuario:usuario,
+    p_clave:clave,
+    p_ip:null,
+    p_user_agent:navigator.userAgent||"admin"
+  });
+
+  if(error){
+    $("adminLoginMsg").innerHTML='<div class="notice" style="border-color:rgba(239,68,68,.7);color:#fecaca">Error: '+safe(error.message)+'</div>';
+    return;
+  }
+
+  const row=Array.isArray(data)?data[0]:data;
+  if(!row||row.ok!==true){
+    $("adminLoginMsg").innerHTML='<div class="notice" style="border-color:rgba(239,68,68,.7);color:#fecaca">'+safe(row?.mensaje||"Usuario o clave incorrectos")+'</div>';
+    return;
+  }
+
+  const ok=await validarAdminToken(row.session_token);
+  if(!ok){
+    await supabaseClient.rpc("panel_logout",{p_session_token:row.session_token});
+    return;
+  }
+
+  localStorage.setItem(LS_ADMIN_TOKEN,row.session_token);
+}
+
+async function validarAdminToken(token){
+  const {data,error}=await supabaseClient.rpc("panel_validar_admin_session",{
+    p_session_token:token
+  });
+
+  if(error){
+    $("adminLoginMsg").innerHTML='<div class="notice" style="border-color:rgba(239,68,68,.7);color:#fecaca">'+safe(error.message||"Sin permisos admin")+'</div>';
+    return false;
+  }
+
+  const row=Array.isArray(data)?data[0]:data;
+  if(!row||row.ok!==true){
+    $("adminLoginMsg").innerHTML='<div class="notice" style="border-color:rgba(239,68,68,.7);color:#fecaca">Sesión inválida.</div>';
+    return false;
+  }
+
+  adminSessionToken=token;
+  adminScope=row;
+
+  $("loginView").classList.add("hidden");
+  $("appView").classList.remove("hidden");
+
+  $("adminInfo").classList.remove("hidden");
+  $("adminInfo").innerHTML=`<b>${safe(row.nombre||row.usuario)}</b><br>
+    <span class="pill info">${safe(row.rol)}</span>
+    <span class="pill ${row.puede_todas?'ok':'warn'}">${row.puede_todas?'TODAS LAS PCs':'PC '+safe(row.pc_codigo)}</span>`;
+
+  aplicarScopeAdmin();
+  await reloadAll();
+  return true;
+}
+
+function requireAdminToken(){
+  if(!adminSessionToken)throw new Error("Sesión admin no iniciada");
+  return adminSessionToken;
+}
+
+async function adminLogout(){
+  try{
+    if(adminSessionToken){
+      await supabaseClient.rpc("panel_logout",{p_session_token:adminSessionToken});
+    }
+  }catch(e){}
+  localStorage.removeItem(LS_ADMIN_TOKEN);
+  location.reload();
+}
+
+function aplicarScopeAdmin(){
+  if(!adminScope)return;
+
+  // Encargados: no editan configuración global.
+  if(!adminScope.puede_todas){
+    const cfgBtn=document.querySelector('[data-section="config"]');
+    if(cfgBtn)cfgBtn.style.display="none";
+  }
+}
+
 
 function showSection(name){document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));document.querySelectorAll(".navBtn").forEach(b=>b.classList.remove("active"));$("section-"+name).classList.add("active");document.querySelector(`[data-section="${name}"]`)?.classList.add("active");const t={dashboard:["Dashboard","Resumen general navegable por PC."],metricas:["Métricas","Aprobación rápida, respuesta de chat y rendimiento por operador/PC."],worker:["Worker","Cola de automatización, logs, errores y reintentos."],operadores:["Operadores","Crear, editar, activar, desactivar o eliminar operadores."],billeteras:["Billeteras","Administrar cuentas, estados, prioridad, selección manual e integración Mercado Pago."],pcs:["PCs","Administrar catálogo de PCs."],config:["Configuración","Parámetros internos del sistema."]};$("pageTitle").textContent=t[name][0];$("pageSub").textContent=t[name][1];}
 
-async function reloadAll(){await Promise.allSettled([loadPcs(false),loadOperadores(false),loadBilleteras(false),loadConfig(false),loadSolicitudes(false),loadChats(false),loadWorkerJobs(false),loadRetiroCuentas(false),loadRetiroCambios(false)]);fillPcSelects();renderAll();toast("Datos actualizados","okb")}
-async function loadOperadores(render=true){const {data,error}=await supabaseClient.from(TABLES.operadores).select("*").order("nombre",{ascending:true});if(error)return toast("Error operadores: "+error.message,"err");operadores=data||[];if(render)renderAll()}
-async function loadBilleteras(render=true){
-  const {data,error}=await supabaseClient.from(TABLES.billeteras).select("*").order("prioridad",{ascending:false}).order("orden",{ascending:true}).order("id",{ascending:true});
-  if(error)return toast("Error billeteras: "+error.message,"err");
-
-  let base=data||[];
-
-  // Datos Mercado Pago admin sin exponer secretos.
-  const {data:mpData,error:mpError}=await supabaseClient.rpc("admin_mp_listar_billeteras");
-  if(mpError){
-    console.warn("No pude leer config MP admin:",mpError);
-    billeteras=base;
-  }else{
-    const mpMap=new Map((mpData||[]).map(x=>[String(x.billetera_id),x]));
-    billeteras=base.map(b=>({...b,...(mpMap.get(String(b.id))||{})}));
-  }
-
-  if(render)renderAll()
+async function reloadAll(){await Promise.allSettled([loadPcs(false),loadOperadores(false),loadBilleteras(false),loadConfig(false),loadSolicitudes(false),loadChats(false),loadWorkerJobs(false)]);fillPcSelects();renderAll();toast("Datos actualizados","okb")}
+async function loadOperadores(render=true){
+  const {data,error}=await supabaseClient.rpc("admin_get_operadores",{p_session_token:requireAdminToken()});
+  if(error)return toast("Error operadores: "+error.message,"err");
+  operadores=data||[];
+  if(render)renderAll();
 }
-async function loadPcs(render=true){const {data,error}=await supabaseClient.from(TABLES.pcs).select("*").order("codigo",{ascending:true});if(error)return toast("Error PCs: "+error.message,"err");pcs=data||[];if(render)renderAll()}
-async function loadConfig(render=true){const {data,error}=await supabaseClient.from(TABLES.config).select("*").order("clave",{ascending:true});if(error)return toast("Error config: "+error.message,"err");configuracion=data||[];if(render)renderAll()}
-async function loadSolicitudes(render=true){const {data,error}=await supabaseClient.from(TABLES.solicitudes).select("*").order("created_at",{ascending:false}).limit(1000);if(error){console.warn(error);solicitudes=[];return toast("No pude leer solicitudes: "+error.message,"err")}solicitudes=data||[];if(render)renderAll()}
-async function loadChats(render=true){const {data:ses,error:e1}=await supabaseClient.from(TABLES.chatSesiones).select("*").order("created_at",{ascending:false}).limit(1000);if(e1){console.warn(e1);chatSesiones=[];chatMensajes=[];return}chatSesiones=ses||[];const ids=chatSesiones.map(c=>c.chat_id).filter(Boolean);if(ids.length){const {data:ms,error:e2}=await supabaseClient.from(TABLES.chatMensajes).select("*").in("chat_id",ids).order("created_at",{ascending:true});if(e2){console.warn(e2);chatMensajes=[]}else chatMensajes=ms||[]}else chatMensajes=[];if(render)renderAll()}
-
-async function loadWorkerJobs(render=true){
-  const {data,error}=await supabaseClient.from(TABLES.workerJobs).select("*").order("created_at",{ascending:false}).limit(1500);
-  if(error){console.warn(error);workerJobs=[];return toast("No pude leer worker_jobs: "+error.message,"err")}
-  workerJobs=data||[];
-  if(render)renderAll()
+async function loadPcs(render=true){
+  const {data,error}=await supabaseClient.rpc("admin_get_pcs",{p_session_token:requireAdminToken()});
+  if(error)return toast("Error PCs: "+error.message,"err");
+  pcs=data||[];
+  if(render)renderAll();
 }
 async function loadWorkerLogs(jobId){
-  let q=supabaseClient.from(TABLES.workerLogs).select("*").order("created_at",{ascending:true});
-  if(jobId) q=q.eq("job_id",Number(jobId));
-  else q=q.limit(2000);
-  const {data,error}=await q;
+  const {data,error}=await supabaseClient.rpc("admin_get_worker_logs",{
+    p_session_token:requireAdminToken(),
+    p_worker_job_id:jobId?Number(jobId):null
+  });
   if(error){console.warn(error);toast("No pude leer worker_logs: "+error.message,"err");return[]}
   return data||[];
 }
-
-async function loadRetiroCuentas(render=true){
-  const {data,error}=await supabaseClient.rpc("panel_retiro_listar_cuentas",{p_pc_codigo:null,p_estado:null});
-  if(error){console.warn(error);retiroCuentas=[];return toast("No pude leer cuentas retiro: "+error.message,"err")}
-  retiroCuentas=data||[];
-  if(render)renderAll();
-}
-
-async function loadRetiroCambios(render=true){
-  const {data,error}=await supabaseClient.rpc("panel_retiro_listar_cambios",{p_pc_codigo:null,p_estado:null});
-  if(error){console.warn(error);retiroCambios=[];return toast("No pude leer cambios retiro: "+error.message,"err")}
-  retiroCambios=data||[];
-  if(render)renderAll();
-}
-
-function renderAll(){fillPcSelects();renderDashboard();renderMetricas();renderWorker();renderOperadores();renderBilleteras();renderRetiroCuentas();renderRetiroCambios();renderPcs();renderCfg();badges()}
+function renderAll(){fillPcSelects();renderDashboard();renderMetricas();renderWorker();renderOperadores();renderBilleteras();renderPcs();renderCfg();badges()}
 
 function pcSeleccionada(){return val("globalPc")}function listaFiltradaPc(arr,campo="pc_codigo"){const pc=pcSeleccionada();return pc?arr.filter(x=>String(x[campo]||"")===pc):arr}
 function hoyBA(fecha){const d=fecha?new Date(fecha):new Date();return d.toLocaleDateString("en-CA",{timeZone:"America/Argentina/Buenos_Aires"})}
@@ -498,130 +539,6 @@ function workerTipoBadge(t){return String(t||"").includes("RETIRO")?pill(t,"vio"
 function workerNivelBadge(n){const x=String(n||"INFO");if(x==="SUCCESS")return "✅";if(x==="ERROR")return "❌";if(x==="WARN")return "⚠️";return "ℹ️"}
 function abrirModal(titulo,html){$("modalTitle").textContent=titulo;$("modalBody").innerHTML=html;$("modalOverlay").classList.add("show")}
 function cerrarModal(){$("modalOverlay").classList.remove("show");$("modalBody").innerHTML=""}
-
-
-function renderRetiroCuentas(){
-  if(!$("retiroCuentasBody"))return;
-
-  const pc=val("rc_filter_pc");
-  const estado=val("rc_filter_estado");
-  const q=norm(val("rc_search"));
-
-  let rows=retiroCuentas.filter(c=>
-    (!pc||String(c.pc_codigo||"")===pc)&&
-    (!estado||String(c.estado||"")===estado)&&
-    (!q||norm([c.cuenta_id,c.usuario,c.dni,c.dni_normalizado,c.pc_codigo,c.titular,c.alias_cbu,c.estado].join(" ")).includes(q))
-  );
-
-  setText({
-    rcPend:retiroCuentas.filter(c=>c.estado==="PENDIENTE_VERIFICACION").length,
-    rcVer:retiroCuentas.filter(c=>c.estado==="VERIFICADA").length,
-    rcBloq:retiroCuentas.filter(c=>c.estado==="BLOQUEADA").length,
-    rcCambios:retiroCambios.filter(c=>c.estado==="PENDIENTE_REVISION").length,
-    rcTotal:retiroCuentas.length
-  });
-
-  if(!rows.length)return empty("retiroCuentasBody",9,"No hay cuentas de retiro.");
-
-  $("retiroCuentasBody").innerHTML=rows.map(c=>`<tr>
-    <td>#${safe(c.cuenta_id)}</td>
-    <td>${safe(c.pc_codigo)}</td>
-    <td><strong>${safe(c.usuario)}</strong></td>
-    <td>${safe(c.dni_normalizado||c.dni)}</td>
-    <td>${safe(c.titular)}</td>
-    <td><strong>${safe(c.alias_cbu)}</strong><br><button class="small" onclick="copyAdmin('${attr(c.alias_cbu)}','Alias/CBU')">Copiar</button></td>
-    <td>${cuentaRetiroBadge(c.estado)}</td>
-    <td>${c.verificada_at?fecha(c.verificada_at):'<span class="muted">No</span>'}</td>
-    <td><div class="rowActions">
-      ${c.estado!=="VERIFICADA"&&c.estado!=="BLOQUEADA"?`<button class="small primary" onclick="adminVerificarCuenta('${c.cuenta_id}')">Verificar</button>`:""}
-      ${c.estado!=="BLOQUEADA"?`<button class="small danger" onclick="adminBloquearCuenta('${c.cuenta_id}')">Bloquear</button>`:""}
-    </div></td>
-  </tr>`).join("");
-}
-
-function renderRetiroCambios(){
-  if(!$("retiroCambiosBody"))return;
-
-  const pc=pcSeleccionada();
-  let rows=retiroCambios.filter(c=>!pc||String(c.pc_codigo||"")===pc);
-
-  if(!rows.length)return empty("retiroCambiosBody",8,"No hay solicitudes de cambio de cuenta.");
-
-  $("retiroCambiosBody").innerHTML=rows.map(c=>`<tr>
-    <td>#${safe(c.cambio_id)}</td>
-    <td>${safe(c.pc_codigo)}</td>
-    <td><strong>${safe(c.usuario)}</strong><br><span class="muted">DNI ${safe(c.dni_normalizado||c.dni)}</span></td>
-    <td>${safe(c.titular_actual||"-")}<br><strong>${safe(c.alias_cbu_actual||"-")}</strong></td>
-    <td>${safe(c.titular_nuevo)}<br><strong>${safe(c.alias_cbu_nuevo)}</strong><br><button class="small" onclick="copyAdmin('${attr(c.alias_cbu_nuevo)}','Alias nuevo')">Copiar</button></td>
-    <td>${cambioCuentaBadge(c.estado)}</td>
-    <td>${safe(c.resolucion||"-")}</td>
-    <td><div class="rowActions">
-      ${c.estado==="PENDIENTE_REVISION"?`<button class="small primary" onclick="adminAprobarCambio('${c.cambio_id}')">Aprobar</button><button class="small danger" onclick="adminRechazarCambio('${c.cambio_id}')">Rechazar</button>`:""}
-    </div></td>
-  </tr>`).join("");
-}
-
-function cuentaRetiroBadge(e){
-  const x=String(e||"");
-  if(x==="VERIFICADA")return pill(x,"ok");
-  if(x==="BLOQUEADA")return pill(x,"off");
-  if(x==="PENDIENTE_VERIFICACION"||x==="REQUIERE_REVISION")return pill(x,"warn");
-  return pill(x,"info");
-}
-
-function cambioCuentaBadge(e){
-  const x=String(e||"");
-  if(x==="APROBADA")return pill(x,"ok");
-  if(x==="RECHAZADA")return pill(x,"off");
-  return pill(x,"warn");
-}
-
-function clearRetiroCuentasFilters(){setVals({rc_search:"",rc_filter_estado:"",rc_filter_pc:""});renderRetiroCuentas()}
-
-async function adminVerificarCuenta(id){
-  if(!confirm("¿Verificar esta cuenta de retiro?"))return;
-  const {error}=await supabaseClient.rpc("panel_retiro_verificar_cuenta",{p_cuenta_id:Number(id),p_operador:"admin"});
-  if(error)return toast(error.message,"err");
-  await Promise.all([loadRetiroCuentas(false),loadSolicitudes(false)]);
-  renderAll();
-  toast("Cuenta verificada","okb");
-}
-
-async function adminBloquearCuenta(id){
-  const motivo=prompt("Motivo del bloqueo:","Requiere revisión");
-  if(motivo===null)return;
-  const {error}=await supabaseClient.rpc("panel_retiro_bloquear_cuenta",{p_cuenta_id:Number(id),p_motivo:motivo,p_operador:"admin"});
-  if(error)return toast(error.message,"err");
-  await Promise.all([loadRetiroCuentas(false),loadSolicitudes(false)]);
-  renderAll();
-  toast("Cuenta bloqueada","okb");
-}
-
-async function adminAprobarCambio(id){
-  const resolucion=prompt("Resolución:","Cambio aprobado por revisión manual");
-  if(resolucion===null)return;
-  const {error}=await supabaseClient.rpc("panel_retiro_aprobar_cambio",{p_cambio_id:Number(id),p_operador:"admin",p_resolucion:resolucion});
-  if(error)return toast(error.message,"err");
-  await Promise.all([loadRetiroCuentas(false),loadRetiroCambios(false)]);
-  renderAll();
-  toast("Cambio aprobado","okb");
-}
-
-async function adminRechazarCambio(id){
-  const resolucion=prompt("Motivo de rechazo:","No se aprueba cambio de cuenta");
-  if(resolucion===null)return;
-  const {error}=await supabaseClient.rpc("panel_retiro_rechazar_cambio",{p_cambio_id:Number(id),p_operador:"admin",p_resolucion:resolucion});
-  if(error)return toast(error.message,"err");
-  await loadRetiroCambios(false);
-  renderAll();
-  toast("Cambio rechazado","okb");
-}
-
-function copyAdmin(texto,nombre="Dato"){
-  navigator.clipboard.writeText(String(texto||""));
-  toast(nombre+" copiado","okb");
-}
-
 
 async function saveOperador(e){e.preventDefault();const id=val("op_id");const payload={usuario:val("op_usuario"),nombre:val("op_nombre"),clave:val("op_clave"),password:val("op_password"),rol:val("op_rol"),tipo:val("op_tipo"),pc_codigo:val("op_pc_codigo"),turno:val("op_turno"),telefono:val("op_telefono"),email:val("op_email"),activo:bool("op_activo"),observaciones:val("op_observaciones"),updated_at:new Date().toISOString()};if(!payload.password)delete payload.password;if(!payload.clave)delete payload.clave;const res=id?await supabaseClient.from(TABLES.operadores).update(payload).eq("id",id):await supabaseClient.from(TABLES.operadores).insert([payload]);if(res.error)return toast("Error operador: "+res.error.message,"err");resetOperadorForm();await loadOperadores();toast("Operador guardado","okb")}
 function renderOperadores(){const q=norm(val("op_search")),rol=val("op_filter_rol"),pc=val("op_filter_pc"),act=val("op_filter_activo");let rows=operadores.filter(o=>(!q||norm([o.id,o.usuario,o.nombre,o.rol,o.tipo,o.pc_codigo,o.turno,o.telefono,o.email].join(" ")).includes(q))&&(!rol||o.rol===rol)&&(!pc||o.pc_codigo===pc)&&(act===""||String(!!o.activo)===act));if(!rows.length)return empty("operadoresBody",9,"No hay operadores.");$("operadoresBody").innerHTML=rows.map(o=>`<tr><td>${safe(o.id)}</td><td>${safe(o.usuario)}</td><td><strong>${safe(o.nombre)}</strong></td><td>${pill(o.rol||'-','vio')}</td><td>${safe(o.tipo)}</td><td>${safe(o.pc_codigo)}</td><td>${safe(o.turno)}</td><td>${o.activo?pill('Activo','ok'):pill('Inactivo','off')}</td><td><div class="rowActions"><button class="small blue" onclick="editOperador('${o.id}')">Editar</button><button class="small ${o.activo?'warning':'primary'}" onclick="toggleRow('${TABLES.operadores}','${o.id}','activo',${!o.activo},loadOperadores)">${o.activo?'Desactivar':'Activar'}</button><button class="small danger" onclick="deleteRow('${TABLES.operadores}','${o.id}',loadOperadores,'operador')">Eliminar</button></div></td></tr>`).join("")}
@@ -824,11 +741,53 @@ function renderCfg(){if(!configuracion.length)return empty("cfgBody",5,"No hay c
 function editCfg(id){const c=configuracion.find(x=>String(x.id)===String(id));if(!c)return;setVals({cfg_id:c.id,cfg_clave:c.clave,cfg_valor:c.valor,cfg_descripcion:c.descripcion});$("cfgFormTitle").textContent="Editar configuración";showSection("config")}function resetCfgForm(){$("cfgForm").reset();setVals({cfg_id:""});$("cfgFormTitle").textContent="Crear configuración"}
 
 async function toggleRow(table,id,col,value,reload){const {error}=await supabaseClient.from(table).update({[col]:value,updated_at:new Date().toISOString()}).eq("id",id);if(error)return toast(error.message,"err");await reload();toast("Actualizado","okb")}async function deleteRow(table,id,reload,label){if(!confirm(`¿Seguro que querés eliminar ${label}?`))return;const {error}=await supabaseClient.from(table).delete().eq("id",id);if(error)return toast("Error al eliminar: "+error.message,"err");await reload();toast("Eliminado","okb")}
-function fillPcSelects(){const cods=[...new Set(pcs.map(p=>p.codigo||p.nombre).filter(Boolean))];const opts=['<option value="">Seleccionar</option>'].concat(cods.map(c=>`<option value="${attr(c)}">${safe(c)}</option>`)).join("");const filt=['<option value="">Todas las PCs</option>'].concat(cods.map(c=>`<option value="${attr(c)}">${safe(c)}</option>`)).join("");["op_pc_codigo","bi_pc_codigo"].forEach(id=>{const el=$(id);if(el){const v=el.value;el.innerHTML=opts;el.value=v}});["op_filter_pc","bi_filter_pc","globalPc","wk_filter_pc","rc_filter_pc"].forEach(id=>{const el=$(id);if(el){const v=el.value;el.innerHTML=filt;el.value=v}})}
-function badges(){setText({badgeDashboard:solicitudes.length,badgeMetricas:solicitudes.filter(esRealizada).length,badgeWorker:workerJobs.filter(j=>["PENDIENTE","REINTENTAR","TOMADO","PROCESANDO","ERROR","REQUIERE_MANUAL"].includes(j.estado)).length,badgeOperadores:operadores.length,badgeBilleteras:billeteras.length,badgeRetiroCuentas:retiroCuentas.filter(c=>["PENDIENTE_VERIFICACION","REQUIERE_REVISION","BLOQUEADA"].includes(c.estado)).length,badgePcs:pcs.length,badgeConfig:configuracion.length})}
+function fillPcSelects(){const cods=[...new Set(pcs.map(p=>p.codigo||p.nombre).filter(Boolean))];const opts=['<option value="">Seleccionar</option>'].concat(cods.map(c=>`<option value="${attr(c)}">${safe(c)}</option>`)).join("");const filt=['<option value="">Todas las PCs</option>'].concat(cods.map(c=>`<option value="${attr(c)}">${safe(c)}</option>`)).join("");["op_pc_codigo","bi_pc_codigo"].forEach(id=>{const el=$(id);if(el){const v=el.value;el.innerHTML=opts;el.value=v}});["op_filter_pc","bi_filter_pc","globalPc","wk_filter_pc"].forEach(id=>{const el=$(id);if(el){const v=el.value;el.innerHTML=filt;el.value=v}})
+  if(adminScope && !adminScope.puede_todas){
+    ["globalPc","op_filter_pc","bi_filter_pc","wk_filter_pc"].forEach(id=>{const el=$(id);if(el){el.value=adminScope.pc_codigo; if(id==="globalPc")el.disabled=true;}});
+  }}
+function badges(){setText({badgeDashboard:solicitudes.length,badgeMetricas:solicitudes.filter(esRealizada).length,badgeWorker:workerJobs.filter(j=>["PENDIENTE","REINTENTAR","TOMADO","PROCESANDO","ERROR","REQUIERE_MANUAL"].includes(j.estado)).length,badgeOperadores:operadores.length,badgeBilleteras:billeteras.length,badgePcs:pcs.length,badgeConfig:configuracion.length})}
 function toast(msg,cls="okb"){const e=$("toast");e.className=`toast show ${cls}`;e.textContent=msg;clearTimeout(window.__to);window.__to=setTimeout(()=>e.classList.remove("show"),3200)}
 function empty(id,col,msg){$(id).innerHTML=`<tr><td colspan="${col}" class="empty">${safe(msg)}</td></tr>`}function val(id){return ($(id)?.value||"").trim()}function bool(id){return val(id)==="true"}function num(id){return Number(val(id)||0)}function norm(v){return String(v||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim()}function avg(a){return a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null}function money(n){return Number(n||0).toLocaleString("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0})}function fecha(f){if(!f)return"";return new Date(f).toLocaleString("es-AR",{timeZone:"America/Argentina/Buenos_Aires",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).replace(","," ·")}function fechaCompleta(f){if(!f)return"";return new Date(f).toLocaleString("es-AR",{timeZone:"America/Argentina/Buenos_Aires",day:"2-digit",month:"2-digit",year:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false}).replace(","," ·")}function estado(e){if(esRealizada({estado:e}))return pill(e||"Realizada","ok");if(norm(e)==="rechazada")return pill(e,"off");return pill(e||"Pendiente","warn")}
 function setVals(obj){Object.entries(obj).forEach(([k,v])=>{if($(k))$(k).value=v??""})}function setText(obj){Object.entries(obj).forEach(([k,v])=>{if($(k))$(k).textContent=v??""})}function safe(v){return String(v??"").replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]))}function attr(v){return safe(v).replace(/`/g,"&#96;")}function pill(t,type){const m={ok:"ok",off:"off",warn:"warn",info:"info",vio:"vio"};return`<span class="pill ${m[type]||'info'}">${safe(t)}</span>`}
 </script>
 </body>
-</html>
+</html>async function loadBilleteras(render=true){
+  const pc=val("globalPc")||null;
+  const {data,error}=await supabaseClient.rpc("admin_get_billeteras",{
+    p_session_token:requireAdminToken(),
+    p_pc_codigo:pc
+  });
+  if(error)return toast("Error billeteras: "+error.message,"err");
+  billeteras=data||[];
+  if(render)renderAll();
+}
+async function loadChats(render=true){
+  const pc=val("globalPc")||null;
+  const {data:ses,error:e1}=await supabaseClient.rpc("admin_get_chat_sesiones",{
+    p_session_token:requireAdminToken(),
+    p_pc_codigo:pc
+  });
+  if(e1){console.warn(e1);chatSesiones=[];chatMensajes=[];return}
+  chatSesiones=ses||[];
+
+  const {data:ms,error:e2}=await supabaseClient.rpc("admin_get_chat_mensajes",{
+    p_session_token:requireAdminToken(),
+    p_pc_codigo:pc
+  });
+  if(e2){console.warn(e2);chatMensajes=[]}
+  else chatMensajes=ms||[];
+
+  if(render)renderAll();
+}
+async function loadWorkerJobs(render=true){
+  const pc=val("globalPc")||null;
+  const {data,error}=await supabaseClient.rpc("admin_get_worker_jobs",{
+    p_session_token:requireAdminToken(),
+    p_pc_codigo:pc,
+    p_limit:1500
+  });
+  if(error){console.warn(error);workerJobs=[];return toast("No pude leer worker_jobs: "+error.message,"err")}
+  workerJobs=data||[];
+  if(render)renderAll();
+}
+
