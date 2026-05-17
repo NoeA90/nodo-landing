@@ -414,16 +414,10 @@ button:disabled{
     <div class="card transfer-card">
       <div class="gold-title">💳 Datos para transferir</div>
 
-      <span class="label">Alias</span>
+      <span class="label">CBU / CVU / Alias</span>
       <div class="data-row">
-  <     div id="aliasBox" class="big-data">Cargando...</div>
-        <button class="copy-btn" onclick="copiarAlias()">Copiar</button>
-      </div >  
-
-      <span class="label">CBU / CVU</span>
-      <div class="data-row">
-        <div id="cbuBox" class="big-data">Cargando...</div>
-        <button class="copy-btn" onclick="copiarCbu()">Copiar</button>
+        <div id="cvuBox" class="big-data">Cargando...</div>
+        <button class="copy-btn" onclick="copiarCvu()">Copiar</button>
       </div>
 
       <div class="line"><b>Titular:</b> <span id="titularBox">Cargando...</span></div>
@@ -509,13 +503,13 @@ button:disabled{
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-// Landing 100% Supabase: no usa Apps Script.
+const API_URL = "https://script.google.com/macros/s/AKfycbwvZGRAOxBLNIQ52mlED6ZlsOkpAd2PicOvmlZFBTKptXR5lnC_n87w-awDvowmktI8/exec";
 
 const SUPABASE_URL = "https://pjvvyvfcwjoocjqvdror.supabase.co";
 const SUPABASE_KEY = "sb_publishable_NYqRoKptTgcL90VAVF2kqA_Gl06mEUF";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-console.log("Landing 100% Supabase conectada ✅ · sin Apps Script");
+console.log("Supabase conectado ✅");
 
 const WHATSAPP_POR_PC = {
   P1: "5492235181171",
@@ -550,17 +544,6 @@ function normalizarPC(valor) {
 
 const PC = normalizarPC(params.get("pc") || "P1");
 
-function pcCandidatos(pc){
-  const raw = String(pc || "P1").trim().toUpperCase();
-  const out = [raw];
-
-  // Compatibilidad: si la landing usa P1 pero en Supabase cargaste PC1, prueba ambas.
-  if(/^P\d+$/.test(raw)) out.push("PC" + raw.replace("P", ""));
-  if(/^PC\d+$/.test(raw)) out.push("P" + raw.replace("PC", ""));
-
-  return [...new Set(out)];
-}
-
 const LS_USER = "bet300_user_" + PC;
 const LS_SOLICITUD = "solicitud_actual_" + PC;
 
@@ -577,52 +560,26 @@ window.onload = async () => {
   await cargarBilletera();
 };
 
-// ======================================================
-// Helpers Supabase
-// ======================================================
+async function api(params) {
+  const url = API_URL + "?" + new URLSearchParams(params).toString();
+  const res = await fetch(url);
+  const text = await res.text();
 
-async function supabaseInsertSeguro(tabla, payloads){
-  for(const payload of payloads){
-    const { data, error } = await supabaseClient
-      .from(tabla)
-      .insert(payload)
-      .select()
-      .single();
-
-    if(!error){
-      return { ok:true, data };
-    }
-
-    console.warn("Intento fallido en " + tabla, error.message, payload);
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.error(text);
+    return { ok: false, error: "Respuesta inválida de API" };
   }
-
-  return { ok:false, error:"No se pudo guardar en " + tabla };
 }
 
-async function registrarContactoSupabase(usuario, nombre, telefono){
-  // La tabla usuarios ya existe en tu proyecto. Como no todas las bases tienen las mismas columnas,
-  // probamos payloads compatibles sin romper la landing si una variante no existe.
-  const base = {
-    usuario,
-    telefono,
-    pc_codigo: PC
-  };
 
-  const intentos = [
-    { ...base, nombre_completo: nombre },
-    { ...base, nombre },
-    { usuario, nombre_completo: nombre, telefono },
-    { usuario, nombre, telefono }
-  ];
-
-  const r = await supabaseInsertSeguro("usuarios", intentos);
-
-  // Si la tabla usuarios tiene otra estructura, no bloqueamos al usuario.
-  // Lo importante para el panel operativo es que la solicitud y el chat se creen en Supabase.
-  if(!r.ok){
-    console.warn("No se pudo registrar contacto en usuarios. Se continúa igual:", r.error);
-  }
-
+async function apiPostNoCors(data){
+  await fetch(API_URL, {
+    method: "POST",
+    mode: "no-cors",
+    body: JSON.stringify(data)
+  });
   return { ok:true };
 }
 
@@ -731,7 +688,13 @@ async function continuarRegistro() {
   document.getElementById("btnContinuar").disabled = true;
   document.getElementById("btnContinuar").innerText = "Guardando...";
 
-  const r = await registrarContactoSupabase(usuario, nombre, telefono);
+  const r = await api({
+    action: "registrarcontacto",
+    pc: PC,
+    usuarioJugador: usuario,
+    nombreCompleto: nombre,
+    telefono
+  });
 
   document.getElementById("btnContinuar").disabled = false;
   document.getElementById("btnContinuar").innerText = "Continuar";
@@ -753,84 +716,46 @@ function mostrarRegistroMsg(texto, ok) {
 }
 
 async function cargarBilletera() {
-  const pcsCompatibles = [PC];
+  const r = await api({ action: "getbilleteras", pc: PC });
 
-  if (PC.startsWith("P") && !PC.startsWith("PC")) {
-    pcsCompatibles.push("PC" + PC.replace("P", ""));
-  }
-
-  if (PC.startsWith("PC")) {
-    pcsCompatibles.push("P" + PC.replace("PC", ""));
-  }
-
-  const { data, error } = await supabaseClient
-    .from("billeteras")
-    .select("*")
-    .in("pc_codigo", pcsCompatibles)
-    .eq("activa", true)
-    .order("seleccionada_manual", { ascending: false })
-    .order("prioridad", { ascending: false })
-    .order("orden", { ascending: true });
-
-  if (error) {
-    console.error("Error cargando billetera:", error);
-    mostrarBilleteraNoDisponible();
+  if (!r.ok || !r.billeteras || r.billeteras.length === 0) {
+    document.getElementById("cvuBox").innerText = "No disponible";
+    document.getElementById("titularBox").innerText = "Consultar por WhatsApp";
+    billeteraActiva = null;
     return;
   }
 
-  if (!data || data.length === 0) {
-    mostrarBilleteraNoDisponible();
+  const billeteras = r.billeteras.filter(b =>
+    String(b.ACTIVA || "").toUpperCase() === "SI"
+  );
+
+  if (billeteras.length === 0) {
+    document.getElementById("cvuBox").innerText = "No disponible";
+    document.getElementById("titularBox").innerText = "Consultar por WhatsApp";
+    billeteraActiva = null;
     return;
   }
 
   billeteraActiva =
-    data.find(b => b.seleccionada_manual === true) ||
-    data[0];
+    billeteras.find(b => String(b.SELECCIONADA_MANUAL || "").toUpperCase() === "SI") ||
+    billeteras[0];
 
-  document.getElementById("aliasBox").innerText =
-    billeteraActiva.alias || "Consultar";
-
-  document.getElementById("cbuBox").innerText =
-    billeteraActiva.cbu || "Consultar";
+  document.getElementById("cvuBox").innerText =
+    billeteraActiva.CVU_CBU || billeteraActiva.ALIAS || "Consultar";
 
   document.getElementById("titularBox").innerText =
-    billeteraActiva.titular || billeteraActiva.nombre_visible || "Consultar";
+    billeteraActiva.TITULAR || billeteraActiva.NOMBRE_VISIBLE || "Consultar";
 
   document.getElementById("bancoBox").innerText =
-    billeteraActiva.banco || "Billetera";
+    String(billeteraActiva.TIPO || "").includes("MP")
+      ? "Mercado Pago"
+      : billeteraActiva.TIPO || "Billetera";
 }
 
-function mostrarBilleteraNoDisponible() {
-  billeteraActiva = null;
-
-  document.getElementById("aliasBox").innerText = "No disponible";
-  document.getElementById("cbuBox").innerText = "No disponible";
-  document.getElementById("titularBox").innerText = "Consultar por chat";
-  document.getElementById("bancoBox").innerText = "Consultar";
-}
-function copiarTextoDato(id, nombreDato) {
-  const texto = document.getElementById(id)?.innerText || "";
-
-  if (!texto || texto === "Consultar" || texto === "No disponible") {
-    mostrarResultado(`${nombreDato} no disponible. Contactanos por chat.`, false);
-    return;
-  }
-
-  navigator.clipboard.writeText(texto);
-  mostrarResultado(`${nombreDato} copiado correctamente.`, true);
-}
-
-function copiarAlias() {
-  copiarTextoDato("aliasBox", "Alias");
-}
-
-function copiarCbu() {
-  copiarTextoDato("cbuBox", "CBU / CVU");
-}
-
-/* Compatibilidad por si quedó algún botón viejo llamando copiarCvu */
 function copiarCvu() {
-  copiarAlias();
+  const texto = document.getElementById("cvuBox").innerText;
+  navigator.clipboard.writeText(texto);
+  mostrarResultado("Copiado correctamente.", true);
 }
 
 
@@ -1102,9 +1027,8 @@ async function crearSolicitudSupabase(monto, tipo="CARGA"){
     chat_id: chatSessionId || null
   };
 
-  if(!esRetiro && billeteraActiva){
-    payload.billetera_nombre = billeteraActiva.nombre_visible || "";
-    payload.billetera_id = billeteraActiva.id || null;
+  if(!esRetiro){
+    payload.billetera_nombre = billeteraActiva?.NOMBRE_VISIBLE || billeteraActiva?.BILLETERA_NOMBRE || "";
   }
 
   const { data, error } = await supabaseClient
