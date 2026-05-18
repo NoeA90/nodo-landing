@@ -4,7 +4,190 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>NODO · ADMIN</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
+/* =========================================================
+   ADMIN V16A FIX1 · OPERADORES
+   Fallback robusto para que guardar/editar/eliminar use RPC sí o sí
+   y muestre errores visibles.
+========================================================= */
+
+window.__submitOperadorFallback = function(ev){
+  // Dejamos que el submit normal corra, pero si el navegador no dispara submit,
+  // llamamos la función manualmente.
+  setTimeout(()=>{
+    if(window.__lastOperadorSubmitAt && Date.now() - window.__lastOperadorSubmitAt < 900) return;
+    try{ saveOperador(ev); }catch(e){ console.error(e); alert("Error guardando operador: "+(e.message||e)); }
+  },50);
+  return true;
+};
+
+async function saveOperador(e){
+  if(e && e.preventDefault)e.preventDefault();
+  window.__lastOperadorSubmitAt = Date.now();
+
+  try{
+    const id = val("op_id");
+    const usuario = val("op_usuario").trim();
+    const nombre = val("op_nombre").trim();
+
+    if(!usuario || !nombre){
+      toast("Completá usuario y nombre.", "err");
+      return false;
+    }
+
+    const payload = {
+      p_session_token: requireAdminToken(),
+      p_operador_id: id ? Number(id) : null,
+      p_usuario: usuario,
+      p_nombre: nombre,
+      p_clave: val("op_clave"),
+      p_password: val("op_password"),
+      p_rol: val("op_rol") || "OPERADOR",
+      p_tipo: val("op_tipo") || "FIJO",
+      p_pc_codigo: val("op_pc_codigo"),
+      p_turno: val("op_turno"),
+      p_telefono: val("op_telefono"),
+      p_email: val("op_email"),
+      p_activo: bool("op_activo"),
+      p_observaciones: val("op_observaciones")
+    };
+
+    console.log("RPC admin_guardar_operador payload", payload);
+
+    const {data,error}=await supabaseClient.rpc("admin_guardar_operador", payload);
+
+    if(error){
+      console.error("admin_guardar_operador", error);
+      toast("Error operador: " + (error.message || "error desconocido"), "err");
+      alert("Error operador: " + (error.message || "error desconocido"));
+      return false;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+
+    resetOperadorForm();
+    await loadOperadores(true);
+    renderOperadores();
+    toast(row?.mensaje || "Operador guardado por RPC", "okb");
+    alert(row?.mensaje || "Operador guardado");
+    return false;
+
+  }catch(err){
+    console.error("saveOperador exception", err);
+    toast("Error operador: " + (err.message || err), "err");
+    alert("Error operador: " + (err.message || err));
+    return false;
+  }
+}
+
+async function adminToggleOperador(id, activo){
+  try{
+    const accion = activo ? "activar" : "desactivar";
+    if(!confirm(`¿Querés ${accion} este operador?`))return;
+
+    const {data,error}=await supabaseClient.rpc("admin_cambiar_estado_operador", {
+      p_session_token: requireAdminToken(),
+      p_operador_id: Number(id),
+      p_activo: !!activo
+    });
+
+    if(error){
+      console.error("admin_cambiar_estado_operador", error);
+      toast("Error: " + (error.message || "error desconocido"), "err");
+      alert("Error: " + (error.message || "error desconocido"));
+      return;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+    await loadOperadores(true);
+    renderOperadores();
+    toast(row?.mensaje || "Operador actualizado", "okb");
+  }catch(err){
+    console.error(err);
+    alert("Error cambiando estado: "+(err.message||err));
+  }
+}
+
+async function adminDeleteOperador(id){
+  try{
+    if(!confirm("¿Seguro que querés eliminar este operador? Esta acción no se puede deshacer."))return;
+
+    const {data,error}=await supabaseClient.rpc("admin_eliminar_operador", {
+      p_session_token: requireAdminToken(),
+      p_operador_id: Number(id)
+    });
+
+    if(error){
+      console.error("admin_eliminar_operador", error);
+      toast("Error al eliminar: " + (error.message || "error desconocido"), "err");
+      alert("Error al eliminar: " + (error.message || "error desconocido"));
+      return;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+    await loadOperadores(true);
+    renderOperadores();
+    toast(row?.mensaje || "Operador eliminado", "okb");
+  }catch(err){
+    console.error(err);
+    alert("Error eliminando: "+(err.message||err));
+  }
+}
+
+function renderOperadores(){
+  const q=norm(val("op_search")),rol=val("op_filter_rol"),pc=val("op_filter_pc"),act=val("op_filter_activo");
+  let rows=operadores.filter(o=>
+    (!q||norm([o.id,o.usuario,o.nombre,o.rol,o.tipo,o.pc_codigo,o.turno,o.telefono,o.email].join(" ")).includes(q))&&
+    (!rol||o.rol===rol)&&
+    (!pc||o.pc_codigo===pc)&&
+    (act===""||String(!!o.activo)===act)
+  );
+
+  if(!rows.length)return empty("operadoresBody",9,"No hay operadores.");
+
+  $("operadoresBody").innerHTML=rows.map(o=>`<tr>
+    <td>${safe(o.id)}</td>
+    <td>${safe(o.usuario)}</td>
+    <td><strong>${safe(o.nombre)}</strong></td>
+    <td>${pill(o.rol||'-','vio')}</td>
+    <td>${safe(o.tipo)}</td>
+    <td>${safe(o.pc_codigo)}</td>
+    <td>${safe(o.turno)}</td>
+    <td>${o.activo?pill('Activo','ok'):pill('Inactivo','off')}</td>
+    <td><div class="rowActions">
+      <button class="small blue" onclick="editOperador('${o.id}')">Editar</button>
+      <button class="small ${o.activo?'warning':'primary'}" onclick="adminToggleOperador('${o.id}',${!o.activo})">${o.activo?'Desactivar':'Activar'}</button>
+      <button class="small danger" onclick="adminDeleteOperador('${o.id}')">Eliminar</button>
+    </div></td>
+  </tr>`).join("");
+}
+
+function editOperador(id){
+  const o=operadores.find(x=>String(x.id)===String(id));
+  if(!o)return;
+
+  setVals({
+    op_id:o.id,
+    op_usuario:o.usuario,
+    op_nombre:o.nombre,
+    op_clave:"",
+    op_password:"",
+    op_rol:o.rol||'OPERADOR',
+    op_tipo:o.tipo||'FIJO',
+    op_pc_codigo:o.pc_codigo,
+    op_turno:o.turno,
+    op_telefono:o.telefono,
+    op_email:o.email,
+    op_activo:String(!!o.activo),
+    op_observaciones:o.observaciones
+  });
+
+  $("opFormTitle").textContent="Editar operador";
+  showSection("operadores");
+  scrollTo(0,0);
+}
+
+</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
 :root{--bg:#020617;--panel:#0f172a;--card:#111827;--card2:#1f2937;--line:#334155;--muted:#94a3b8;--txt:#f8fafc;--green:#22c55e;--red:#ef4444;--yellow:#f59e0b;--blue:#3b82f6;--violet:#8b5cf6}
@@ -245,7 +428,7 @@ const TABLES={operadores:"operadores",billeteras:"billeteras",pcs:"pcs",config:"
 let operadores=[],billeteras=[],pcs=[],configuracion=[],solicitudes=[],chatSesiones=[],chatMensajes=[],workerJobs=[],workerLogs=[];
 const $=id=>document.getElementById(id);
 
-document.addEventListener("DOMContentLoaded",()=>{$("operadorForm").addEventListener("submit",saveOperador);$("billeteraForm").addEventListener("submit",saveBilletera);$("pcForm").addEventListener("submit",savePc);$("cfgForm").addEventListener("submit",saveCfg);reloadAll();});
+document.addEventListener("DOMContentLoaded",()=>{if($("operadorForm")){$("operadorForm").addEventListener("submit",saveOperador);}$("billeteraForm").addEventListener("submit",saveBilletera);$("pcForm").addEventListener("submit",savePc);$("cfgForm").addEventListener("submit",saveCfg);reloadAll();});
 
 function showSection(name){document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));document.querySelectorAll(".navBtn").forEach(b=>b.classList.remove("active"));$("section-"+name).classList.add("active");document.querySelector(`[data-section="${name}"]`)?.classList.add("active");const t={dashboard:["Dashboard","Resumen general navegable por PC."],metricas:["Métricas","Aprobación rápida, respuesta de chat y rendimiento por operador/PC."],worker:["Worker","Cola de automatización, logs, errores y reintentos."],operadores:["Operadores","Crear, editar, activar, desactivar o eliminar operadores."],billeteras:["Billeteras","Administrar cuentas, estados, prioridad, selección manual e integración Mercado Pago."],pcs:["PCs","Administrar catálogo de PCs."],config:["Configuración","Parámetros internos del sistema."]};$("pageTitle").textContent=t[name][0];$("pageSub").textContent=t[name][1];}
 
@@ -750,6 +933,189 @@ function badges(){setText({badgeDashboard:solicitudes.length,badgeMetricas:solic
 function toast(msg,cls="okb"){const e=$("toast");e.className=`toast show ${cls}`;e.textContent=msg;clearTimeout(window.__to);window.__to=setTimeout(()=>e.classList.remove("show"),3200)}
 function empty(id,col,msg){$(id).innerHTML=`<tr><td colspan="${col}" class="empty">${safe(msg)}</td></tr>`}function val(id){return ($(id)?.value||"").trim()}function bool(id){return val(id)==="true"}function num(id){return Number(val(id)||0)}function norm(v){return String(v||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim()}function avg(a){return a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null}function money(n){return Number(n||0).toLocaleString("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0})}function fecha(f){if(!f)return"";return new Date(f).toLocaleString("es-AR",{timeZone:"America/Argentina/Buenos_Aires",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).replace(","," ·")}function fechaCompleta(f){if(!f)return"";return new Date(f).toLocaleString("es-AR",{timeZone:"America/Argentina/Buenos_Aires",day:"2-digit",month:"2-digit",year:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false}).replace(","," ·")}function estado(e){if(esRealizada({estado:e}))return pill(e||"Realizada","ok");if(norm(e)==="rechazada")return pill(e,"off");return pill(e||"Pendiente","warn")}
 function setVals(obj){Object.entries(obj).forEach(([k,v])=>{if($(k))$(k).value=v??""})}function setText(obj){Object.entries(obj).forEach(([k,v])=>{if($(k))$(k).textContent=v??""})}function safe(v){return String(v??"").replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]))}function attr(v){return safe(v).replace(/`/g,"&#96;")}function pill(t,type){const m={ok:"ok",off:"off",warn:"warn",info:"info",vio:"vio"};return`<span class="pill ${m[type]||'info'}">${safe(t)}</span>`}
+
+/* =========================================================
+   ADMIN V16A FIX1 · OPERADORES
+   Fallback robusto para que guardar/editar/eliminar use RPC sí o sí
+   y muestre errores visibles.
+========================================================= */
+
+window.__submitOperadorFallback = function(ev){
+  // Dejamos que el submit normal corra, pero si el navegador no dispara submit,
+  // llamamos la función manualmente.
+  setTimeout(()=>{
+    if(window.__lastOperadorSubmitAt && Date.now() - window.__lastOperadorSubmitAt < 900) return;
+    try{ saveOperador(ev); }catch(e){ console.error(e); alert("Error guardando operador: "+(e.message||e)); }
+  },50);
+  return true;
+};
+
+async function saveOperador(e){
+  if(e && e.preventDefault)e.preventDefault();
+  window.__lastOperadorSubmitAt = Date.now();
+
+  try{
+    const id = val("op_id");
+    const usuario = val("op_usuario").trim();
+    const nombre = val("op_nombre").trim();
+
+    if(!usuario || !nombre){
+      toast("Completá usuario y nombre.", "err");
+      return false;
+    }
+
+    const payload = {
+      p_session_token: requireAdminToken(),
+      p_operador_id: id ? Number(id) : null,
+      p_usuario: usuario,
+      p_nombre: nombre,
+      p_clave: val("op_clave"),
+      p_password: val("op_password"),
+      p_rol: val("op_rol") || "OPERADOR",
+      p_tipo: val("op_tipo") || "FIJO",
+      p_pc_codigo: val("op_pc_codigo"),
+      p_turno: val("op_turno"),
+      p_telefono: val("op_telefono"),
+      p_email: val("op_email"),
+      p_activo: bool("op_activo"),
+      p_observaciones: val("op_observaciones")
+    };
+
+    console.log("RPC admin_guardar_operador payload", payload);
+
+    const {data,error}=await supabaseClient.rpc("admin_guardar_operador", payload);
+
+    if(error){
+      console.error("admin_guardar_operador", error);
+      toast("Error operador: " + (error.message || "error desconocido"), "err");
+      alert("Error operador: " + (error.message || "error desconocido"));
+      return false;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+
+    resetOperadorForm();
+    await loadOperadores(true);
+    renderOperadores();
+    toast(row?.mensaje || "Operador guardado por RPC", "okb");
+    alert(row?.mensaje || "Operador guardado");
+    return false;
+
+  }catch(err){
+    console.error("saveOperador exception", err);
+    toast("Error operador: " + (err.message || err), "err");
+    alert("Error operador: " + (err.message || err));
+    return false;
+  }
+}
+
+async function adminToggleOperador(id, activo){
+  try{
+    const accion = activo ? "activar" : "desactivar";
+    if(!confirm(`¿Querés ${accion} este operador?`))return;
+
+    const {data,error}=await supabaseClient.rpc("admin_cambiar_estado_operador", {
+      p_session_token: requireAdminToken(),
+      p_operador_id: Number(id),
+      p_activo: !!activo
+    });
+
+    if(error){
+      console.error("admin_cambiar_estado_operador", error);
+      toast("Error: " + (error.message || "error desconocido"), "err");
+      alert("Error: " + (error.message || "error desconocido"));
+      return;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+    await loadOperadores(true);
+    renderOperadores();
+    toast(row?.mensaje || "Operador actualizado", "okb");
+  }catch(err){
+    console.error(err);
+    alert("Error cambiando estado: "+(err.message||err));
+  }
+}
+
+async function adminDeleteOperador(id){
+  try{
+    if(!confirm("¿Seguro que querés eliminar este operador? Esta acción no se puede deshacer."))return;
+
+    const {data,error}=await supabaseClient.rpc("admin_eliminar_operador", {
+      p_session_token: requireAdminToken(),
+      p_operador_id: Number(id)
+    });
+
+    if(error){
+      console.error("admin_eliminar_operador", error);
+      toast("Error al eliminar: " + (error.message || "error desconocido"), "err");
+      alert("Error al eliminar: " + (error.message || "error desconocido"));
+      return;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+    await loadOperadores(true);
+    renderOperadores();
+    toast(row?.mensaje || "Operador eliminado", "okb");
+  }catch(err){
+    console.error(err);
+    alert("Error eliminando: "+(err.message||err));
+  }
+}
+
+function renderOperadores(){
+  const q=norm(val("op_search")),rol=val("op_filter_rol"),pc=val("op_filter_pc"),act=val("op_filter_activo");
+  let rows=operadores.filter(o=>
+    (!q||norm([o.id,o.usuario,o.nombre,o.rol,o.tipo,o.pc_codigo,o.turno,o.telefono,o.email].join(" ")).includes(q))&&
+    (!rol||o.rol===rol)&&
+    (!pc||o.pc_codigo===pc)&&
+    (act===""||String(!!o.activo)===act)
+  );
+
+  if(!rows.length)return empty("operadoresBody",9,"No hay operadores.");
+
+  $("operadoresBody").innerHTML=rows.map(o=>`<tr>
+    <td>${safe(o.id)}</td>
+    <td>${safe(o.usuario)}</td>
+    <td><strong>${safe(o.nombre)}</strong></td>
+    <td>${pill(o.rol||'-','vio')}</td>
+    <td>${safe(o.tipo)}</td>
+    <td>${safe(o.pc_codigo)}</td>
+    <td>${safe(o.turno)}</td>
+    <td>${o.activo?pill('Activo','ok'):pill('Inactivo','off')}</td>
+    <td><div class="rowActions">
+      <button class="small blue" onclick="editOperador('${o.id}')">Editar</button>
+      <button class="small ${o.activo?'warning':'primary'}" onclick="adminToggleOperador('${o.id}',${!o.activo})">${o.activo?'Desactivar':'Activar'}</button>
+      <button class="small danger" onclick="adminDeleteOperador('${o.id}')">Eliminar</button>
+    </div></td>
+  </tr>`).join("");
+}
+
+function editOperador(id){
+  const o=operadores.find(x=>String(x.id)===String(id));
+  if(!o)return;
+
+  setVals({
+    op_id:o.id,
+    op_usuario:o.usuario,
+    op_nombre:o.nombre,
+    op_clave:"",
+    op_password:"",
+    op_rol:o.rol||'OPERADOR',
+    op_tipo:o.tipo||'FIJO',
+    op_pc_codigo:o.pc_codigo,
+    op_turno:o.turno,
+    op_telefono:o.telefono,
+    op_email:o.email,
+    op_activo:String(!!o.activo),
+    op_observaciones:o.observaciones
+  });
+
+  $("opFormTitle").textContent="Editar operador";
+  showSection("operadores");
+  scrollTo(0,0);
+}
+
 </script>
 </body>
 </html>
