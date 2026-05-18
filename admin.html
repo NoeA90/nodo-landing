@@ -39,7 +39,7 @@ body.force-login-lock #appView{display:none!important}
 body.force-login-lock #loginView{display:flex!important}
 </style>
 </head>
-<body class="force-login-lock">
+<body>
 <script>
 (function(){
   window.NODO_ADMIN_FORCE_LOGIN = true;
@@ -63,7 +63,7 @@ body.force-login-lock #loginView{display:flex!important}
     try{ sessionStorage.removeItem("admin_force_login"); }catch(e){}
   }
 
-  wipeAdminStorage();
+  /* wipeAdminStorage disabled by final stable session fix */
   document.documentElement.classList.add("force-login-lock");
   document.addEventListener("DOMContentLoaded", function(){
     document.body.classList.add("force-login-lock");
@@ -99,7 +99,7 @@ function nodoWipeAdminStorage(){
 
 function mostrarLoginAdmin(){
   try{ adminSessionToken=""; adminScope=null; }catch(e){}
-  nodoWipeAdminStorage();
+  /* nodoWipeAdminStorage disabled by final stable session fix */
 
   const login=$("loginView");
   const app=$("appView");
@@ -173,7 +173,7 @@ async function adminLogin(){
     return;
   }
 
-  nodoWipeAdminStorage();
+  /* nodoWipeAdminStorage disabled by final stable session fix */
 }
 
 async function validarAdminToken(token){
@@ -1568,10 +1568,10 @@ async function adminLogout(){
     if(typeof adminScope !== "undefined") adminScope = null;
   }catch(e){}
 
-  limpiarSesionAdminLocal();
+  /* limpiarSesionAdminLocal disabled by final stable session fix */
 
   // Esta marca evita que initAdminSession intente reusar algo en el próximo reload.
-  sessionStorage.setItem("admin_force_login", "1");
+  /* disabled force login flag */
 
   // Recarga sin conservar estado.
   window.location.replace(window.location.pathname + "?logout=1&t=" + Date.now());
@@ -1583,7 +1583,7 @@ async function initAdminSession(){
   const forcedLogout = urlParams.get("logout") === "1" || sessionStorage.getItem("admin_force_login") === "1";
 
   if(forcedLogout){
-    limpiarSesionAdminLocal();
+    /* limpiarSesionAdminLocal disabled by final stable session fix */
     sessionStorage.removeItem("admin_force_login");
 
     if($("loginView"))$("loginView").classList.remove("hidden");
@@ -1602,7 +1602,7 @@ async function initAdminSession(){
     if(ok)return;
   }
 
-  limpiarSesionAdminLocal();
+  /* limpiarSesionAdminLocal disabled by final stable session fix */
 
   if($("loginView"))$("loginView").classList.remove("hidden");
   if($("appView"))$("appView").classList.add("hidden");
@@ -1682,7 +1682,7 @@ function mostrarLoginAdmin(){
 // IMPORTANTE: reemplaza el init anterior.
 // Ya no mira localStorage. Siempre pide login al abrir.
 async function initAdminSession(){
-  limpiarSesionAdminLocal();
+  /* limpiarSesionAdminLocal disabled by final stable session fix */
   mostrarLoginAdmin();
 }
 
@@ -1772,7 +1772,7 @@ async function adminLogout(){
     if(token) await supabaseClient.rpc("panel_logout",{p_session_token:token});
   }catch(e){console.warn(e)}
 
-  limpiarSesionAdminLocal();
+  /* limpiarSesionAdminLocal disabled by final stable session fix */
   mostrarLoginAdmin();
 
   // Limpia formularios de login.
@@ -1833,7 +1833,7 @@ function nodoWipeAdminStorage(){
 
 function mostrarLoginAdmin(){
   try{ adminSessionToken=""; adminScope=null; }catch(e){}
-  nodoWipeAdminStorage();
+  /* nodoWipeAdminStorage disabled by final stable session fix */
 
   const login=$("loginView");
   const app=$("appView");
@@ -1907,7 +1907,7 @@ async function adminLogin(){
     return;
   }
 
-  nodoWipeAdminStorage();
+  /* nodoWipeAdminStorage disabled by final stable session fix */
 }
 
 async function validarAdminToken(token){
@@ -2165,22 +2165,22 @@ document.addEventListener("DOMContentLoaded",()=>{
       }
     }catch(e){}
 
-    limpiarSesionAdmin();
+    /* limpiarSesionAdmin disabled by final stable session fix */
     crearLogin();
   };
 
   window.initAdminSession = async function(){
-    limpiarSesionAdmin();
+    /* limpiarSesionAdmin disabled by final stable session fix */
     crearLogin();
   };
 
   document.addEventListener("DOMContentLoaded", function(){
-    limpiarSesionAdmin();
+    /* limpiarSesionAdmin disabled by final stable session fix */
     crearLogin();
   });
 
   setTimeout(function(){
-    limpiarSesionAdmin();
+    /* limpiarSesionAdmin disabled by final stable session fix */
     crearLogin();
   }, 300);
 })();
@@ -2362,6 +2362,142 @@ document.addEventListener("DOMContentLoaded",()=>{
   };
   document.addEventListener('DOMContentLoaded',()=>{ clearLocalSessions(); createGate(); setInterval(applyScopeLock,1000); });
   setTimeout(()=>{ clearLocalSessions(); createGate(); },300);
+})();
+</script>
+
+
+<script>
+/* =========================================================
+   ADMIN FINAL FIX V2 · sesión estable + scope real
+   - Mantiene sesión admin hasta cerrar manualmente.
+   - Cerrar sesión borra SOLO token admin, no toca operativo/chat.
+   - ENCARGADO queda forzado a su PC.
+========================================================= */
+(function(){
+  const ADMIN_TOKEN_KEY = "nodo_admin_session_token";
+  let booting = false;
+
+  function q(id){return document.getElementById(id)}
+  function getToken(){return window.adminSessionToken || localStorage.getItem(ADMIN_TOKEN_KEY) || ""}
+  function setToken(t){window.adminSessionToken=t||""; if(t) localStorage.setItem(ADMIN_TOKEN_KEY,t);}
+  function clearAdminOnly(){try{localStorage.removeItem(ADMIN_TOKEN_KEY);localStorage.removeItem('LS_ADMIN_TOKEN')}catch(e){} window.adminSessionToken=""; window.adminScope=null;}
+  function isLimited(){return !!(window.adminScope && window.adminScope.puede_todas===false)}
+  function forcedPc(){return isLimited()?String(window.adminScope.pc_codigo||'').trim().toUpperCase():''}
+  function tokenOrThrow(){const t=getToken(); if(!t) throw new Error('Sesión admin no iniciada.'); return t;}
+
+  window.requireAdminToken = tokenOrThrow;
+
+  function hideLogin(){
+    const gate=q('adminLoginGate'); if(gate) gate.remove();
+    const lv=q('loginView'); if(lv){lv.classList.add('hidden'); lv.style.display='none'}
+    const app=q('appView') || document.querySelector('.app'); if(app){app.classList.remove('hidden'); app.style.display=''}
+    document.body.classList.remove('force-login-lock'); document.documentElement.classList.remove('force-login-lock');
+  }
+
+  function showLogin(msg=''){
+    const app=q('appView') || document.querySelector('.app'); if(app){app.classList.add('hidden'); app.style.display='none'}
+    let gate=q('adminLoginGate');
+    if(!gate){
+      gate=document.createElement('div');
+      gate.id='adminLoginGate';
+      gate.style.cssText='position:fixed;inset:0;z-index:9999999;background:#020617;display:flex;align-items:center;justify-content:center;padding:20px';
+      gate.innerHTML=`<div style="width:min(430px,94vw);background:#111827;border:1px solid #334155;border-radius:20px;padding:24px;color:white;box-shadow:0 20px 70px rgba(0,0,0,.45)">
+        <h2 style="font-size:26px;margin:0 0 6px">NODO ADMIN</h2>
+        <p style="margin:0 0 18px;color:#94a3b8">Ingreso seguro al panel.</p>
+        <label style="display:block;margin:10px 0 6px;font-weight:800">Usuario</label>
+        <input id="gateAdminUsuario" autocomplete="username" style="width:100%;padding:13px;border-radius:12px;border:1px solid #334155;background:#020617;color:white">
+        <label style="display:block;margin:12px 0 6px;font-weight:800">Clave</label>
+        <input id="gateAdminClave" type="password" autocomplete="current-password" style="width:100%;padding:13px;border-radius:12px;border:1px solid #334155;background:#020617;color:white">
+        <button id="gateAdminBtn" style="width:100%;margin-top:18px;padding:14px;border:0;border-radius:12px;background:#22c55e;color:#03120a;font-weight:900;cursor:pointer">Ingresar</button>
+        <div id="gateAdminMsg" style="margin-top:14px;color:#facc15;font-weight:700"></div>
+      </div>`;
+      document.body.appendChild(gate);
+      q('gateAdminBtn').onclick=window.adminLogin;
+      q('gateAdminClave').addEventListener('keydown',e=>{if(e.key==='Enter')window.adminLogin()});
+    }
+    const m=q('gateAdminMsg'); if(m) m.textContent=msg||'';
+  }
+
+  function forceScopeUI(){
+    const pc=forcedPc();
+    if(!pc) return;
+    const setOnly=id=>{const el=q(id); if(el){el.innerHTML=`<option value="${pc}">${pc}</option>`; el.value=pc; el.disabled=true;}};
+    ['globalPc','op_filter_pc','bi_filter_pc','wk_filter_pc','op_pc_codigo','bi_pc_codigo'].forEach(setOnly);
+    const cfg=document.querySelector('[data-section="config"]'); if(cfg) cfg.style.display='none';
+  }
+  window.aplicarScopeAdmin = forceScopeUI;
+
+  function pcActual(){return forcedPc() || (q('globalPc')?q('globalPc').value:'') || ''}
+  window.pcSeleccionada=function(){return pcActual()}
+
+  function filterScope(arr,campo='pc_codigo'){
+    const pc=forcedPc(); if(!pc) return arr||[];
+    return (arr||[]).filter(x=>String(x[campo]||'').trim().toUpperCase()===pc);
+  }
+
+  window.fillPcSelects=function(){
+    let cods=[];
+    try{cods=[...new Set([...(window.pcs||[]).map(p=>p.codigo||p.nombre),...(window.solicitudes||[]).map(s=>s.pc_codigo),...(window.billeteras||[]).map(b=>b.pc_codigo),...(window.workerJobs||[]).map(w=>w.pc_codigo),...(window.operadores||[]).map(o=>o.pc_codigo)].filter(Boolean).map(x=>String(x).trim().toUpperCase()).filter(x=>x&&x!=='TODAS'))].sort();}catch(e){}
+    const pc=forcedPc(); if(pc) cods=[pc];
+    const filt=(pc?'':'<option value="">Todas las PCs</option>')+cods.map(c=>`<option value="${c}">${c}</option>`).join('');
+    const opts='<option value="">Seleccionar</option>'+cods.map(c=>`<option value="${c}">${c}</option>`).join('');
+    ['globalPc','op_filter_pc','bi_filter_pc','wk_filter_pc'].forEach(id=>{const el=q(id); if(el){const old=el.value; el.innerHTML=filt; el.value=pc || old || ''; if(pc) el.disabled=true;}});
+    ['op_pc_codigo','bi_pc_codigo'].forEach(id=>{const el=q(id); if(el){const old=el.value; el.innerHTML=opts; el.value=pc || old || ''; if(pc) el.disabled=true;}});
+  };
+
+  async function validarAdminTokenFinal(token){
+    const {data,error}=await supabaseClient.rpc('panel_validar_admin_session',{p_session_token:token});
+    if(error) throw error;
+    const row=Array.isArray(data)?data[0]:data;
+    if(!row||row.ok!==true) throw new Error('Sesión inválida');
+    setToken(token); window.adminScope=row;
+    const info=q('adminInfo'); if(info){info.classList.remove('hidden'); info.innerHTML=`<b>${row.nombre||row.usuario}</b><br><span class="pill info">${row.rol}</span> <span class="pill ${row.puede_todas?'ok':'warn'}">${row.puede_todas?'TODAS LAS PCs':'PC '+row.pc_codigo}</span>`;}
+    hideLogin(); forceScopeUI();
+    if(typeof window.reloadAll==='function') await window.reloadAll();
+    forceScopeUI();
+    return true;
+  }
+  window.validarAdminToken=validarAdminTokenFinal;
+
+  window.adminLogin=async function(){
+    const u=(q('gateAdminUsuario')?.value || q('adminLoginUsuario')?.value || '').trim();
+    const c=(q('gateAdminClave')?.value || q('adminLoginClave')?.value || '').trim();
+    const msg=q('gateAdminMsg') || q('adminLoginMsg');
+    if(!u||!c){if(msg)msg.textContent='Completá usuario y clave.';return;}
+    if(msg)msg.textContent='Validando acceso...';
+    const {data,error}=await supabaseClient.rpc('panel_login',{p_usuario:u,p_clave:c,p_ip:null,p_user_agent:navigator.userAgent||'admin'});
+    if(error){if(msg)msg.textContent='Error: '+error.message;return;}
+    const row=Array.isArray(data)?data[0]:data;
+    if(!row||row.ok!==true){if(msg)msg.textContent=row?.mensaje||'Usuario o clave incorrectos.';return;}
+    try{await validarAdminTokenFinal(row.session_token);}catch(e){if(msg)msg.textContent=e.message||'No tenés permisos admin'; try{await supabaseClient.rpc('panel_logout',{p_session_token:row.session_token})}catch(_){}}
+  };
+
+  window.adminLogout=async function(){
+    const t=getToken();
+    try{if(t) await supabaseClient.rpc('panel_logout',{p_session_token:t});}catch(e){}
+    clearAdminOnly(); showLogin('Sesión cerrada.');
+  };
+
+  async function bootAdmin(){
+    if(booting) return; booting=true;
+    const t=getToken();
+    if(t){try{await validarAdminTokenFinal(t); booting=false; return;}catch(e){clearAdminOnly();}}
+    showLogin(); booting=false;
+  }
+  window.initAdminSession=bootAdmin;
+
+  async function scopedRpc(name,args={}){args.p_session_token=tokenOrThrow(); return await supabaseClient.rpc(name,args);}
+  window.loadPcs=async function(render=true){const {data,error}=await scopedRpc('admin_get_pcs'); if(error){console.error(error); return} window.pcs=filterScope(data||[],'codigo'); if(render&&window.renderAll)renderAll();};
+  window.loadOperadores=async function(render=true){const {data,error}=await scopedRpc('admin_get_operadores'); if(error){console.error(error);return} window.operadores=filterScope(data||[]); if(render&&window.renderAll)renderAll();};
+  window.loadBilleteras=async function(render=true){const {data,error}=await scopedRpc('admin_get_billeteras',{p_pc_codigo:pcActual()||null}); if(error){console.error(error);return} window.billeteras=filterScope(data||[]); if(render&&window.renderAll)renderAll();};
+  window.loadSolicitudes=async function(render=true){const {data,error}=await scopedRpc('admin_get_solicitudes',{p_pc_codigo:pcActual()||null,p_limit:1000}); if(error){console.error(error);return} window.solicitudes=filterScope(data||[]); if(render&&window.renderAll)renderAll();};
+  window.loadWorkerJobs=async function(render=true){const {data,error}=await scopedRpc('admin_get_worker_jobs',{p_pc_codigo:pcActual()||null,p_limit:1500}); if(error){console.error(error);return} window.workerJobs=filterScope(data||[]); if(render&&window.renderAll)renderAll();};
+  window.loadChats=async function(render=true){const {data:ses}=await scopedRpc('admin_get_chat_sesiones',{p_pc_codigo:pcActual()||null}); window.chatSesiones=filterScope(ses||[]); const {data:ms}=await scopedRpc('admin_get_chat_mensajes',{p_pc_codigo:pcActual()||null}); window.chatMensajes=ms||[]; if(render&&window.renderAll)renderAll();};
+  const oldRender=window.renderAll;
+  window.renderAll=function(){if(oldRender)oldRender(); forceScopeUI();};
+
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(bootAdmin,900));
+  setTimeout(bootAdmin,1200);
 })();
 </script>
 
