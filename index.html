@@ -614,9 +614,14 @@ function renderMensajeChatLite(texto){
 
     const nombre = escapeHtml(data.nombre_visible || data.nombre || "Billetera");
     const titular = escapeHtml(data.titular || "");
-    const alias = escapeHtml(data.alias || "");
-    const cbu = escapeHtml(data.cbu || "");
+    const aliasRaw = String(data.alias || "");
+    const cbuRaw = String(data.cbu || "");
+    const alias = escapeHtml(aliasRaw);
+    const cbu = escapeHtml(cbuRaw);
     const banco = escapeHtml(data.banco || "");
+
+    const aliasId = "alias_" + Math.random().toString(36).slice(2);
+    const cbuId = "cbu_" + Math.random().toString(36).slice(2);
 
     return `
       <div style="
@@ -624,13 +629,72 @@ function renderMensajeChatLite(texto){
         background:rgba(212,175,55,.08);
         border-radius:14px;
         padding:12px;
-        min-width:230px;
+        min-width:240px;
       ">
-        <div style="font-weight:900;color:#f7d774;margin-bottom:8px;">💳 ${nombre}</div>
-        ${alias ? `<div style="font-size:12px;color:#94a3b8;">ALIAS</div><div style="font-weight:900;margin-bottom:7px;">${alias}</div>` : ""}
-        ${cbu ? `<div style="font-size:12px;color:#94a3b8;">CBU / CVU</div><div style="font-weight:900;margin-bottom:7px;word-break:break-all;">${cbu}</div>` : ""}
-        ${titular ? `<div style="font-size:12px;color:#94a3b8;">TITULAR</div><div style="font-weight:900;margin-bottom:7px;">${titular}</div>` : ""}
-        ${banco ? `<div style="font-size:12px;color:#94a3b8;">Banco: ${banco}</div>` : ""}
+        <div style="font-weight:900;color:#f7d774;margin-bottom:10px;">
+          💳 ${nombre}
+        </div>
+
+        ${alias ? `
+          <div style="font-size:12px;color:#94a3b8;">ALIAS</div>
+          <div id="${aliasId}" style="font-weight:900;margin-bottom:7px;word-break:break-all;">
+            ${alias}
+          </div>
+          <button
+            type="button"
+            onclick="copiarDesdeTarjeta('${aliasId}', 'Alias copiado')"
+            style="
+              width:100%;
+              margin:0 0 10px 0;
+              padding:9px 10px;
+              border-radius:10px;
+              border:0;
+              background:rgba(255,255,255,.12);
+              color:white;
+              font-weight:900;
+              cursor:pointer;
+              box-shadow:none;
+              font-size:13px;
+            "
+          >
+            Copiar alias
+          </button>
+        ` : ""}
+
+        ${cbu ? `
+          <div style="font-size:12px;color:#94a3b8;">CBU / CVU</div>
+          <div id="${cbuId}" style="font-weight:900;margin-bottom:7px;word-break:break-all;">
+            ${cbu}
+          </div>
+          <button
+            type="button"
+            onclick="copiarDesdeTarjeta('${cbuId}', 'CBU/CVU copiado')"
+            style="
+              width:100%;
+              margin:0 0 10px 0;
+              padding:9px 10px;
+              border-radius:10px;
+              border:0;
+              background:rgba(255,255,255,.12);
+              color:white;
+              font-weight:900;
+              cursor:pointer;
+              box-shadow:none;
+              font-size:13px;
+            "
+          >
+            Copiar CBU / CVU
+          </button>
+        ` : ""}
+
+        ${titular ? `
+          <div style="font-size:12px;color:#94a3b8;">TITULAR</div>
+          <div style="font-weight:900;margin-bottom:7px;">${titular}</div>
+        ` : ""}
+
+        ${banco ? `
+          <div style="font-size:12px;color:#94a3b8;">Banco: ${banco}</div>
+        ` : ""}
       </div>
     `;
   }catch(e){
