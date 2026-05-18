@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>NODO · OPERATIVO FINAL V3</title>
+<title>NODO · OPERATIVO FINAL V4 CHAT</title>
 
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
@@ -1988,6 +1988,253 @@ async function cerrarSesion(){
     try{localStorage.removeItem(LS_OPERADOR);localStorage.removeItem(LS_PC);localStorage.removeItem(LS_TOKEN);}catch(e){}
     location.reload();
   };
+})();
+</script>
+
+
+
+<script>
+/* =========================================================
+   NODO OPERATIVO CHAT FIX V4
+   - Usa cache de mensajes por PC para abrir conversaciones.
+   - Si RPC individual devuelve vacío, usa mensajes ya cargados.
+   - UI chat compacta: iconos en header, sin botón lateral.
+   - Modal de info de usuario/chat.
+========================================================= */
+(function(){
+  const INFO_ICON = 'ℹ️';
+  const COPY_ICON = '📋';
+
+  function normTipoV4(v){return String(v||'').trim().toUpperCase();}
+  function chatIdOf(v){return String(v?.chat_id ?? v?.CHAT_ID ?? v?.ID_CHAT ?? '').trim();}
+  function msgChatId(v){return String(v?.chat_id ?? v?.CHAT_ID ?? '').trim();}
+  function msgDate(v){return v?.created_at || v?.FECHA || v?.fecha || '';}
+  function msgText(v){return v?.mensaje || v?.MENSAJE || '';}
+  function msgImg(v){return v?.imagen_url || v?.IMAGEN_URL || '';}
+  function userMsgCount(ms){return (ms||[]).filter(m=>normTipoV4(m.tipo_emisor||m.TIPO_EMISOR)==='USUARIO').length;}
+  function readKeyV4(id){return 'nodo_operativo_chat_read_v4_'+String(window.pcOperativa||pcOperativa||'')+'_'+String(id||'');}
+  function getReadV4(id){return Number(localStorage.getItem(readKeyV4(id))||0);}
+  function setReadV4(id,n){localStorage.setItem(readKeyV4(id),String(Number(n||0)));}
+  function getCachedMessagesForChat(id){
+    const key=String(id||'');
+    return (window.__chatMensajesPcCache||[]).filter(m=>msgChatId(m)===key);
+  }
+  function updateUnreadForOpenChat(){
+    if(!chatActualId) return;
+    const cached=getCachedMessagesForChat(chatActualId);
+    const base=(chatMensajes&&chatMensajes.length)?chatMensajes:cached;
+    const uc=userMsgCount(base);
+    if(uc>=0) setReadV4(chatActualId,uc);
+    const row=(chats||[]).find(c=>chatIdOf(c)===String(chatActualId));
+    if(row){ row.SIN_LEER=0; row.USER_COUNT=uc; }
+  }
+  async function markServerReadV4(id){
+    try{ await supabaseClient.rpc('panel_operativo_marcar_chat_leido',{p_session_token:requireSessionToken(),p_chat_id:id}); }catch(e){ console.warn('marcar_chat_leido no disponible:', e?.message||e); }
+  }
+
+  window.getChatReadCount = getReadV4;
+  window.setChatReadCount = setReadV4;
+
+  function chatCuentaVinculada(chat){
+    const sid=String(chat?.SOLICITUD_ID||chat?.solicitud_id||'').trim();
+    if(!sid) return null;
+    return (solicitudes||[]).find(s=>String(s.ID||s.SOLICITUD_ID||s.id||'')===sid) || null;
+  }
+
+  window.abrirInfoChat = function(id){
+    const chat=(chats||[]).find(c=>chatIdOf(c)===String(id))||{};
+    const sol=chatCuentaVinculada(chat);
+    const html=`
+      <div class="verify-box">
+        <div class="verify-title">${INFO_ICON} Información del chat</div>
+        <div class="verify-grid">
+          ${verifyRow ? verifyRow('Usuario', chat.USUARIO || '-', '', true) : `<div>${escapeHtml(chat.USUARIO||'-')}</div>`}
+          ${verifyRow ? verifyRow('Teléfono', chat.TELEFONO || '-', '', true) : `<div>${escapeHtml(chat.TELEFONO||'-')}</div>`}
+          ${verifyRow ? verifyRow('Nombre', chat.NOMBRE_COMPLETO || '-', '', false) : `<div>${escapeHtml(chat.NOMBRE_COMPLETO||'-')}</div>`}
+          ${verifyRow ? verifyRow('Solicitud vinculada', chat.SOLICITUD_ID || '-', '', false) : `<div>${escapeHtml(chat.SOLICITUD_ID||'-')}</div>`}
+          ${verifyRow ? verifyRow('PC', pcOperativa || '-', '', false) : `<div>${escapeHtml(pcOperativa||'-')}</div>`}
+          ${verifyRow ? verifyRow('Estado', chat.ESTADO || '-', '', false) : `<div>${escapeHtml(chat.ESTADO||'-')}</div>`}
+        </div>
+      </div>
+      ${sol?`
+        <div class="verify-box good">
+          <div class="verify-title">Cuenta / solicitud vinculada</div>
+          <div class="verify-grid">
+            ${verifyRow('Tipo', sol.TIPO_SOLICITUD || sol.TIPO || '-')}
+            ${verifyRow('Monto', money(sol.MONTO_DECLARADO || sol.MONTO_REAL || sol.MONTO || 0), 'big')}
+            ${verifyRow('DNI', sol.DNI_NORMALIZADO || sol.DNI || '-')}
+            ${verifyRow('Estado solicitud', sol.ESTADO || '-')}
+            ${verifyRow('Destino retiro', sol.RETIRO_ALIAS_CBU || '-')}
+            ${verifyRow('Titular retiro', sol.RETIRO_TITULAR || '-')}
+          </div>
+        </div>`:''}
+    `;
+    if(typeof abrirModal==='function'){
+      abrirModal('Info del usuario', html, async()=>cerrarModal(), 'Cerrar');
+    }else{
+      alert(`Usuario: ${chat.USUARIO||'-'}\nTeléfono: ${chat.TELEFONO||'-'}\nSolicitud: ${chat.SOLICITUD_ID||'-'}`);
+    }
+  };
+
+  window.renderChatList = function(){
+    if(!chats.length){
+      setBox('chatList',`<div class="alert-box" style="margin:12px">No hay chats activos.</div>`);
+      return;
+    }
+    let html='';
+    chats.forEach(c=>{
+      const id=chatIdOf(c);
+      const unread=Number(c.SIN_LEER||0);
+      const usuario=c.USUARIO||'Usuario landing';
+      const preview=c.ULTIMO_MENSAJE||'';
+      html+=`<div class="chat-item ${String(id)===String(chatActualId)?'active':''}" onclick="abrirChat('${escapeAttr(id)}')">
+        <div class="chat-item-title">
+          <span>${escapeHtml(usuario)}</span>
+          ${unread?`<span class="chat-unread">${unread}</span>`:''}
+        </div>
+        <div class="small">${formatFecha(c.FECHA_ULTIMO||c.FECHA||'')}</div>
+        ${preview?`<div class="small ${preview.startsWith('📄')?'chat-preview-transfer':''}">${escapeHtml(preview)}</div>`:''}
+      </div>`;
+    });
+    setBox('chatList',html);
+  };
+
+  window.cargarChats = async function(silencioso=false){
+    const {data:sesiones,error}=await supabaseClient.rpc('panel_operativo_get_chat_sesiones',{p_session_token:requireSessionToken(),p_pc_codigo:pcOperativa});
+    if(error){console.error('Error cargando chat_sesiones RPC:',error);return;}
+
+    const {data:mensajesData,error:errorMensajes}=await supabaseClient.rpc('panel_operativo_get_chat_mensajes_pc',{p_session_token:requireSessionToken(),p_pc_codigo:pcOperativa,p_limit:3000});
+    if(errorMensajes) console.error('Error cargando chat_mensajes RPC:',errorMensajes);
+    const mensajes=errorMensajes?[]:(mensajesData||[]);
+    window.__chatMensajesPcCache=mensajes;
+
+    chats=(sesiones||[]).map(c=>{
+      const id=chatIdOf(c);
+      const ms=mensajes.filter(m=>msgChatId(m)===id).sort((a,b)=>new Date(msgDate(a)||0)-new Date(msgDate(b)||0));
+      const ultimo=ms.length?ms[ms.length-1]:null;
+      const uc=userMsgCount(ms);
+      if(String(id)===String(chatActualId)){
+        setReadV4(id,uc);
+        markServerReadV4(id);
+      }
+      const sinLeer=String(id)===String(chatActualId)?0:Math.max(0,uc-getReadV4(id));
+      return {
+        ID_CHAT:id,
+        chat_id:id,
+        USUARIO:c.usuario||c.USUARIO||'Usuario',
+        NOMBRE_COMPLETO:c.nombre_completo||c.NOMBRE_COMPLETO||c.usuario||'',
+        TELEFONO:c.telefono||c.TELEFONO||'',
+        FECHA:c.created_at||c.FECHA,
+        FECHA_ULTIMO:msgDate(ultimo)||c.ultimo_mensaje||c.updated_at||c.created_at,
+        ULTIMO_MENSAJE:resumenMensajeChatPreview(msgText(ultimo),msgImg(ultimo)),
+        SIN_LEER:sinLeer,
+        USER_COUNT:uc,
+        SOLICITUD_ID:c.solicitud_id||c.SOLICITUD_ID||'',
+        ESTADO:c.estado||c.ESTADO||'ABIERTO'
+      };
+    }).sort((a,b)=>new Date(b.FECHA_ULTIMO||0)-new Date(a.FECHA_ULTIMO||0));
+
+    if(chatActualId && (!chatMensajes || !chatMensajes.length)){
+      chatMensajes=getCachedMessagesForChat(chatActualId);
+    }
+    updateUnreadForOpenChat();
+    renderChatList();
+    verificarChats(true);
+    renderInicio();
+    if(chatActualId) renderChatMensajes();
+    if(!silencioso) console.log('Chats cargados por RPC:',chats.length,'Mensajes cache:',mensajes.length);
+  };
+
+  window.abrirChat = async function(id){
+    chatActualId=String(id||'');
+    const cached=getCachedMessagesForChat(chatActualId);
+    chatMensajes=cached||[];
+    if(chatMensajes.length){
+      setReadV4(chatActualId,userMsgCount(chatMensajes));
+      markServerReadV4(chatActualId);
+      renderChatMensajes();
+    }
+    await cargarChatActual(false);
+    setReadV4(chatActualId,userMsgCount(chatMensajes));
+    await markServerReadV4(chatActualId);
+    await cargarChats(true);
+    renderChatList();
+    renderChatMensajes();
+    verificarChats(false);
+    renderInicio();
+  };
+
+  window.cargarChatActual = async function(){
+    if(!chatActualId) return;
+    const cached=getCachedMessagesForChat(chatActualId);
+    let finalMessages=cached||[];
+
+    try{
+      const {data,error}=await supabaseClient.rpc('panel_operativo_get_chat_mensajes',{p_session_token:requireSessionToken(),p_chat_id:chatActualId});
+      if(error){
+        console.warn('RPC individual de chat falló, uso cache PC:',error.message||error);
+      }else if((data||[]).length){
+        finalMessages=data||[];
+      }
+    }catch(e){
+      console.warn('RPC individual de chat exception, uso cache PC:',e?.message||e);
+    }
+
+    chatMensajes=(finalMessages||[]).sort((a,b)=>new Date(msgDate(a)||0)-new Date(msgDate(b)||0));
+    setReadV4(chatActualId,userMsgCount(chatMensajes));
+    await markServerReadV4(chatActualId);
+    renderChatMensajes();
+  };
+
+  window.renderChatMensajes = function(){
+    renderWalletSelectChat();
+    const chat=(chats||[]).find(c=>chatIdOf(c)===String(chatActualId))||{};
+    const usuarioChat=chat.USUARIO||'Chat landing';
+    const chatId=chatIdOf(chat)||chatActualId;
+
+    setBox('chatTitulo',`
+      <span>${escapeHtml(usuarioChat)}</span>
+      <button title="Copiar usuario" class="chat-icon-btn" onclick="copiarTextoOperativo('${escapeAttr(usuarioChat)}','Usuario')">${COPY_ICON}</button>
+      <button title="Info usuario" class="chat-icon-btn" onclick="abrirInfoChat('${escapeAttr(chatId)}')">${INFO_ICON}</button>
+    `);
+    setBox('chatSubtitulo',`${formatFecha(chat.FECHA_ULTIMO||chat.FECHA||'')}`);
+    setBox('chatEstado',chat.SOLICITUD_ID?`Solicitud: ${escapeHtml(chat.SOLICITUD_ID)}`:'Sin solicitud');
+
+    if(!chatMensajes.length){
+      setBox('chatBody',`<div class="alert-box">Sin mensajes todavía.</div>`);
+      return;
+    }
+
+    let html='';
+    chatMensajes.forEach(m=>{
+      const tipo=normTipoV4(m.tipo_emisor||m.TIPO_EMISOR);
+      const esUser=tipo==='USUARIO';
+      const mensaje=msgText(m);
+      const imagen=msgImg(m);
+      const fecha=msgDate(m);
+      const card=parseTransferCardMessage(mensaje);
+      html+=`<div class="chat-msg ${esUser?'user':'op'}">
+        <div class="chat-bubble">
+          ${card?renderTransferCardChat(card):escapeHtml(mensaje)}
+          ${imagen?`<img src="${normalizarImagenUrl(imagen)}" alt="Imagen">`:''}
+        </div>
+        <div class="chat-meta">${formatFecha(fecha)}</div>
+      </div>`;
+    });
+
+    const box=document.getElementById('chatBody');
+    if(box){ box.innerHTML=html; box.scrollTop=box.scrollHeight; }
+  };
+
+  // CSS adicional para header compacto.
+  const css=document.createElement('style');
+  css.textContent=`
+    .chat-icon-btn{width:auto;min-width:30px;height:28px;margin:0 0 0 6px;padding:4px 8px;border-radius:9px;border:0;background:#2d3443;color:#fff;cursor:pointer;font-weight:900;vertical-align:middle}
+    .chat-icon-btn:hover{background:#3a4354}
+    .chat-item .small{line-height:1.35}.chat-item-title{align-items:center}
+    .chat-head b#chatTitulo{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+  `;
+  document.head.appendChild(css);
 })();
 </script>
 
