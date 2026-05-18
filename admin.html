@@ -3008,5 +3008,200 @@ document.addEventListener("DOMContentLoaded",()=>{
 });
 
 </script>
+<script>
+(function(){
+  function q(id){ return document.getElementById(id); }
+
+  function limpiarSesionAdmin(){
+    try{
+      const keys = [];
+      for(let i = 0; i < localStorage.length; i++){
+        const k = localStorage.key(i);
+        if(!k) continue;
+        const lk = k.toLowerCase();
+        if(
+          lk.includes("nodo") ||
+          lk.includes("admin") ||
+          lk.includes("session") ||
+          lk.includes("token") ||
+          lk.includes("supabase") ||
+          lk.includes("sb-")
+        ){
+          keys.push(k);
+        }
+      }
+      keys.forEach(k => localStorage.removeItem(k));
+    }catch(e){}
+
+    try{ sessionStorage.clear(); }catch(e){}
+
+    window.adminSessionToken = "";
+    window.adminScope = null;
+  }
+
+  function ocultarPanel(){
+    const appView = q("appView") || document.querySelector(".app");
+    if(appView){
+      appView.style.display = "none";
+      appView.classList.add("hidden");
+    }
+  }
+
+  function mostrarPanel(){
+    const appView = q("appView") || document.querySelector(".app");
+    if(appView){
+      appView.style.display = "";
+      appView.classList.remove("hidden");
+    }
+
+    const gate = q("adminLoginGate");
+    if(gate) gate.remove();
+  }
+
+  function crearLogin(){
+    if(q("adminLoginGate")) return;
+
+    ocultarPanel();
+
+    const gate = document.createElement("div");
+    gate.id = "adminLoginGate";
+    gate.style.position = "fixed";
+    gate.style.inset = "0";
+    gate.style.zIndex = "9999999";
+    gate.style.background = "#020617";
+    gate.style.display = "flex";
+    gate.style.alignItems = "center";
+    gate.style.justifyContent = "center";
+    gate.style.padding = "20px";
+    gate.innerHTML = `
+      <div style="width:min(430px,94vw);background:#111827;border:1px solid #334155;border-radius:20px;padding:24px;color:white;box-shadow:0 20px 70px rgba(0,0,0,.45)">
+        <h2 style="font-size:26px;margin:0 0 6px">NODO ADMIN</h2>
+        <p style="margin:0 0 18px;color:#94a3b8">Ingreso seguro al panel.</p>
+
+        <label style="display:block;margin:10px 0 6px;font-weight:800">Usuario</label>
+        <input id="gateAdminUsuario" autocomplete="username" style="width:100%;padding:13px;border-radius:12px;border:1px solid #334155;background:#020617;color:white">
+
+        <label style="display:block;margin:12px 0 6px;font-weight:800">Clave</label>
+        <input id="gateAdminClave" type="password" autocomplete="current-password" style="width:100%;padding:13px;border-radius:12px;border:1px solid #334155;background:#020617;color:white">
+
+        <button id="gateAdminBtn" style="width:100%;margin-top:18px;padding:14px;border:0;border-radius:12px;background:#22c55e;color:#03120a;font-weight:900;cursor:pointer">Ingresar</button>
+
+        <div id="gateAdminMsg" style="margin-top:14px;color:#facc15;font-weight:700"></div>
+      </div>
+    `;
+
+    document.body.appendChild(gate);
+
+    q("gateAdminBtn").onclick = adminLoginGate;
+    q("gateAdminClave").addEventListener("keydown", function(e){
+      if(e.key === "Enter") adminLoginGate();
+    });
+  }
+
+  async function adminLoginGate(){
+    const usuario = q("gateAdminUsuario").value.trim();
+    const clave = q("gateAdminClave").value.trim();
+    const msg = q("gateAdminMsg");
+
+    if(!usuario || !clave){
+      msg.textContent = "Completá usuario y clave.";
+      return;
+    }
+
+    msg.textContent = "Validando acceso...";
+
+    const { data, error } = await supabaseClient.rpc("panel_login", {
+      p_usuario: usuario,
+      p_clave: clave,
+      p_ip: null,
+      p_user_agent: navigator.userAgent || "admin"
+    });
+
+    if(error){
+      msg.textContent = "Error: " + error.message;
+      return;
+    }
+
+    const login = Array.isArray(data) ? data[0] : data;
+
+    if(!login || login.ok !== true){
+      msg.textContent = login?.mensaje || "Usuario o clave incorrectos.";
+      return;
+    }
+
+    const { data: validacion, error: errorValidacion } = await supabaseClient.rpc("panel_validar_admin_session", {
+      p_session_token: login.session_token
+    });
+
+    if(errorValidacion){
+      msg.textContent = errorValidacion.message || "No tenés permisos de Admin.";
+      try{
+        await supabaseClient.rpc("panel_logout", { p_session_token: login.session_token });
+      }catch(e){}
+      return;
+    }
+
+    const sesion = Array.isArray(validacion) ? validacion[0] : validacion;
+
+    if(!sesion || sesion.ok !== true){
+      msg.textContent = "Sesión admin inválida.";
+      return;
+    }
+
+    window.adminSessionToken = login.session_token;
+    window.adminScope = sesion;
+
+    const adminInfo = q("adminInfo");
+    if(adminInfo){
+      adminInfo.classList.remove("hidden");
+      adminInfo.innerHTML = `
+        <b>${sesion.nombre || sesion.usuario}</b><br>
+        <span class="pill info">${sesion.rol}</span>
+        <span class="pill ${sesion.puede_todas ? "ok" : "warn"}">
+          ${sesion.puede_todas ? "TODAS LAS PCs" : "PC " + sesion.pc_codigo}
+        </span>
+      `;
+    }
+
+    mostrarPanel();
+
+    if(typeof aplicarScopeAdmin === "function") aplicarScopeAdmin();
+    if(typeof reloadAll === "function") await reloadAll();
+  }
+
+  window.requireAdminToken = function(){
+    if(window.adminSessionToken) return window.adminSessionToken;
+    throw new Error("Sesión admin no iniciada. Ingresá usuario y clave.");
+  };
+
+  window.adminLogout = async function(){
+    const token = window.adminSessionToken;
+
+    try{
+      if(token){
+        await supabaseClient.rpc("panel_logout", { p_session_token: token });
+      }
+    }catch(e){}
+
+    limpiarSesionAdmin();
+    crearLogin();
+  };
+
+  window.initAdminSession = async function(){
+    limpiarSesionAdmin();
+    crearLogin();
+  };
+
+  document.addEventListener("DOMContentLoaded", function(){
+    limpiarSesionAdmin();
+    crearLogin();
+  });
+
+  setTimeout(function(){
+    limpiarSesionAdmin();
+    crearLogin();
+  }, 300);
+})();
+</script>   
 </body>
 </html>
