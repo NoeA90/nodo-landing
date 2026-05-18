@@ -455,12 +455,135 @@ async function crearSolicitudSupabase(monto,tipo="CARGA"){
 }
 
 function guardarSolicitudLocal(id,chatId,chatToken,tipo){solicitudActual=id?String(id):null;solicitudChatId=chatId?String(chatId):"";if(chatToken){chatSessionToken=String(chatToken);localStorage.setItem(LS_CHAT_TOKEN,chatSessionToken)}localStorage.setItem(LS_SOLICITUD,JSON.stringify({id:solicitudActual,chat_id:solicitudChatId,chat_token:chatToken?String(chatToken):"",tipo:tipo||tipoSolicitudActual||"CARGA"}))}
-function recuperarSolicitudPendiente(){const g=localStorage.getItem(LS_SOLICITUD);if(!g)return;try{const o=JSON.parse(g);solicitudActual=o.id?String(o.id):null;solicitudChatId=o.chat_id?String(o.chat_id):"";if(o.chat_token){chatSessionToken=String(o.chat_token);localStorage.setItem(LS_CHAT_TOKEN,chatSessionToken)}if(o.tipo)tipoSolicitudActual=String(o.tipo).toUpperCase()}catch(e){solicitudActual=String(g||"");solicitudChatId=localStorage.getItem(LS_CHAT)||"";chatSessionToken=localStorage.getItem(LS_CHAT_TOKEN)||""}if(solicitudActual){mostrarEstadoEspera("PENDIENTE");iniciarEscuchaEstado()}}
+function recuperarSolicitudPendiente(){
+  const g = localStorage.getItem(LS_SOLICITUD);
+
+  if(!g) return;
+
+  try{
+    const o = JSON.parse(g);
+
+    solicitudActual = o.id ? String(o.id) : null;
+    solicitudChatId = o.chat_id ? String(o.chat_id) : "";
+
+    if(o.chat_token){
+      chatSessionToken = String(o.chat_token);
+      localStorage.setItem(LS_CHAT_TOKEN, chatSessionToken);
+    }
+
+    if(o.tipo){
+      tipoSolicitudActual = String(o.tipo).toUpperCase();
+    }
+
+  }catch(e){
+    solicitudActual = String(g || "");
+    solicitudChatId = localStorage.getItem(LS_CHAT) || "";
+    chatSessionToken = localStorage.getItem(LS_CHAT_TOKEN) || "";
+  }
+
+  if(solicitudActual){
+    mostrarEstadoEspera("PENDIENTE");
+    iniciarEscuchaEstado();
+  }
+}
 function mostrarReferenciaPago(s){const box=$("referenciaPagoBox");if(!box)return;const tipo=String(s?.tipo||tipoSolicitudActual||"CARGA").toUpperCase(), ref=s?.referencia_pago||s?.referencia_pago_visible||"";if(tipo!=="CARGA"||!ref){box.classList.add("hidden");box.innerHTML="";return}box.classList.remove("hidden");box.innerHTML=`<b>Referencia de carga:</b> ${escapeHtml(ref)}<br><span class="mini">Si tu billetera permite agregar nota o motivo, escribí esta referencia. Esto ayuda a validar tu pago más rápido.</span><button class="copy-btn" type="button" onclick="navigator.clipboard.writeText('${escapeAttr(ref)}')">Copiar referencia</button>`}
 function mostrarResultado(texto,ok){const box=$("resultado");box.innerHTML=texto;box.className="result "+(ok?"ok":"err")}
 function mostrarEstadoEspera(e="PENDIENTE"){$("estadoEspera").classList.remove("hidden");renderProgresoSolicitud(e)}
 function renderProgresoSolicitud(estado){const e=String(estado||"PENDIENTE").toUpperCase(), esRetiro=String(tipoSolicitudActual||"CARGA").toUpperCase()==="RETIRO", ok=["ACREDITADA","PAGADA"].includes(e), bad=["RECHAZADA","ERROR"].includes(e);$("step1Text").innerText=esRetiro?"Recibimos tu solicitud de retiro.":"Recibimos tu pedido de carga.";$("step2Text").innerText=esRetiro?"Un operador está revisando tu retiro.":"Un operador está revisando la transferencia.";$("step3Title").innerText=esRetiro?"Retiro aprobado/pagado":"Fichas acreditadas";$("step1").className="step done";$("step2").className=ok?"step done":(bad?"step":"step active");$("step3").className=ok?"step done":"step"}
-function iniciarEscuchaEstado(){if(intervaloEstado)clearInterval(intervaloEstado);intervaloEstado=setInterval(async()=>{if(!solicitudActual||!solicitudChatId)return;const {data,error}=await supabaseClient.rpc("landing_estado_solicitud",{p_solicitud_id:Number(solicitudActual),p_chat_id:solicitudChatId});if(error||!data||!data.length)return;const s=data[0], estado=String(s.estado||""), tipo=String(s.tipo||tipoSolicitudActual||"CARGA").toUpperCase();tipoSolicitudActual=tipo;renderProgresoSolicitud(estado);if(["ACREDITADA","PAGADA"].includes(estado)){clearInterval(intervaloEstado);if(tipo==="RETIRO"){mostrarResultado("✅ Tu retiro fue marcado como pagado/aprobado.",true);setTimeout(()=>{resetLandingEstado();location.reload()},2600)}else{$("successModal").classList.remove("hidden");setTimeout(()=>{resetLandingEstado();location.reload()},4500)}if(navigator.vibrate)navigator.vibrate([160,80,160])}if(["RECHAZADA","ERROR"].includes(estado)){clearInterval(intervaloEstado);mostrarResultado("La solicitud no pudo ser aprobada. Contactanos por chat.",false);setTimeout(()=>{resetLandingEstado();location.reload()},3200)}},3500)}
+function iniciarEscuchaEstado(){
+  if(intervaloEstado) clearInterval(intervaloEstado);
+
+  intervaloEstado = setInterval(async () => {
+    if(!solicitudActual){
+      return;
+    }
+
+    const chatParam = String(solicitudChatId || chatSessionId || "").trim();
+
+    if(!chatParam){
+      console.warn("No hay chat asociado para consultar estado.");
+      return;
+    }
+
+    const {data,error} = await supabaseClient.rpc("landing_estado_solicitud",{
+      p_solicitud_id: Number(solicitudActual),
+      p_chat_id: chatParam
+    });
+
+    if(error){
+      console.error("Error consultando estado de solicitud:", error);
+      return;
+    }
+
+    const s = Array.isArray(data) ? data[0] : data;
+
+    if(!s){
+      console.warn("landing_estado_solicitud no devolvió datos", {
+        solicitudActual,
+        chatParam,
+        data
+      });
+      return;
+    }
+
+    const estado = String(s.estado || "").toUpperCase();
+    const tipo = String(s.tipo || tipoSolicitudActual || "CARGA").toUpperCase();
+
+    tipoSolicitudActual = tipo;
+
+    console.log("Estado solicitud:", {
+      solicitud: solicitudActual,
+      chat: chatParam,
+      tipo,
+      estado
+    });
+
+    renderProgresoSolicitud(estado);
+
+    if(["ACREDITADA","PAGADA"].includes(estado)){
+      clearInterval(intervaloEstado);
+      intervaloEstado = null;
+
+      if(tipo === "RETIRO"){
+        mostrarResultado("✅ Tu retiro fue marcado como pagado/aprobado.", true);
+
+        setTimeout(() => {
+          resetLandingEstado();
+          location.reload();
+        }, 2600);
+
+      } else {
+        $("successModal").classList.remove("hidden");
+
+        if(navigator.vibrate){
+          navigator.vibrate([160,80,160]);
+        }
+
+        setTimeout(() => {
+          resetLandingEstado();
+          location.reload();
+        }, 4500);
+      }
+
+      return;
+    }
+
+    if(["RECHAZADA","ERROR"].includes(estado)){
+      clearInterval(intervaloEstado);
+      intervaloEstado = null;
+
+      mostrarResultado("La solicitud no pudo ser aprobada. Contactanos por chat.", false);
+
+      setTimeout(() => {
+        resetLandingEstado();
+        location.reload();
+      }, 3200);
+
+      return;
+    }
+
+  }, 3000);
+}
 function resetLandingEstado(){solicitudActual=null;if(intervaloEstado){clearInterval(intervaloEstado);intervaloEstado=null}localStorage.removeItem(LS_SOLICITUD);$("estadoEspera").classList.add("hidden");$("successModal").classList.add("hidden");$("resultado").innerHTML="";$("resultado").className="result";$("monto").value="";seleccionarTipoSolicitud("CARGA")}
 function irPlataforma(){resetLandingEstado();window.location.href=LINKS_PLATAFORMA[PC]||LINKS_PLATAFORMA.P1}
 function cerrarModalExito(){$("successModal").classList.add("hidden");resetLandingEstado();setTimeout(()=>location.reload(),300)}
