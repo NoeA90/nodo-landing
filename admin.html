@@ -496,6 +496,56 @@ function renderBilleteras(){
   </tr>`).join("");
 }
 
+
+/* =========================================================
+   ADMIN V16B FIX LOGOUT
+   Cerrar sesión robusto para cambiar de admi a nahuel.
+========================================================= */
+
+async function adminLogout(){
+  try{
+    const token = (typeof adminSessionToken !== "undefined" && adminSessionToken)
+      ? adminSessionToken
+      : localStorage.getItem("nodo_admin_session_token");
+
+    if(token){
+      try{
+        await supabaseClient.rpc("panel_logout", { p_session_token: token });
+      }catch(e){
+        console.warn("No se pudo cerrar sesión en backend:", e);
+      }
+    }
+  }finally{
+    try{ localStorage.removeItem("nodo_admin_session_token"); }catch(e){}
+    try{ localStorage.removeItem("LS_ADMIN_TOKEN"); }catch(e){}
+    try{ sessionStorage.clear(); }catch(e){}
+    location.reload();
+  }
+}
+
+// Botón flotante de emergencia, por si la barra superior queda fuera de vista.
+document.addEventListener("DOMContentLoaded",()=>{
+  setTimeout(()=>{
+    if(document.getElementById("logoutFloatingBtn"))return;
+    const btn=document.createElement("button");
+    btn.id="logoutFloatingBtn";
+    btn.textContent="Cerrar sesión";
+    btn.onclick=adminLogout;
+    btn.style.position="fixed";
+    btn.style.right="18px";
+    btn.style.bottom="18px";
+    btn.style.zIndex="99999";
+    btn.style.background="#ef4444";
+    btn.style.color="#fff";
+    btn.style.border="0";
+    btn.style.borderRadius="14px";
+    btn.style.padding="12px 16px";
+    btn.style.fontWeight="900";
+    btn.style.boxShadow="0 12px 35px rgba(0,0,0,.35)";
+    document.body.appendChild(btn);
+  },800);
+});
+
 </script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
@@ -525,6 +575,7 @@ button{border:0;border-radius:12px;padding:11px 14px;cursor:pointer;font-weight:
 .mp-status-card{background:rgba(2,6,23,.45);border:1px solid var(--line);border-radius:10px;padding:9px;font-size:12px;color:var(--muted)}
 .mp-status-card b{display:block;color:#fff;margin-top:3px}
 
+.logout-btn{background:#ef4444!important;color:white!important;border:none;border-radius:12px;padding:11px 16px;font-weight:900;cursor:pointer}
 </style>
 </head>
 <body>
@@ -541,7 +592,7 @@ button{border:0;border-radius:12px;padding:11px 14px;cursor:pointer;font-weight:
   </div>
 </aside>
 <main>
-<div class="top"><div><h2 id="pageTitle">Dashboard</h2><p id="pageSub">Resumen general navegable por PC.</p></div><div class="top-actions"><select id="globalPc" onchange="renderAll()"><option value="">Todas las PCs</option></select><button class="blue" onclick="reloadAll()">Actualizar todo</button></div></div>
+<div class="top"><div><h2 id="pageTitle">Dashboard</h2><p id="pageSub">Resumen general navegable por PC.</p></div><div class="top-actions"><select id="globalPc" onchange="renderAll()"><option value="">Todas las PCs</option></select><button class="blue" onclick="reloadAll()">Actualizar todo</button><button class="logout-btn" onclick="adminLogout()">Cerrar sesión</button></div></div>
 
 <section id="section-dashboard" class="section active">
   <div class="notice">Selector superior: elegí una PC para ver el dashboard filtrado o dejá “Todas las PCs” para la vista general.</div>
@@ -1733,6 +1784,56 @@ function renderBilleteras(){
     </div></td>
   </tr>`).join("");
 }
+
+
+/* =========================================================
+   ADMIN V16B FIX LOGOUT
+   Cerrar sesión robusto para cambiar de admi a nahuel.
+========================================================= */
+
+async function adminLogout(){
+  try{
+    const token = (typeof adminSessionToken !== "undefined" && adminSessionToken)
+      ? adminSessionToken
+      : localStorage.getItem("nodo_admin_session_token");
+
+    if(token){
+      try{
+        await supabaseClient.rpc("panel_logout", { p_session_token: token });
+      }catch(e){
+        console.warn("No se pudo cerrar sesión en backend:", e);
+      }
+    }
+  }finally{
+    try{ localStorage.removeItem("nodo_admin_session_token"); }catch(e){}
+    try{ localStorage.removeItem("LS_ADMIN_TOKEN"); }catch(e){}
+    try{ sessionStorage.clear(); }catch(e){}
+    location.reload();
+  }
+}
+
+// Botón flotante de emergencia, por si la barra superior queda fuera de vista.
+document.addEventListener("DOMContentLoaded",()=>{
+  setTimeout(()=>{
+    if(document.getElementById("logoutFloatingBtn"))return;
+    const btn=document.createElement("button");
+    btn.id="logoutFloatingBtn";
+    btn.textContent="Cerrar sesión";
+    btn.onclick=adminLogout;
+    btn.style.position="fixed";
+    btn.style.right="18px";
+    btn.style.bottom="18px";
+    btn.style.zIndex="99999";
+    btn.style.background="#ef4444";
+    btn.style.color="#fff";
+    btn.style.border="0";
+    btn.style.borderRadius="14px";
+    btn.style.padding="12px 16px";
+    btn.style.fontWeight="900";
+    btn.style.boxShadow="0 12px 35px rgba(0,0,0,.35)";
+    document.body.appendChild(btn);
+  },800);
+});
 
 </script>
 </body>
