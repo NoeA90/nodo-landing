@@ -666,6 +666,180 @@ document.addEventListener("DOMContentLoaded",()=>{
   },700);
 });
 
+
+/* =========================================================
+   ADMIN V16B FIX3 · SIN AUTOLOGIN
+   Esta versión NO reutiliza localStorage para entrar sola.
+   Cada pestaña nueva pide usuario y clave.
+========================================================= */
+
+function limpiarSesionAdminLocal(){
+  try{
+    const keys=[];
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(!k)continue;
+      const lk=k.toLowerCase();
+      if(
+        lk.includes("nodo") ||
+        lk.includes("admin") ||
+        lk.includes("session") ||
+        lk.includes("token") ||
+        lk.includes("supabase") ||
+        lk.includes("sb-")
+      ){
+        keys.push(k);
+      }
+    }
+    keys.forEach(k=>localStorage.removeItem(k));
+    localStorage.removeItem("nodo_admin_session_token");
+    localStorage.removeItem("LS_ADMIN_TOKEN");
+  }catch(e){console.warn(e)}
+
+  try{sessionStorage.clear()}catch(e){}
+}
+
+function mostrarLoginAdmin(){
+  try{
+    if(typeof adminSessionToken !== "undefined") adminSessionToken="";
+    if(typeof adminScope !== "undefined") adminScope=null;
+  }catch(e){}
+
+  if($("loginView"))$("loginView").classList.remove("hidden");
+  if($("appView"))$("appView").classList.add("hidden");
+
+  const msg=$("adminLoginMsg");
+  if(msg)msg.innerHTML="";
+}
+
+// IMPORTANTE: reemplaza el init anterior.
+// Ya no mira localStorage. Siempre pide login al abrir.
+async function initAdminSession(){
+  limpiarSesionAdminLocal();
+  mostrarLoginAdmin();
+}
+
+// Login sin guardar token en localStorage.
+async function adminLogin(){
+  const usuario=val("adminLoginUsuario").trim();
+  const clave=val("adminLoginClave").trim();
+
+  if(!usuario||!clave){
+    $("adminLoginMsg").innerHTML='<div class="notice">Completá usuario y clave.</div>';
+    return;
+  }
+
+  $("adminLoginMsg").innerHTML='<div class="notice">Validando acceso...</div>';
+
+  const {data,error}=await supabaseClient.rpc("panel_login",{
+    p_usuario:usuario,
+    p_clave:clave,
+    p_ip:null,
+    p_user_agent:navigator.userAgent||"admin"
+  });
+
+  if(error){
+    $("adminLoginMsg").innerHTML='<div class="notice" style="border-color:rgba(239,68,68,.7);color:#fecaca">Error: '+safe(error.message)+'</div>';
+    return;
+  }
+
+  const row=Array.isArray(data)?data[0]:data;
+  if(!row||row.ok!==true){
+    $("adminLoginMsg").innerHTML='<div class="notice" style="border-color:rgba(239,68,68,.7);color:#fecaca">'+safe(row?.mensaje||"Usuario o clave incorrectos")+'</div>';
+    return;
+  }
+
+  const ok=await validarAdminToken(row.session_token);
+  if(!ok){
+    try{await supabaseClient.rpc("panel_logout",{p_session_token:row.session_token})}catch(e){}
+    return;
+  }
+
+  // NO guardar en localStorage.
+  try{localStorage.removeItem("nodo_admin_session_token")}catch(e){}
+}
+
+// Validación usando variable de memoria.
+async function validarAdminToken(token){
+  const {data,error}=await supabaseClient.rpc("panel_validar_admin_session",{
+    p_session_token:token
+  });
+
+  if(error){
+    $("adminLoginMsg").innerHTML='<div class="notice" style="border-color:rgba(239,68,68,.7);color:#fecaca">'+safe(error.message||"Sin permisos admin")+'</div>';
+    return false;
+  }
+
+  const row=Array.isArray(data)?data[0]:data;
+  if(!row||row.ok!==true){
+    $("adminLoginMsg").innerHTML='<div class="notice" style="border-color:rgba(239,68,68,.7);color:#fecaca">Sesión inválida.</div>';
+    return false;
+  }
+
+  adminSessionToken=token;
+  adminScope=row;
+
+  $("loginView").classList.add("hidden");
+  $("appView").classList.remove("hidden");
+
+  $("adminInfo").classList.remove("hidden");
+  $("adminInfo").innerHTML=`<b>${safe(row.nombre||row.usuario)}</b><br>
+    <span class="pill info">${safe(row.rol)}</span>
+    <span class="pill ${row.puede_todas?'ok':'warn'}">${row.puede_todas?'TODAS LAS PCs':'PC '+safe(row.pc_codigo)}</span>`;
+
+  aplicarScopeAdmin();
+  await reloadAll();
+  return true;
+}
+
+window.requireAdminToken=function(){
+  if(typeof adminSessionToken !== "undefined" && adminSessionToken){
+    return adminSessionToken;
+  }
+  throw new Error("Sesión admin no iniciada. Volvé a ingresar usuario y clave.");
+};
+
+async function adminLogout(){
+  const token=(typeof adminSessionToken !== "undefined" && adminSessionToken) ? adminSessionToken : "";
+  try{
+    if(token) await supabaseClient.rpc("panel_logout",{p_session_token:token});
+  }catch(e){console.warn(e)}
+
+  limpiarSesionAdminLocal();
+  mostrarLoginAdmin();
+
+  // Limpia formularios de login.
+  try{
+    if($("adminLoginUsuario"))$("adminLoginUsuario").value="";
+    if($("adminLoginClave"))$("adminLoginClave").value="";
+  }catch(e){}
+}
+
+// Botón flotante fijo.
+document.addEventListener("DOMContentLoaded",()=>{
+  setTimeout(()=>{
+    let btn=document.getElementById("logoutFloatingBtn");
+    if(!btn){
+      btn=document.createElement("button");
+      btn.id="logoutFloatingBtn";
+      btn.textContent="Cerrar sesión";
+      document.body.appendChild(btn);
+    }
+    btn.onclick=adminLogout;
+    btn.style.position="fixed";
+    btn.style.right="18px";
+    btn.style.bottom="18px";
+    btn.style.zIndex="999999";
+    btn.style.background="#ef4444";
+    btn.style.color="#fff";
+    btn.style.border="0";
+    btn.style.borderRadius="14px";
+    btn.style.padding="12px 16px";
+    btn.style.fontWeight="900";
+    btn.style.boxShadow="0 12px 35px rgba(0,0,0,.35)";
+  },700);
+});
+
 </script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
@@ -2051,6 +2225,180 @@ async function initAdminSession(){
 }
 
 // Botón flotante fijo visible siempre dentro del panel.
+document.addEventListener("DOMContentLoaded",()=>{
+  setTimeout(()=>{
+    let btn=document.getElementById("logoutFloatingBtn");
+    if(!btn){
+      btn=document.createElement("button");
+      btn.id="logoutFloatingBtn";
+      btn.textContent="Cerrar sesión";
+      document.body.appendChild(btn);
+    }
+    btn.onclick=adminLogout;
+    btn.style.position="fixed";
+    btn.style.right="18px";
+    btn.style.bottom="18px";
+    btn.style.zIndex="999999";
+    btn.style.background="#ef4444";
+    btn.style.color="#fff";
+    btn.style.border="0";
+    btn.style.borderRadius="14px";
+    btn.style.padding="12px 16px";
+    btn.style.fontWeight="900";
+    btn.style.boxShadow="0 12px 35px rgba(0,0,0,.35)";
+  },700);
+});
+
+
+/* =========================================================
+   ADMIN V16B FIX3 · SIN AUTOLOGIN
+   Esta versión NO reutiliza localStorage para entrar sola.
+   Cada pestaña nueva pide usuario y clave.
+========================================================= */
+
+function limpiarSesionAdminLocal(){
+  try{
+    const keys=[];
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(!k)continue;
+      const lk=k.toLowerCase();
+      if(
+        lk.includes("nodo") ||
+        lk.includes("admin") ||
+        lk.includes("session") ||
+        lk.includes("token") ||
+        lk.includes("supabase") ||
+        lk.includes("sb-")
+      ){
+        keys.push(k);
+      }
+    }
+    keys.forEach(k=>localStorage.removeItem(k));
+    localStorage.removeItem("nodo_admin_session_token");
+    localStorage.removeItem("LS_ADMIN_TOKEN");
+  }catch(e){console.warn(e)}
+
+  try{sessionStorage.clear()}catch(e){}
+}
+
+function mostrarLoginAdmin(){
+  try{
+    if(typeof adminSessionToken !== "undefined") adminSessionToken="";
+    if(typeof adminScope !== "undefined") adminScope=null;
+  }catch(e){}
+
+  if($("loginView"))$("loginView").classList.remove("hidden");
+  if($("appView"))$("appView").classList.add("hidden");
+
+  const msg=$("adminLoginMsg");
+  if(msg)msg.innerHTML="";
+}
+
+// IMPORTANTE: reemplaza el init anterior.
+// Ya no mira localStorage. Siempre pide login al abrir.
+async function initAdminSession(){
+  limpiarSesionAdminLocal();
+  mostrarLoginAdmin();
+}
+
+// Login sin guardar token en localStorage.
+async function adminLogin(){
+  const usuario=val("adminLoginUsuario").trim();
+  const clave=val("adminLoginClave").trim();
+
+  if(!usuario||!clave){
+    $("adminLoginMsg").innerHTML='<div class="notice">Completá usuario y clave.</div>';
+    return;
+  }
+
+  $("adminLoginMsg").innerHTML='<div class="notice">Validando acceso...</div>';
+
+  const {data,error}=await supabaseClient.rpc("panel_login",{
+    p_usuario:usuario,
+    p_clave:clave,
+    p_ip:null,
+    p_user_agent:navigator.userAgent||"admin"
+  });
+
+  if(error){
+    $("adminLoginMsg").innerHTML='<div class="notice" style="border-color:rgba(239,68,68,.7);color:#fecaca">Error: '+safe(error.message)+'</div>';
+    return;
+  }
+
+  const row=Array.isArray(data)?data[0]:data;
+  if(!row||row.ok!==true){
+    $("adminLoginMsg").innerHTML='<div class="notice" style="border-color:rgba(239,68,68,.7);color:#fecaca">'+safe(row?.mensaje||"Usuario o clave incorrectos")+'</div>';
+    return;
+  }
+
+  const ok=await validarAdminToken(row.session_token);
+  if(!ok){
+    try{await supabaseClient.rpc("panel_logout",{p_session_token:row.session_token})}catch(e){}
+    return;
+  }
+
+  // NO guardar en localStorage.
+  try{localStorage.removeItem("nodo_admin_session_token")}catch(e){}
+}
+
+// Validación usando variable de memoria.
+async function validarAdminToken(token){
+  const {data,error}=await supabaseClient.rpc("panel_validar_admin_session",{
+    p_session_token:token
+  });
+
+  if(error){
+    $("adminLoginMsg").innerHTML='<div class="notice" style="border-color:rgba(239,68,68,.7);color:#fecaca">'+safe(error.message||"Sin permisos admin")+'</div>';
+    return false;
+  }
+
+  const row=Array.isArray(data)?data[0]:data;
+  if(!row||row.ok!==true){
+    $("adminLoginMsg").innerHTML='<div class="notice" style="border-color:rgba(239,68,68,.7);color:#fecaca">Sesión inválida.</div>';
+    return false;
+  }
+
+  adminSessionToken=token;
+  adminScope=row;
+
+  $("loginView").classList.add("hidden");
+  $("appView").classList.remove("hidden");
+
+  $("adminInfo").classList.remove("hidden");
+  $("adminInfo").innerHTML=`<b>${safe(row.nombre||row.usuario)}</b><br>
+    <span class="pill info">${safe(row.rol)}</span>
+    <span class="pill ${row.puede_todas?'ok':'warn'}">${row.puede_todas?'TODAS LAS PCs':'PC '+safe(row.pc_codigo)}</span>`;
+
+  aplicarScopeAdmin();
+  await reloadAll();
+  return true;
+}
+
+window.requireAdminToken=function(){
+  if(typeof adminSessionToken !== "undefined" && adminSessionToken){
+    return adminSessionToken;
+  }
+  throw new Error("Sesión admin no iniciada. Volvé a ingresar usuario y clave.");
+};
+
+async function adminLogout(){
+  const token=(typeof adminSessionToken !== "undefined" && adminSessionToken) ? adminSessionToken : "";
+  try{
+    if(token) await supabaseClient.rpc("panel_logout",{p_session_token:token});
+  }catch(e){console.warn(e)}
+
+  limpiarSesionAdminLocal();
+  mostrarLoginAdmin();
+
+  // Limpia formularios de login.
+  try{
+    if($("adminLoginUsuario"))$("adminLoginUsuario").value="";
+    if($("adminLoginClave"))$("adminLoginClave").value="";
+  }catch(e){}
+}
+
+// Botón flotante fijo.
 document.addEventListener("DOMContentLoaded",()=>{
   setTimeout(()=>{
     let btn=document.getElementById("logoutFloatingBtn");
