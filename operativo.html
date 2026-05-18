@@ -2071,5 +2071,98 @@ async function cerrarSesion(){
 })();
 </script>
 
+
+<script>
+/* =========================================================
+   OPERATIVO FINAL FIX V2 · sesión fluida + chat leído estable
+   - La sesión se mantiene en refresh hasta cerrar manualmente.
+   - Leer chat se guarda local y se intenta guardar en RPC.
+   - Si el chat está abierto, su badge no vuelve a aparecer al actualizar.
+========================================================= */
+(function(){
+  const TOKEN_KEY = 'nodo_panel_session_token_lite';
+  const PC_KEY = 'nodo_pc_operativa_lite';
+  const OP_KEY = 'nodo_operador_lite';
+
+  window.requireSessionToken=function(){
+    const t=panelSessionToken || localStorage.getItem(TOKEN_KEY) || '';
+    if(!t) throw new Error('Sesión no iniciada. Volvé a ingresar.');
+    panelSessionToken=t;
+    return t;
+  };
+
+  const oldFinalizar=window.finalizarLogin || finalizarLogin;
+  window.finalizarLogin=function(guardar=true){
+    if(panelSessionToken) localStorage.setItem(TOKEN_KEY,panelSessionToken);
+    if(pcOperativa) localStorage.setItem(PC_KEY,pcOperativa);
+    if(operador) localStorage.setItem(OP_KEY,JSON.stringify(operador));
+    return oldFinalizar ? oldFinalizar(false) : null;
+  };
+
+  window.cerrarSesion=async function(){
+    try{ if(panelSessionToken) await supabaseClient.rpc('panel_logout',{p_session_token:panelSessionToken}); }catch(e){}
+    localStorage.removeItem(OP_KEY); localStorage.removeItem(PC_KEY); localStorage.removeItem(TOKEN_KEY);
+    location.reload();
+  };
+
+  function k(id){return String(id||'')}
+  function msgTipo(m){return String(m.tipo_emisor||m.TIPO_EMISOR||m.emisor||'').trim().toUpperCase()}
+  function getMsgDate(m){return m.created_at||m.FECHA||m.fecha||''}
+  function sortMsgs(a){return (a||[]).slice().sort((x,y)=>new Date(getMsgDate(x)||0)-new Date(getMsgDate(y)||0))}
+  function userCount(arr){return (arr||[]).filter(m=>msgTipo(m)==='USUARIO').length}
+
+  async function marcarLeidoBackend(chatId){
+    try{
+      await supabaseClient.rpc('panel_operativo_marcar_chat_leido',{
+        p_session_token:requireSessionToken(),
+        p_chat_id:chatId
+      });
+    }catch(e){console.warn('marcar_chat_leido fallback local:', e.message||e)}
+  }
+
+  const oldAbrir=window.abrirChat;
+  window.abrirChat=async function(id){
+    chatActualId=k(id);
+    if(window.chatMensajesPorId && window.chatMensajesPorId[chatActualId]){
+      chatMensajes=sortMsgs(window.chatMensajesPorId[chatActualId]);
+    }
+    if(typeof renderChatList==='function')renderChatList();
+    if(typeof renderChatMensajes==='function')renderChatMensajes();
+    if(typeof cargarChatActual==='function') await cargarChatActual(true);
+    const count=userCount(chatMensajes);
+    setChatReadCount(chatActualId,count);
+    await marcarLeidoBackend(chatActualId);
+    chats=(chats||[]).map(c=>k(c.ID_CHAT||c.chat_id)===chatActualId?{...c,SIN_LEER:0,USER_COUNT:count}:c);
+    if(typeof renderChatList==='function')renderChatList();
+    if(typeof renderInicio==='function')renderInicio();
+  };
+
+  const oldCargarChats=window.cargarChats;
+  window.cargarChats=async function(silencioso=false){
+    if(oldCargarChats) await oldCargarChats(silencioso);
+    if(chatActualId){
+      const opened=k(chatActualId);
+      let arr=[];
+      if(window.chatMensajesPorId && window.chatMensajesPorId[opened]) arr=sortMsgs(window.chatMensajesPorId[opened]);
+      if(arr.length){chatMensajes=arr;}
+      const count=userCount(chatMensajes);
+      setChatReadCount(opened,count);
+      chats=(chats||[]).map(c=>k(c.ID_CHAT||c.chat_id)===opened?{...c,SIN_LEER:0,USER_COUNT:count}:c);
+      await marcarLeidoBackend(opened);
+      if(typeof renderChatList==='function')renderChatList();
+      if(typeof renderChatMensajes==='function')renderChatMensajes();
+      if(typeof renderInicio==='function')renderInicio();
+    }
+  };
+
+  window.addEventListener('load',async()=>{
+    const t=localStorage.getItem(TOKEN_KEY), pc=localStorage.getItem(PC_KEY);
+    if(t && pc && !panelSessionToken){
+      try{ await validarSesionGuardada(t,pc); }catch(e){console.warn(e)}
+    }
+  });
+})();
+</script>
+
 </body>
 </html>
