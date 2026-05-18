@@ -1601,7 +1601,7 @@ async function crearSolicitudSupabase(monto, tipo="CARGA"){
     p_tipo: esRetiro ? "RETIRO" : "CARGA",
     p_monto: Number(monto),
     p_comprobante_url: null,
-    p_billetera_id: (!esRetiro && billeteraActiva) ? String(billeteraActiva.id || "") : null,
+    p_billetera_id: (!esRetiro && billeteraActiva?.id) ? Number(billeteraActiva.id) : null,
     p_billetera_nombre: (!esRetiro && billeteraActiva) ? String(billeteraActiva.nombre_visible || "") : null,
     p_link_plataforma: LINKS_PLATAFORMA[PC] || LINKS_PLATAFORMA.P1 || null,
     p_retiro_alias_cbu: destinoRetiro,
