@@ -330,6 +330,172 @@ async function adminDeleteOperador(id){
   }
 }
 
+
+/* =========================================================
+   ADMIN V16B · BILLETERAS POR RPC
+   Migra guardar/editar, activar/pausar, manual y eliminar.
+========================================================= */
+
+async function saveBilletera(e){
+  if(e && e.preventDefault)e.preventDefault();
+
+  try{
+    const id = val("bi_id");
+
+    const payload = {
+      p_session_token: window.requireAdminToken ? window.requireAdminToken() : requireAdminToken(),
+      p_billetera_id: id ? Number(id) : null,
+      p_pc_codigo: val("bi_pc_codigo"),
+      p_nombre_visible: val("bi_nombre_visible"),
+      p_titular: val("bi_titular"),
+      p_alias: val("bi_alias"),
+      p_cbu: val("bi_cbu"),
+      p_banco: val("bi_banco"),
+      p_estado: val("bi_estado") || "activa",
+      p_prioridad: num("bi_prioridad"),
+      p_activa: bool("bi_activa"),
+      p_seleccionada_manual: bool("bi_manual"),
+      p_orden: num("bi_orden"),
+      p_observaciones: val("bi_observaciones")
+    };
+
+    const {data,error}=await supabaseClient.rpc("admin_guardar_billetera", payload);
+
+    if(error){
+      console.error("admin_guardar_billetera", error);
+      toast("Error billetera: " + (error.message || "error desconocido"), "err");
+      alert("Error billetera: " + (error.message || "error desconocido"));
+      return false;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+
+    resetBilleteraForm();
+    await loadBilleteras(true);
+    renderBilleteras();
+    toast(row?.mensaje || "Billetera guardada", "okb");
+    alert(row?.mensaje || "Billetera guardada");
+    return false;
+
+  }catch(err){
+    console.error("saveBilletera exception", err);
+    toast("Error billetera: " + (err.message || err), "err");
+    alert("Error billetera: " + (err.message || err));
+    return false;
+  }
+}
+
+async function toggleBilletera(id, activa){
+  try{
+    const accion = activa ? "activar" : "pausar";
+    if(!confirm(`¿Querés ${accion} esta billetera?`))return;
+
+    const {data,error}=await supabaseClient.rpc("admin_cambiar_estado_billetera", {
+      p_session_token: window.requireAdminToken ? window.requireAdminToken() : requireAdminToken(),
+      p_billetera_id: Number(id),
+      p_activa: !!activa
+    });
+
+    if(error){
+      console.error("admin_cambiar_estado_billetera", error);
+      toast("Error: " + (error.message || "error desconocido"), "err");
+      alert("Error: " + (error.message || "error desconocido"));
+      return;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+    await loadBilleteras(true);
+    renderBilleteras();
+    toast(row?.mensaje || "Billetera actualizada", "okb");
+  }catch(err){
+    console.error(err);
+    alert("Error cambiando estado: "+(err.message||err));
+  }
+}
+
+async function setManual(id){
+  try{
+    if(!confirm("¿Poner esta billetera como manual para landing en su PC?"))return;
+
+    const {data,error}=await supabaseClient.rpc("admin_seleccionar_billetera_manual", {
+      p_session_token: window.requireAdminToken ? window.requireAdminToken() : requireAdminToken(),
+      p_billetera_id: Number(id)
+    });
+
+    if(error){
+      console.error("admin_seleccionar_billetera_manual", error);
+      toast("Error: " + (error.message || "error desconocido"), "err");
+      alert("Error: " + (error.message || "error desconocido"));
+      return;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+    await loadBilleteras(true);
+    renderBilleteras();
+    toast(row?.mensaje || "Billetera seleccionada", "okb");
+  }catch(err){
+    console.error(err);
+    alert("Error seleccionando manual: "+(err.message||err));
+  }
+}
+
+async function adminDeleteBilletera(id){
+  try{
+    if(!confirm("¿Seguro que querés eliminar esta billetera? Esta acción no se puede deshacer."))return;
+
+    const {data,error}=await supabaseClient.rpc("admin_eliminar_billetera", {
+      p_session_token: window.requireAdminToken ? window.requireAdminToken() : requireAdminToken(),
+      p_billetera_id: Number(id)
+    });
+
+    if(error){
+      console.error("admin_eliminar_billetera", error);
+      toast("Error al eliminar: " + (error.message || "error desconocido"), "err");
+      alert("Error al eliminar: " + (error.message || "error desconocido"));
+      return;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+    await loadBilleteras(true);
+    renderBilleteras();
+    toast(row?.mensaje || "Billetera eliminada", "okb");
+  }catch(err){
+    console.error(err);
+    alert("Error eliminando billetera: "+(err.message||err));
+  }
+}
+
+function renderBilleteras(){
+  const q=norm(val("bi_search")),banco=val("bi_filter_banco"),pc=val("bi_filter_pc"),act=val("bi_filter_activa");
+  let rows=billeteras.filter(b=>
+    (!q||norm([b.id,b.pc_codigo,b.nombre_visible,b.titular,b.alias,b.cbu,b.banco,b.estado].join(" ")).includes(q))&&
+    (!banco||b.banco===banco)&&
+    (!pc||b.pc_codigo===pc)&&
+    (act===""||String(!!b.activa)===act)
+  );
+
+  if(!rows.length)return empty("billeterasBody",11,"No hay billeteras para el filtro actual.");
+
+  $("billeterasBody").innerHTML=rows.map(b=>`<tr>
+    <td>${safe(b.id)}</td>
+    <td>${safe(b.pc_codigo)}</td>
+    <td><strong>${safe(b.nombre_visible)}</strong></td>
+    <td>${safe(b.titular)}</td>
+    <td>${safe(b.banco)}</td>
+    <td>${safe(b.alias)}</td>
+    <td>${estadoBi(b)}</td>
+    <td>${mpBadge(b)}</td>
+    <td>${safe(b.prioridad||0)}</td>
+    <td>${b.seleccionada_manual?pill('Manual','warn'):'<span class="muted">No</span>'}</td>
+    <td><div class="rowActions">
+      <button class="small blue" onclick="editBilletera('${b.id}')">Editar</button>
+      <button class="small ${b.activa?'warning':'primary'}" onclick="toggleBilletera('${b.id}',${!b.activa})">${b.activa?'Pausar':'Activar'}</button>
+      <button class="small violet" onclick="setManual('${b.id}')">Manual</button>
+      <button class="small danger" onclick="adminDeleteBilletera('${b.id}')">Eliminar</button>
+    </div></td>
+  </tr>`).join("");
+}
+
 </script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
@@ -1400,6 +1566,172 @@ async function adminDeleteOperador(id){
     console.error(err);
     alert("Error eliminando: "+(err.message||err));
   }
+}
+
+
+/* =========================================================
+   ADMIN V16B · BILLETERAS POR RPC
+   Migra guardar/editar, activar/pausar, manual y eliminar.
+========================================================= */
+
+async function saveBilletera(e){
+  if(e && e.preventDefault)e.preventDefault();
+
+  try{
+    const id = val("bi_id");
+
+    const payload = {
+      p_session_token: window.requireAdminToken ? window.requireAdminToken() : requireAdminToken(),
+      p_billetera_id: id ? Number(id) : null,
+      p_pc_codigo: val("bi_pc_codigo"),
+      p_nombre_visible: val("bi_nombre_visible"),
+      p_titular: val("bi_titular"),
+      p_alias: val("bi_alias"),
+      p_cbu: val("bi_cbu"),
+      p_banco: val("bi_banco"),
+      p_estado: val("bi_estado") || "activa",
+      p_prioridad: num("bi_prioridad"),
+      p_activa: bool("bi_activa"),
+      p_seleccionada_manual: bool("bi_manual"),
+      p_orden: num("bi_orden"),
+      p_observaciones: val("bi_observaciones")
+    };
+
+    const {data,error}=await supabaseClient.rpc("admin_guardar_billetera", payload);
+
+    if(error){
+      console.error("admin_guardar_billetera", error);
+      toast("Error billetera: " + (error.message || "error desconocido"), "err");
+      alert("Error billetera: " + (error.message || "error desconocido"));
+      return false;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+
+    resetBilleteraForm();
+    await loadBilleteras(true);
+    renderBilleteras();
+    toast(row?.mensaje || "Billetera guardada", "okb");
+    alert(row?.mensaje || "Billetera guardada");
+    return false;
+
+  }catch(err){
+    console.error("saveBilletera exception", err);
+    toast("Error billetera: " + (err.message || err), "err");
+    alert("Error billetera: " + (err.message || err));
+    return false;
+  }
+}
+
+async function toggleBilletera(id, activa){
+  try{
+    const accion = activa ? "activar" : "pausar";
+    if(!confirm(`¿Querés ${accion} esta billetera?`))return;
+
+    const {data,error}=await supabaseClient.rpc("admin_cambiar_estado_billetera", {
+      p_session_token: window.requireAdminToken ? window.requireAdminToken() : requireAdminToken(),
+      p_billetera_id: Number(id),
+      p_activa: !!activa
+    });
+
+    if(error){
+      console.error("admin_cambiar_estado_billetera", error);
+      toast("Error: " + (error.message || "error desconocido"), "err");
+      alert("Error: " + (error.message || "error desconocido"));
+      return;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+    await loadBilleteras(true);
+    renderBilleteras();
+    toast(row?.mensaje || "Billetera actualizada", "okb");
+  }catch(err){
+    console.error(err);
+    alert("Error cambiando estado: "+(err.message||err));
+  }
+}
+
+async function setManual(id){
+  try{
+    if(!confirm("¿Poner esta billetera como manual para landing en su PC?"))return;
+
+    const {data,error}=await supabaseClient.rpc("admin_seleccionar_billetera_manual", {
+      p_session_token: window.requireAdminToken ? window.requireAdminToken() : requireAdminToken(),
+      p_billetera_id: Number(id)
+    });
+
+    if(error){
+      console.error("admin_seleccionar_billetera_manual", error);
+      toast("Error: " + (error.message || "error desconocido"), "err");
+      alert("Error: " + (error.message || "error desconocido"));
+      return;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+    await loadBilleteras(true);
+    renderBilleteras();
+    toast(row?.mensaje || "Billetera seleccionada", "okb");
+  }catch(err){
+    console.error(err);
+    alert("Error seleccionando manual: "+(err.message||err));
+  }
+}
+
+async function adminDeleteBilletera(id){
+  try{
+    if(!confirm("¿Seguro que querés eliminar esta billetera? Esta acción no se puede deshacer."))return;
+
+    const {data,error}=await supabaseClient.rpc("admin_eliminar_billetera", {
+      p_session_token: window.requireAdminToken ? window.requireAdminToken() : requireAdminToken(),
+      p_billetera_id: Number(id)
+    });
+
+    if(error){
+      console.error("admin_eliminar_billetera", error);
+      toast("Error al eliminar: " + (error.message || "error desconocido"), "err");
+      alert("Error al eliminar: " + (error.message || "error desconocido"));
+      return;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+    await loadBilleteras(true);
+    renderBilleteras();
+    toast(row?.mensaje || "Billetera eliminada", "okb");
+  }catch(err){
+    console.error(err);
+    alert("Error eliminando billetera: "+(err.message||err));
+  }
+}
+
+function renderBilleteras(){
+  const q=norm(val("bi_search")),banco=val("bi_filter_banco"),pc=val("bi_filter_pc"),act=val("bi_filter_activa");
+  let rows=billeteras.filter(b=>
+    (!q||norm([b.id,b.pc_codigo,b.nombre_visible,b.titular,b.alias,b.cbu,b.banco,b.estado].join(" ")).includes(q))&&
+    (!banco||b.banco===banco)&&
+    (!pc||b.pc_codigo===pc)&&
+    (act===""||String(!!b.activa)===act)
+  );
+
+  if(!rows.length)return empty("billeterasBody",11,"No hay billeteras para el filtro actual.");
+
+  $("billeterasBody").innerHTML=rows.map(b=>`<tr>
+    <td>${safe(b.id)}</td>
+    <td>${safe(b.pc_codigo)}</td>
+    <td><strong>${safe(b.nombre_visible)}</strong></td>
+    <td>${safe(b.titular)}</td>
+    <td>${safe(b.banco)}</td>
+    <td>${safe(b.alias)}</td>
+    <td>${estadoBi(b)}</td>
+    <td>${mpBadge(b)}</td>
+    <td>${safe(b.prioridad||0)}</td>
+    <td>${b.seleccionada_manual?pill('Manual','warn'):'<span class="muted">No</span>'}</td>
+    <td><div class="rowActions">
+      <button class="small blue" onclick="editBilletera('${b.id}')">Editar</button>
+      <button class="small ${b.activa?'warning':'primary'}" onclick="toggleBilletera('${b.id}',${!b.activa})">${b.activa?'Pausar':'Activar'}</button>
+      <button class="small violet" onclick="setManual('${b.id}')">Manual</button>
+      <button class="small danger" onclick="adminDeleteBilletera('${b.id}')">Eliminar</button>
+    </div></td>
+  </tr>`).join("");
 }
 
 </script>
