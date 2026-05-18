@@ -186,6 +186,8 @@ table{width:100%;border-collapse:collapse}th,td{padding:11px;border-bottom:1px s
   cursor:pointer;
 }
 .chat-icon-btn:hover{background:#3a4354}
+.chat-item .chat-extra-actions{display:none}
+.chat-item.clean-chat-item{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
 
 </style>
 </head>
@@ -370,674 +372,415 @@ table{width:100%;border-collapse:collapse}th,td{padding:11px;border-bottom:1px s
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
 /* =========================================================
-   OPERATIVO CHAT NOTIFY V6
-   Corrige:
-   - Si el usuario responde en un chat ya abierto, vuelve a marcar badge 1.
-   - Mantiene sonido/toast.
-   - El badge representa mensajes de usuario nuevos no atendidos.
-   - Al hacer click/abrir el chat, se limpia el badge de ese chat.
-   - No crea chats duplicados: dedup por chat_id / solicitud_id / usuario+telefono.
+   OPERATIVO CHAT NOTIFY V8 · ESTABLE SIN REDECLARAR
+   - Sin let/const globales duplicados.
+   - Sin recursión en mostrarVista.
+   - Badge lateral Chat suma mensajes nuevos aunque estés en Inicio.
+   - Chat se limpia solo al abrir/clickearel chat o al responder.
+   - Carga mensajes desde RPC PC como fuente principal.
 ========================================================= */
+(function(){
+  const S = window.NODO_CHAT_V8 = window.NODO_CHAT_V8 || {
+    lastUserCount: {},
+    badgeCount: {},
+    currentView: "inicio",
+    installed: false
+  };
 
-let __chatLastUserCountById = window.__chatLastUserCountById || {};
-let __chatBadgeCountById = window.__chatBadgeCountById || {};
-let __chatKnownIds = window.__chatKnownIds || new Set();
+  function chatIdOf(c){
+    return String((c && (c.ID_CHAT || c.chat_id || c.id)) || "").trim();
+  }
 
-function chatKeyStable(c){
-  return String(
-    c?.chat_id ||
-    c?.ID_CHAT ||
-    c?.solicitud_id ||
-    c?.SOLICITUD_ID ||
-    ((c?.usuario || c?.USUARIO || "") + "|" + (c?.telefono || c?.TELEFONO || ""))
-  ).trim();
-}
+  function chatBadgeKey(chatId){
+    return "nodo_chat_badge_v8_" + String(window.pcOperativa || pcOperativa || "") + "_" + String(chatId || "");
+  }
 
-function dedupeChatsV6(lista){
-  const map = new Map();
+  window.getChatBadgeV8 = function(chatId){
+    const id = String(chatId || "");
+    if(S.badgeCount[id] !== undefined) return Number(S.badgeCount[id] || 0);
+    return Number(localStorage.getItem(chatBadgeKey(id)) || 0);
+  };
 
-  (lista || []).forEach(c=>{
-    const k = chatKeyStable(c);
-    if(!k) return;
+  window.setChatBadgeV8 = function(chatId, count){
+    const id = String(chatId || "");
+    const n = Math.max(0, Number(count || 0));
+    S.badgeCount[id] = n;
+    try{ localStorage.setItem(chatBadgeKey(id), String(n)); }catch(e){}
+  };
 
-    const old = map.get(k);
-    if(!old){
-      map.set(k, c);
+  window.clearChatBadgeV8 = function(chatId){
+    window.setChatBadgeV8(chatId, 0);
+  };
+
+  function countUserMessages(ms){
+    return (ms || []).filter(m => String(m.tipo_emisor || m.emisor || "").toUpperCase() === "USUARIO").length;
+  }
+
+  function stableKey(c){
+    return String(
+      c?.chat_id || c?.ID_CHAT || c?.id || c?.solicitud_id || c?.SOLICITUD_ID ||
+      ((c?.usuario || c?.USUARIO || "") + "|" + (c?.telefono || c?.TELEFONO || ""))
+    ).trim();
+  }
+
+  function dedupe(lista){
+    const map = new Map();
+    (lista || []).forEach(c=>{
+      const k = stableKey(c);
+      if(!k) return;
+      const old = map.get(k);
+      if(!old){
+        map.set(k,c);
+        return;
+      }
+      const od = new Date(old.FECHA_ULTIMO || old.FECHA || old.updated_at || old.created_at || 0).getTime() || 0;
+      const nd = new Date(c.FECHA_ULTIMO || c.FECHA || c.updated_at || c.created_at || 0).getTime() || 0;
+      const merged = nd >= od ? {...old,...c} : {...c,...old};
+      merged.SIN_LEER = Math.max(Number(old.SIN_LEER||0), Number(c.SIN_LEER||0));
+      merged.USER_COUNT = Math.max(Number(old.USER_COUNT||0), Number(c.USER_COUNT||0));
+      map.set(k, merged);
+    });
+    return [...map.values()];
+  }
+
+  function resumenPreview(texto, imagen){
+    if(imagen) return "📎 Imagen";
+    const t = String(texto || "").trim();
+    if(!t) return "";
+    if(t.startsWith("TRANSFER_CARD:")) return "💳 Tarjeta de transferencia enviada";
+    return t.length > 44 ? t.slice(0,44) + "..." : t;
+  }
+
+  function totalUnread(){
+    return (window.chats || chats || []).reduce((a,c)=>a + Number(window.getChatBadgeV8(chatIdOf(c)) || 0), 0);
+  }
+
+  window.updateBadgeChatLateralV8 = function(){
+    const total = totalUnread();
+    const badge = document.getElementById("badgeChat");
+    if(badge){
+      if(total > 0){
+        badge.classList.remove("hidden");
+        badge.textContent = total;
+      }else{
+        badge.classList.add("hidden");
+        badge.textContent = "0";
+      }
+    }
+    const stat = document.getElementById("statChats");
+    if(stat) stat.textContent = total;
+    return total;
+  };
+
+  function isChatVisible(){
+    const el = document.getElementById("viewChat");
+    return !!(el && !el.classList.contains("hidden"));
+  }
+
+  async function loadMensajesPc(){
+    const { data, error } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes_pc", {
+      p_session_token: requireSessionToken(),
+      p_pc_codigo: pcOperativa,
+      p_limit: 1500
+    });
+    if(error){
+      console.error("Error cargando chat_mensajes_pc:", error);
+      return [];
+    }
+    return data || [];
+  }
+
+  window.cargarChats = async function(silencioso=false){
+    const { data: sesiones, error } = await supabaseClient.rpc("panel_operativo_get_chat_sesiones", {
+      p_session_token: requireSessionToken(),
+      p_pc_codigo: pcOperativa
+    });
+
+    if(error){
+      console.error("Error cargando chat_sesiones RPC:", error);
       return;
     }
 
-    const oldDate = new Date(old.FECHA_ULTIMO || old.ultimo_mensaje || old.created_at || old.FECHA || 0).getTime() || 0;
-    const newDate = new Date(c.FECHA_ULTIMO || c.ultimo_mensaje || c.created_at || c.FECHA || 0).getTime() || 0;
+    const mensajes = await loadMensajesPc();
+    let nuevos = 0;
 
-    // Conserva el más nuevo y suma contadores si existían duplicados raros.
-    const merged = newDate >= oldDate ? {...old, ...c} : {...c, ...old};
-    merged.SIN_LEER = Math.max(Number(old.SIN_LEER || 0), Number(c.SIN_LEER || 0));
-    merged.USER_COUNT = Math.max(Number(old.USER_COUNT || 0), Number(c.USER_COUNT || 0));
-    map.set(k, merged);
-  });
+    const next = (sesiones || []).map(c=>{
+      const id = String(c.chat_id || c.id || "");
+      const ms = mensajes.filter(m => String(m.chat_id) === id);
+      const ultimo = ms.length ? ms[ms.length - 1] : null;
+      const userCount = countUserMessages(ms);
 
-  return [...map.values()];
-}
+      // Base: si ya lo vio, usa readCount. Si no, cuenta todo lo del usuario.
+      const readCount = (typeof getChatReadCount === "function") ? Number(getChatReadCount(id) || 0) : 0;
+      const prev = S.lastUserCount[id] !== undefined ? Number(S.lastUserCount[id] || 0) : readCount;
 
-function chatBadgeKeyV6(chatId){
-  return "nodo_chat_badge_v6_" + String(pcOperativa || "") + "_" + String(chatId || "");
-}
+      let badge = window.getChatBadgeV8(id);
 
-function getChatBadgeV6(chatId){
-  const mem = __chatBadgeCountById[String(chatId)];
-  if(mem !== undefined) return Number(mem || 0);
-  return Number(localStorage.getItem(chatBadgeKeyV6(chatId)) || 0);
-}
-
-function setChatBadgeV6(chatId, count){
-  const n = Math.max(0, Number(count || 0));
-  __chatBadgeCountById[String(chatId)] = n;
-  localStorage.setItem(chatBadgeKeyV6(chatId), String(n));
-}
-
-function clearChatBadgeV6(chatId){
-  setChatBadgeV6(chatId, 0);
-}
-
-function userMsgCountFromMensajesV6(ms){
-  return (ms || []).filter(m => String(m.tipo_emisor || m.emisor || "").toUpperCase() === "USUARIO").length;
-}
-
-function resumenMensajeChatPreviewV6(texto, imagen){
-  if(imagen) return "📎 Imagen";
-  const t = String(texto || "").trim();
-  if(!t) return "";
-  if(t.startsWith("TRANSFER_CARD:")) return "💳 Tarjeta de transferencia enviada";
-  return t.length > 42 ? t.slice(0,42) + "..." : t;
-}
-
-async function cargarChats(silencioso=false){
-  const { data: sesiones, error } = await supabaseClient.rpc("panel_operativo_get_chat_sesiones", {
-    p_session_token: requireSessionToken(),
-    p_pc_codigo: pcOperativa
-  });
-
-  if(error){
-    console.error("Error cargando chat_sesiones RPC:", error);
-    return;
-  }
-
-  const { data: mensajesData, error: errorMensajes } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes_pc", {
-    p_session_token: requireSessionToken(),
-    p_pc_codigo: pcOperativa,
-    p_limit: 1500
-  });
-
-  const mensajes = errorMensajes ? [] : (mensajesData || []);
-
-  if(errorMensajes){
-    console.error("Error cargando chat_mensajes RPC:", errorMensajes);
-  }
-
-  const prevBadgeTotal = Object.values(__chatBadgeCountById || {}).reduce((a,b)=>a+Number(b||0),0);
-  let nuevosParaAvisar = 0;
-
-  let nextChats = (sesiones || []).map(c => {
-    const chatId = String(c.chat_id || c.id || "");
-    const ms = mensajes.filter(m => String(m.chat_id) === chatId);
-    const ultimo = ms.length ? ms[ms.length - 1] : null;
-
-    const userCount = userMsgCountFromMensajesV6(ms);
-    const prevUserCount = Number(__chatLastUserCountById[chatId] ?? getChatReadCount(chatId) ?? 0);
-
-    let badge = getChatBadgeV6(chatId);
-
-    // Si aumentó la cantidad de mensajes del USUARIO, hay respuesta nueva.
-    // Esto aplica aunque el chat esté actualmente abierto.
-    if(userCount > prevUserCount){
-      const delta = userCount - prevUserCount;
-      badge += delta;
-      nuevosParaAvisar += delta;
-      setChatBadgeV6(chatId, badge);
-    }
-
-    __chatLastUserCountById[chatId] = userCount;
-
-    const chatObj = {
-      ID_CHAT: chatId,
-      chat_id: chatId,
-      USUARIO: c.usuario || "Usuario",
-      NOMBRE_COMPLETO: c.nombre_completo || c.usuario || "",
-      TELEFONO: c.telefono || "",
-      FECHA: c.created_at,
-      FECHA_ULTIMO: ultimo?.created_at || c.ultimo_mensaje || c.updated_at || c.created_at,
-      ULTIMO_MENSAJE: resumenMensajeChatPreviewV6(ultimo?.mensaje || "", ultimo?.imagen_url || ""),
-      SIN_LEER: badge,
-      USER_COUNT: userCount,
-      SOLICITUD_ID: c.solicitud_id || "",
-      ESTADO: c.estado || "ABIERTO",
-      PC: c.pc_codigo || pcOperativa
-    };
-
-    return chatObj;
-  });
-
-  chats = dedupeChatsV6(nextChats);
-
-  // Si el chat está abierto y tiene badge, igual debe verse el 1 hasta que el operador haga foco/click en ese chat.
-  // Si se está viendo y ya se llamó cargarChatActual desde abrirChat, se limpia desde abrirChat/cargarChatActual manual.
-  renderChatList();
-  renderInicio();
-
-  if(nuevosParaAvisar > 0 && silencioso){
-    try{
-      toast(`💬 ${nuevosParaAvisar} mensaje/s nuevo/s de usuario`, "blue");
-      if(typeof sonidoNotificacion === "function") sonidoNotificacion();
-      else {
-        const audio = new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=");
-        audio.play().catch(()=>{});
+      if(userCount > prev){
+        const delta = userCount - prev;
+        badge += delta;
+        nuevos += delta;
+        window.setChatBadgeV8(id, badge);
       }
-    }catch(e){}
-  }
 
-  if(!silencioso){
-    console.log("Chats cargados por RPC:", chats.length);
-  }
-}
+      S.lastUserCount[id] = userCount;
 
-async function abrirChat(id){
-  chatActualId = String(id || "");
-
-  // Abrir chat = atendido. Limpia badge visual.
-  clearChatBadgeV6(chatActualId);
-
-  const c = chats.find(x => String(x.ID_CHAT || x.chat_id) === chatActualId) || {};
-  setBox("chatTitulo", `
-    <span>${escapeHtml(c.USUARIO || "Usuario")}</span>
-    <button class="chat-icon-btn" title="Copiar usuario" onclick="copiarTextoOperativo('${escapeAttr(c.USUARIO || "")}','Usuario')">📋</button>
-    <button class="chat-icon-btn" title="Info usuario" onclick="abrirInfoChatUsuario()">ℹ️</button>
-  `);
-  setBox("chatSubtitulo", `${formatFecha(c.FECHA_ULTIMO || c.FECHA || "")}`);
-  setBox("chatEstado", c.SOLICITUD_ID ? `Solicitud: ${escapeHtml(c.SOLICITUD_ID)}` : "-");
-
-  await cargarChatActual(true);
-
-  // Marcamos leído local y backend al abrir.
-  const ms = (chatMensajes || []).filter(m => String(m.chat_id) === chatActualId);
-  const userCount = userMsgCountFromMensajesV6(ms);
-  setChatReadCount(chatActualId, userCount);
-  __chatLastUserCountById[chatActualId] = userCount;
-  clearChatBadgeV6(chatActualId);
-
-  try{
-    await supabaseClient.rpc("panel_operativo_marcar_chat_leido", {
-      p_session_token: requireSessionToken(),
-      p_chat_id: chatActualId
-    });
-  }catch(e){
-    console.warn("No se pudo marcar leído backend:", e);
-  }
-
-  renderChatList();
-  renderInicio();
-}
-
-async function cargarChatActual(scroll=true){
-  if(!chatActualId) return;
-
-  // Primero traemos todos los mensajes por PC, porque esa RPC ya probó ser la más estable.
-  const { data: mensajesData, error: errorPc } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes_pc", {
-    p_session_token: requireSessionToken(),
-    p_pc_codigo: pcOperativa,
-    p_limit: 1500
-  });
-
-  if(errorPc){
-    console.error("Error cargando mensajes PC:", errorPc);
-  }
-
-  let mensajes = (mensajesData || []).filter(m => String(m.chat_id) === String(chatActualId));
-
-  // Fallback individual, solo si la cache por PC vino vacía.
-  if(!mensajes.length){
-    const { data, error } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes", {
-      p_session_token: requireSessionToken(),
-      p_chat_id: chatActualId
+      return {
+        ID_CHAT: id,
+        chat_id: id,
+        USUARIO: c.usuario || "Usuario",
+        NOMBRE_COMPLETO: c.nombre_completo || c.usuario || "",
+        TELEFONO: c.telefono || "",
+        FECHA: c.created_at,
+        FECHA_ULTIMO: ultimo?.created_at || c.ultimo_mensaje || c.updated_at || c.created_at,
+        ULTIMO_MENSAJE: resumenPreview(ultimo?.mensaje || "", ultimo?.imagen_url || ""),
+        SIN_LEER: badge,
+        USER_COUNT: userCount,
+        SOLICITUD_ID: c.solicitud_id || "",
+        ESTADO: c.estado || "ABIERTO",
+        PC: c.pc_codigo || pcOperativa
+      };
     });
 
-    if(error){
-      console.error("Error cargando mensajes chat individual:", error);
-    }else{
-      mensajes = data || [];
-    }
-  }
-
-  chatMensajes = mensajes || [];
-
-  // Si el operador está mirando este chat, se considera leído y se limpia badge.
-  const userCount = userMsgCountFromMensajesV6(chatMensajes);
-  setChatReadCount(chatActualId, userCount);
-  __chatLastUserCountById[chatActualId] = userCount;
-  clearChatBadgeV6(chatActualId);
-
-  renderChatMensajes();
-
-  try{
-    await supabaseClient.rpc("panel_operativo_marcar_chat_leido", {
-      p_session_token: requireSessionToken(),
-      p_chat_id: chatActualId
-    });
-  }catch(e){}
-
-  renderChatList();
-  renderInicio();
-
-  if(scroll){
-    const body = document.getElementById("chatBody");
-    if(body) body.scrollTop = body.scrollHeight;
-  }
-}
-
-function renderChatList(){
-  if(!chats.length){
-    setBox("chatList",`<div class="alert-box">No hay chats activos.</div>`);
-    return;
-  }
-
-  chats = dedupeChatsV6(chats).sort((a,b)=>{
-    return new Date(b.FECHA_ULTIMO || b.FECHA || 0) - new Date(a.FECHA_ULTIMO || a.FECHA || 0);
-  });
-
-  let html="";
-  chats.forEach(c=>{
-    const id = String(c.ID_CHAT || c.chat_id || "");
-    const unread = getChatBadgeV6(id);
-    const active = String(chatActualId || "") === id ? "active" : "";
-    html += `
-      <div class="chat-item ${active}" onclick="abrirChat('${escapeAttr(id)}')">
-        <div class="chat-item-title">
-          <div>
-            <b>${escapeHtml(c.USUARIO || "Usuario")}</b>
-            <div class="small">${formatFecha(c.FECHA_ULTIMO || c.FECHA || "")}</div>
-          </div>
-          ${unread ? `<span class="chat-unread">${unread}</span>` : ""}
-        </div>
-        <div class="small">${escapeHtml(c.ULTIMO_MENSAJE || "")}</div>
-      </div>
-    `;
-  });
-
-  setBox("chatList", html);
-}
-
-function renderChatMensajes(){
-  const body = document.getElementById("chatBody");
-  if(!body) return;
-
-  if(!chatMensajes || !chatMensajes.length){
-    body.innerHTML = `<div class="alert-box">Sin mensajes todavía.</div>`;
-    return;
-  }
-
-  body.innerHTML = chatMensajes.map(m=>{
-    const tipo = String(m.tipo_emisor || m.emisor || "").toUpperCase();
-    const cls = tipo === "USUARIO" ? "user" : "op";
-    const texto = String(m.mensaje || "");
-    const imagen = m.imagen_url || "";
-
-    let contenido = "";
-
-    if(texto.startsWith("TRANSFER_CARD:")){
-      contenido = renderTransferCardChat(texto.replace("TRANSFER_CARD:",""));
-    }else{
-      contenido = escapeHtml(texto);
-    }
-
-    if(imagen){
-      contenido += `<img src="${escapeAttr(imagen)}" alt="imagen chat">`;
-    }
-
-    return `
-      <div class="chat-msg ${cls}">
-        <div class="chat-bubble">${contenido}</div>
-        <div class="chat-meta">${formatearHoraChat(m.created_at || m.fecha || "")}</div>
-      </div>
-    `;
-  }).join("");
-}
-
-function abrirInfoChatUsuario(){
-  if(!chatActualId) return;
-  const c = chats.find(x=>String(x.ID_CHAT || x.chat_id) === String(chatActualId)) || {};
-  const solicitud = solicitudes.find(s => String(s.ID || s.SOLICITUD_ID || "") === String(c.SOLICITUD_ID || ""));
-
-  abrirModal("Info del chat", `
-    <div class="verify-box">
-      <div class="verify-title">👤 Usuario</div>
-      <div class="verify-grid">
-        ${verifyRow("Usuario", c.USUARIO || "-", "", true)}
-        ${verifyRow("Teléfono", c.TELEFONO || "-", "", true)}
-        ${verifyRow("Nombre", c.NOMBRE_COMPLETO || "-", "", false)}
-        ${verifyRow("PC", c.PC || pcOperativa || "-")}
-        ${verifyRow("Solicitud", c.SOLICITUD_ID || "-")}
-        ${verifyRow("Estado", c.ESTADO || "-")}
-      </div>
-    </div>
-    ${solicitud ? renderDatosSolicitudModal(solicitud) : ""}
-  `, async()=>cerrarModal(), "Cerrar");
-}
-
-function renderInicio(){
-  const pendientes=solicitudes.filter(esPendiente);
-  const retiros=pendientes.filter(s=>normalizar(s.TIPO_SOLICITUD||s.TIPO)==="RETIRO");
-  const unread=chats.reduce((a,c)=>a+getChatBadgeV6(c.ID_CHAT || c.chat_id),0);
-  const bil=billeteras.find(b=>normalizar(b.SELECCIONADA_MANUAL)==="SI") || billeteras.find(b=>normalizar(b.ACTIVA)==="SI") || {};
-  const hoy = solicitudes.filter(s=>esMismoDiaBA(s.FECHA_CREACION||s.FECHA));
-  setBox("statPendientes",pendientes.length);
-  setBox("statRetiros",`Retiros: ${retiros.length}`);
-  setBox("statSolicitudesHoy",hoy.length);
-  setBox("statSolicitudesTotalPc",`Total PC: ${solicitudes.length}`);
-  setBox("statChats",unread);
-  setBox("statBilletera",bil.NOMBRE_VISIBLE||bil.BILLETERA_NOMBRE||"-");
-  setBox("statBilleteraTipo",bil.TIPO?`${bil.TIPO} · ${bil.PC||pcOperativa}`:"-");
-  setBox("alertas",`
-    ${pendientes.length?`<div class="alert-box">🔔 Hay ${pendientes.length} solicitud/es pendiente/s.</div>`:""}
-    ${unread?`<div class="alert-box">💬 Hay ${unread} mensaje/s de chat sin leer.</div>`:""}
-  `);
-  setBox("resumenTurnosOperativo",resumenTurnosOperativoHTML(solicitudes));
-  setBox("tablaSolicitudesInicio",tablaSolicitudesHTML(pendientes.slice(0,40)));
-}
-
-function verificarChats(silencioso=true){
-  // V6 ya notifica en cargarChats por delta real de USER_COUNT.
-  const unread = chats.reduce((a,c)=>a+getChatBadgeV6(c.ID_CHAT || c.chat_id),0);
-  const badge=document.getElementById("badgeChat");
-  if(unread){
-    badge.classList.remove("hidden");
-    badge.textContent=unread;
-  }else{
-    badge.classList.add("hidden");
-  }
-  lastChatUnread = unread;
-}
-
-
-/* =========================================================
-   OPERATIVO CHAT NOTIFY V7 · BADGE LATERAL REAL
-   Corrige el caso final:
-   - Los mensajes nuevos de usuario se acumulan en el botón lateral "Chat".
-   - Si salís a Inicio, NO se limpian por tener chatActualId abierto.
-   - Si el chat ya existe, igual suma notificación nueva.
-   - La limpieza del badge ocurre cuando el operador abre/clickea el chat
-     o cuando responde.
-========================================================= */
-
-let __vistaOperativaActualV7 = window.__vistaOperativaActualV7 || "inicio";
-
-function isChatViewActiveV7(){
-  const el = document.getElementById("viewChat");
-  return !!(el && !el.classList.contains("hidden"));
-}
-
-function updateBadgeChatLateralV7(){
-  const total = (chats || []).reduce((a,c)=>a + Number(getChatBadgeV6(c.ID_CHAT || c.chat_id) || 0), 0);
-
-  const badge = document.getElementById("badgeChat");
-  if(badge){
-    if(total > 0){
-      badge.classList.remove("hidden");
-      badge.textContent = total;
-    }else{
-      badge.classList.add("hidden");
-      badge.textContent = "0";
-    }
-  }
-
-  const stat = document.getElementById("statChats");
-  if(stat) stat.textContent = total;
-
-  return total;
-}
-
-const __oldMostrarVistaV7 = typeof mostrarVista === "function" ? mostrarVista : null;
-function mostrarVista(vista){
-  __vistaOperativaActualV7 = String(vista || "").toLowerCase();
-  if(__oldMostrarVistaV7) __oldMostrarVistaV7(vista);
-  updateBadgeChatLateralV7();
-
-  // Si entra a chat pero no clickea ningún chat, no limpiamos nada.
-  // Solo se limpia al abrirChat(id).
-}
-
-async function cargarChats(silencioso=false){
-  const { data: sesiones, error } = await supabaseClient.rpc("panel_operativo_get_chat_sesiones", {
-    p_session_token: requireSessionToken(),
-    p_pc_codigo: pcOperativa
-  });
-
-  if(error){
-    console.error("Error cargando chat_sesiones RPC:", error);
-    return;
-  }
-
-  const { data: mensajesData, error: errorMensajes } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes_pc", {
-    p_session_token: requireSessionToken(),
-    p_pc_codigo: pcOperativa,
-    p_limit: 1500
-  });
-
-  const mensajes = errorMensajes ? [] : (mensajesData || []);
-
-  if(errorMensajes){
-    console.error("Error cargando chat_mensajes RPC:", errorMensajes);
-  }
-
-  let nuevosParaAvisar = 0;
-
-  let nextChats = (sesiones || []).map(c => {
-    const chatId = String(c.chat_id || c.id || "");
-    const ms = mensajes.filter(m => String(m.chat_id) === chatId);
-    const ultimo = ms.length ? ms[ms.length - 1] : null;
-
-    const userCount = userMsgCountFromMensajesV6(ms);
-    const readCount = getChatReadCount(chatId);
-
-    // Primera vez: si el operador ya lo abrió antes, usamos readCount.
-    // Si no lo abrió nunca, todos los mensajes de usuario cuentan como pendientes.
-    const prevUserCount = Number(
-      __chatLastUserCountById[chatId] !== undefined
-        ? __chatLastUserCountById[chatId]
-        : readCount
-    );
-
-    let badge = getChatBadgeV6(chatId);
-
-    // Si aumenta la cantidad de mensajes del usuario, SIEMPRE suma badge lateral.
-    // Aunque el chat esté abierto o aunque el chat ya exista.
-    if(userCount > prevUserCount){
-      const delta = userCount - prevUserCount;
-      badge += delta;
-      nuevosParaAvisar += delta;
-      setChatBadgeV6(chatId, badge);
-    }
-
-    // Actualizamos contador observado para no repetir notificación del mismo mensaje.
-    __chatLastUserCountById[chatId] = userCount;
-
-    return {
-      ID_CHAT: chatId,
-      chat_id: chatId,
-      USUARIO: c.usuario || "Usuario",
-      NOMBRE_COMPLETO: c.nombre_completo || c.usuario || "",
-      TELEFONO: c.telefono || "",
-      FECHA: c.created_at,
-      FECHA_ULTIMO: ultimo?.created_at || c.ultimo_mensaje || c.updated_at || c.created_at,
-      ULTIMO_MENSAJE: resumenMensajeChatPreviewV6(ultimo?.mensaje || "", ultimo?.imagen_url || ""),
-      SIN_LEER: badge,
-      USER_COUNT: userCount,
-      SOLICITUD_ID: c.solicitud_id || "",
-      ESTADO: c.estado || "ABIERTO",
-      PC: c.pc_codigo || pcOperativa
-    };
-  });
-
-  chats = dedupeChatsV6(nextChats);
-
-  renderChatList();
-  verificarChats(true);
-  renderInicio();
-  updateBadgeChatLateralV7();
-
-  if(nuevosParaAvisar > 0 && silencioso){
-    try{
-      toast(`💬 ${nuevosParaAvisar} mensaje/s nuevo/s de usuario`, "blue");
-      if(typeof sonidoNotificacion === "function"){
-        sonidoNotificacion();
-      }else{
-        const a = new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=");
-        a.play().catch(()=>{});
-      }
-    }catch(e){}
-  }
-
-  if(!silencioso){
-    console.log("Chats cargados por RPC:", chats.length);
-  }
-}
-
-async function abrirChat(id){
-  chatActualId = String(id || "");
-
-  const c = chats.find(x => String(x.ID_CHAT || x.chat_id) === chatActualId) || {};
-
-  setBox("chatTitulo", `
-    <span>${escapeHtml(c.USUARIO || "Usuario")}</span>
-    <button class="chat-icon-btn" title="Copiar usuario" onclick="copiarTextoOperativo('${escapeAttr(c.USUARIO || "")}','Usuario')">📋</button>
-    <button class="chat-icon-btn" title="Info usuario" onclick="abrirInfoChatUsuario()">ℹ️</button>
-  `);
-
-  setBox("chatSubtitulo", `${formatFecha(c.FECHA_ULTIMO || c.FECHA || "")}`);
-  setBox("chatEstado", c.SOLICITUD_ID ? `Solicitud: ${escapeHtml(c.SOLICITUD_ID)}` : "-");
-
-  await cargarChatActual(true);
-
-  // Abrir/clickear chat = atendido. Recién acá limpiamos badge.
-  const ms = (chatMensajes || []).filter(m => String(m.chat_id) === chatActualId);
-  const userCount = userMsgCountFromMensajesV6(ms);
-
-  setChatReadCount(chatActualId, userCount);
-  __chatLastUserCountById[chatActualId] = userCount;
-  clearChatBadgeV6(chatActualId);
-
-  try{
-    await supabaseClient.rpc("panel_operativo_marcar_chat_leido", {
-      p_session_token: requireSessionToken(),
-      p_chat_id: chatActualId
-    });
-  }catch(e){
-    console.warn("No se pudo marcar leído backend:", e);
-  }
-
-  renderChatList();
-  verificarChats(true);
-  renderInicio();
-  updateBadgeChatLateralV7();
-}
-
-async function cargarChatActual(scroll=true){
-  if(!chatActualId) return;
-
-  // Si el operador NO está en vista Chat, no tocamos mensajes ni limpiamos lectura.
-  // Esto evita que al volver a Inicio se borren notificaciones nuevas.
-  if(!isChatViewActiveV7()){
-    return;
-  }
-
-  const { data: mensajesData, error: errorPc } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes_pc", {
-    p_session_token: requireSessionToken(),
-    p_pc_codigo: pcOperativa,
-    p_limit: 1500
-  });
-
-  if(errorPc){
-    console.error("Error cargando mensajes PC:", errorPc);
-  }
-
-  let mensajes = (mensajesData || []).filter(m => String(m.chat_id) === String(chatActualId));
-
-  if(!mensajes.length){
-    const { data, error } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes", {
-      p_session_token: requireSessionToken(),
-      p_chat_id: chatActualId
-    });
-
-    if(error){
-      console.error("Error cargando mensajes chat individual:", error);
-    }else{
-      mensajes = data || [];
-    }
-  }
-
-  chatMensajes = mensajes || [];
-  renderChatMensajes();
-
-  // Importante: acá NO limpiamos badge automáticamente.
-  // Si llega un mensaje mientras el chat está abierto, queremos que el lateral Chat marque 1.
-  renderChatList();
-  verificarChats(true);
-  renderInicio();
-  updateBadgeChatLateralV7();
-
-  if(scroll){
-    const body = document.getElementById("chatBody");
-    if(body) body.scrollTop = body.scrollHeight;
-  }
-}
-
-function verificarChats(silencioso=true){
-  updateBadgeChatLateralV7();
-  lastChatUnread = (chats || []).reduce((a,c)=>a + Number(getChatBadgeV6(c.ID_CHAT || c.chat_id) || 0), 0);
-}
-
-function renderInicio(){
-  const pendientes=solicitudes.filter(esPendiente);
-  const retiros=pendientes.filter(s=>normalizar(s.TIPO_SOLICITUD||s.TIPO)==="RETIRO");
-  const unread=(chats || []).reduce((a,c)=>a+Number(getChatBadgeV6(c.ID_CHAT || c.chat_id)||0),0);
-  const bil=billeteras.find(b=>normalizar(b.SELECCIONADA_MANUAL)==="SI") || billeteras.find(b=>normalizar(b.ACTIVA)==="SI") || {};
-  const hoy = solicitudes.filter(s=>esMismoDiaBA(s.FECHA_CREACION||s.FECHA));
-
-  setBox("statPendientes",pendientes.length);
-  setBox("statRetiros",`Retiros: ${retiros.length}`);
-  setBox("statSolicitudesHoy",hoy.length);
-  setBox("statSolicitudesTotalPc",`Total PC: ${solicitudes.length}`);
-  setBox("statChats",unread);
-  setBox("statBilletera",bil.NOMBRE_VISIBLE||bil.BILLETERA_NOMBRE||"-");
-  setBox("statBilleteraTipo",bil.TIPO?`${bil.TIPO} · ${bil.PC||pcOperativa}`:"-");
-  setBox("alertas",`
-    ${pendientes.length?`<div class="alert-box">🔔 Hay ${pendientes.length} solicitud/es pendiente/s.</div>`:""}
-    ${unread?`<div class="alert-box">💬 Hay ${unread} mensaje/s de chat sin leer.</div>`:""}
-  `);
-  setBox("resumenTurnosOperativo",resumenTurnosOperativoHTML(solicitudes));
-  setBox("tablaSolicitudesInicio",tablaSolicitudesHTML(pendientes.slice(0,40)));
-  updateBadgeChatLateralV7();
-}
-
-const __oldEnviarChatV7 = typeof enviarChat === "function" ? enviarChat : null;
-async function enviarChat(){
-  if(__oldEnviarChatV7){
-    await __oldEnviarChatV7();
-  }
-
-  // Cuando el operador responde, se considera atendido el chat abierto.
-  if(chatActualId){
-    const ms = (chatMensajes || []).filter(m => String(m.chat_id) === String(chatActualId));
-    const userCount = userMsgCountFromMensajesV6(ms);
-
-    setChatReadCount(chatActualId, userCount);
-    __chatLastUserCountById[chatActualId] = userCount;
-    clearChatBadgeV6(chatActualId);
+    window.chats = chats = dedupe(next);
 
     renderChatList();
     verificarChats(true);
     renderInicio();
-    updateBadgeChatLateralV7();
+    window.updateBadgeChatLateralV8();
+
+    if(nuevos > 0 && silencioso){
+      try{
+        toast(`💬 ${nuevos} mensaje/s nuevo/s de usuario`, "blue");
+        if(typeof sonidoNotificacion === "function") sonidoNotificacion();
+      }catch(e){}
+    }
+
+    if(!silencioso) console.log("Chats cargados por RPC:", chats.length);
+  };
+
+  window.renderChatList = function(){
+    if(!chats || !chats.length){
+      setBox("chatList",`<div class="alert-box">No hay chats activos.</div>`);
+      window.updateBadgeChatLateralV8();
+      return;
+    }
+
+    chats = window.chats = dedupe(chats).sort((a,b)=>{
+      return new Date(b.FECHA_ULTIMO || b.FECHA || 0) - new Date(a.FECHA_ULTIMO || a.FECHA || 0);
+    });
+
+    let html = "";
+    chats.forEach(c=>{
+      const id = chatIdOf(c);
+      const unread = window.getChatBadgeV8(id);
+      const active = String(chatActualId || "") === id ? "active" : "";
+      html += `
+        <div class="chat-item clean-chat-item ${active}" onclick="abrirChat('${escapeAttr(id)}')">
+          <div>
+            <div class="chat-item-title" style="display:block">
+              <b>${escapeHtml(c.USUARIO || "Usuario")}</b>
+              <div class="small">${formatFecha(c.FECHA_ULTIMO || c.FECHA || "")}</div>
+            </div>
+            <div class="small">${escapeHtml(c.ULTIMO_MENSAJE || "")}</div>
+          </div>
+          ${unread ? `<span class="chat-unread">${unread}</span>` : ""}
+        </div>
+      `;
+    });
+
+    setBox("chatList", html);
+    window.updateBadgeChatLateralV8();
+  };
+
+  window.abrirChat = async function(id){
+    chatActualId = String(id || "");
+
+    const c = (chats || []).find(x => String(x.ID_CHAT || x.chat_id) === chatActualId) || {};
+
+    setBox("chatTitulo", `
+      <span>${escapeHtml(c.USUARIO || "Usuario")}</span>
+      <button class="chat-icon-btn" title="Copiar usuario" onclick="copiarTextoOperativo('${escapeAttr(c.USUARIO || "")}','Usuario')">📋</button>
+      <button class="chat-icon-btn" title="Info usuario" onclick="abrirInfoChatUsuario()">ℹ️</button>
+    `);
+    setBox("chatSubtitulo", `${formatFecha(c.FECHA_ULTIMO || c.FECHA || "")}`);
+    setBox("chatEstado", c.SOLICITUD_ID ? `Solicitud: ${escapeHtml(c.SOLICITUD_ID)}` : "-");
+
+    await cargarChatActual(true);
+
+    // Clic en chat = atendido: limpia badge.
+    const ms = (chatMensajes || []).filter(m => String(m.chat_id) === chatActualId);
+    const userCount = countUserMessages(ms);
+
+    if(typeof setChatReadCount === "function") setChatReadCount(chatActualId, userCount);
+    S.lastUserCount[chatActualId] = userCount;
+    window.clearChatBadgeV8(chatActualId);
+
+    try{
+      await supabaseClient.rpc("panel_operativo_marcar_chat_leido", {
+        p_session_token: requireSessionToken(),
+        p_chat_id: chatActualId
+      });
+    }catch(e){ console.warn("No se pudo marcar leído backend:", e); }
+
+    renderChatList();
+    verificarChats(true);
+    renderInicio();
+    window.updateBadgeChatLateralV8();
+  };
+
+  window.cargarChatActual = async function(scroll=true){
+    if(!chatActualId) return;
+
+    // Si está en Inicio u otra sección, NO cargamos/limpiamos el chat abierto anterior.
+    if(!isChatVisible()) return;
+
+    const mensajes = await loadMensajesPc();
+    let ms = mensajes.filter(m => String(m.chat_id) === String(chatActualId));
+
+    if(!ms.length){
+      const { data, error } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes", {
+        p_session_token: requireSessionToken(),
+        p_chat_id: chatActualId
+      });
+      if(error) console.error("Error cargando mensajes chat individual:", error);
+      else ms = data || [];
+    }
+
+    window.chatMensajes = chatMensajes = ms || [];
+    renderChatMensajes();
+
+    // No limpia badge automáticamente acá. Solo abrirChat o enviarChat.
+    renderChatList();
+    verificarChats(true);
+    renderInicio();
+    window.updateBadgeChatLateralV8();
+
+    if(scroll){
+      const body = document.getElementById("chatBody");
+      if(body) body.scrollTop = body.scrollHeight;
+    }
+  };
+
+  window.renderChatMensajes = function(){
+    const body = document.getElementById("chatBody");
+    if(!body) return;
+
+    if(!chatMensajes || !chatMensajes.length){
+      body.innerHTML = `<div class="alert-box">Sin mensajes todavía.</div>`;
+      return;
+    }
+
+    body.innerHTML = chatMensajes.map(m=>{
+      const tipo = String(m.tipo_emisor || m.emisor || "").toUpperCase();
+      const cls = tipo === "USUARIO" ? "user" : "op";
+      const texto = String(m.mensaje || "");
+      const imagen = m.imagen_url || "";
+      let contenido = "";
+
+      if(texto.startsWith("TRANSFER_CARD:") && typeof renderTransferCardChat === "function"){
+        contenido = renderTransferCardChat(texto.replace("TRANSFER_CARD:",""));
+      }else{
+        contenido = escapeHtml(texto);
+      }
+
+      if(imagen){
+        contenido += `<img src="${escapeAttr(imagen)}" alt="imagen chat">`;
+      }
+
+      return `
+        <div class="chat-msg ${cls}">
+          <div class="chat-bubble">${contenido}</div>
+          <div class="chat-meta">${formatearHoraChat(m.created_at || m.fecha || "")}</div>
+        </div>
+      `;
+    }).join("");
+  };
+
+  window.verificarChats = function(silencioso=true){
+    lastChatUnread = window.updateBadgeChatLateralV8();
+  };
+
+  window.renderInicio = function(){
+    const pendientes=solicitudes.filter(esPendiente);
+    const retiros=pendientes.filter(s=>normalizar(s.TIPO_SOLICITUD||s.TIPO)==="RETIRO");
+    const unread=totalUnread();
+    const bil=billeteras.find(b=>normalizar(b.SELECCIONADA_MANUAL)==="SI") || billeteras.find(b=>normalizar(b.ACTIVA)==="SI") || {};
+    const hoy = solicitudes.filter(s=>esMismoDiaBA(s.FECHA_CREACION||s.FECHA));
+
+    setBox("statPendientes",pendientes.length);
+    setBox("statRetiros",`Retiros: ${retiros.length}`);
+    setBox("statSolicitudesHoy",hoy.length);
+    setBox("statSolicitudesTotalPc",`Total PC: ${solicitudes.length}`);
+    setBox("statChats",unread);
+    setBox("statBilletera",bil.NOMBRE_VISIBLE||bil.BILLETERA_NOMBRE||"-");
+    setBox("statBilleteraTipo",bil.TIPO?`${bil.TIPO} · ${bil.PC||pcOperativa}`:"-");
+    setBox("alertas",`
+      ${pendientes.length?`<div class="alert-box">🔔 Hay ${pendientes.length} solicitud/es pendiente/s.</div>`:""}
+      ${unread?`<div class="alert-box">💬 Hay ${unread} mensaje/s de chat sin leer.</div>`:""}
+    `);
+    setBox("resumenTurnosOperativo",resumenTurnosOperativoHTML(solicitudes));
+    setBox("tablaSolicitudesInicio",tablaSolicitudesHTML(pendientes.slice(0,40)));
+    window.updateBadgeChatLateralV8();
+  };
+
+  window.abrirInfoChatUsuario = function(){
+    if(!chatActualId) return;
+    const c = (chats || []).find(x=>String(x.ID_CHAT || x.chat_id) === String(chatActualId)) || {};
+    const solicitud = (solicitudes || []).find(s => String(s.ID || s.SOLICITUD_ID || "") === String(c.SOLICITUD_ID || ""));
+
+    abrirModal("Info del chat", `
+      <div class="verify-box">
+        <div class="verify-title">👤 Usuario</div>
+        <div class="verify-grid">
+          ${verifyRow("Usuario", c.USUARIO || "-", "", true)}
+          ${verifyRow("Teléfono", c.TELEFONO || "-", "", true)}
+          ${verifyRow("Nombre", c.NOMBRE_COMPLETO || "-", "", false)}
+          ${verifyRow("PC", c.PC || pcOperativa || "-")}
+          ${verifyRow("Solicitud", c.SOLICITUD_ID || "-")}
+          ${verifyRow("Estado", c.ESTADO || "-")}
+        </div>
+      </div>
+      ${solicitud ? renderDatosSolicitudModal(solicitud) : ""}
+    `, async()=>cerrarModal(), "Cerrar");
+  };
+
+  if(!window.__mostrarVistaOriginalV8 && typeof window.mostrarVista === "function"){
+    window.__mostrarVistaOriginalV8 = window.mostrarVista;
   }
-}
+
+  window.mostrarVista = function(vista){
+    S.currentView = String(vista || "").toLowerCase();
+    if(typeof window.__mostrarVistaOriginalV8 === "function"){
+      window.__mostrarVistaOriginalV8(vista);
+    }
+    window.updateBadgeChatLateralV8();
+  };
+
+  if(!window.__enviarChatOriginalV8 && typeof window.enviarChat === "function"){
+    window.__enviarChatOriginalV8 = window.enviarChat;
+  }
+
+  window.enviarChat = async function(){
+    if(typeof window.__enviarChatOriginalV8 === "function"){
+      await window.__enviarChatOriginalV8();
+    }
+
+    // Responder = atendido, limpia badge de ese chat.
+    if(chatActualId){
+      const ms = (chatMensajes || []).filter(m => String(m.chat_id) === String(chatActualId));
+      const userCount = countUserMessages(ms);
+      if(typeof setChatReadCount === "function") setChatReadCount(chatActualId, userCount);
+      S.lastUserCount[chatActualId] = userCount;
+      window.clearChatBadgeV8(chatActualId);
+      renderChatList();
+      verificarChats(true);
+      renderInicio();
+      window.updateBadgeChatLateralV8();
+    }
+  };
+
+})();
 
 </script>
 
@@ -2610,674 +2353,415 @@ async function cerrarSesion(){
 }
 
 /* =========================================================
-   OPERATIVO CHAT NOTIFY V6
-   Corrige:
-   - Si el usuario responde en un chat ya abierto, vuelve a marcar badge 1.
-   - Mantiene sonido/toast.
-   - El badge representa mensajes de usuario nuevos no atendidos.
-   - Al hacer click/abrir el chat, se limpia el badge de ese chat.
-   - No crea chats duplicados: dedup por chat_id / solicitud_id / usuario+telefono.
+   OPERATIVO CHAT NOTIFY V8 · ESTABLE SIN REDECLARAR
+   - Sin let/const globales duplicados.
+   - Sin recursión en mostrarVista.
+   - Badge lateral Chat suma mensajes nuevos aunque estés en Inicio.
+   - Chat se limpia solo al abrir/clickearel chat o al responder.
+   - Carga mensajes desde RPC PC como fuente principal.
 ========================================================= */
+(function(){
+  const S = window.NODO_CHAT_V8 = window.NODO_CHAT_V8 || {
+    lastUserCount: {},
+    badgeCount: {},
+    currentView: "inicio",
+    installed: false
+  };
 
-let __chatLastUserCountById = window.__chatLastUserCountById || {};
-let __chatBadgeCountById = window.__chatBadgeCountById || {};
-let __chatKnownIds = window.__chatKnownIds || new Set();
+  function chatIdOf(c){
+    return String((c && (c.ID_CHAT || c.chat_id || c.id)) || "").trim();
+  }
 
-function chatKeyStable(c){
-  return String(
-    c?.chat_id ||
-    c?.ID_CHAT ||
-    c?.solicitud_id ||
-    c?.SOLICITUD_ID ||
-    ((c?.usuario || c?.USUARIO || "") + "|" + (c?.telefono || c?.TELEFONO || ""))
-  ).trim();
-}
+  function chatBadgeKey(chatId){
+    return "nodo_chat_badge_v8_" + String(window.pcOperativa || pcOperativa || "") + "_" + String(chatId || "");
+  }
 
-function dedupeChatsV6(lista){
-  const map = new Map();
+  window.getChatBadgeV8 = function(chatId){
+    const id = String(chatId || "");
+    if(S.badgeCount[id] !== undefined) return Number(S.badgeCount[id] || 0);
+    return Number(localStorage.getItem(chatBadgeKey(id)) || 0);
+  };
 
-  (lista || []).forEach(c=>{
-    const k = chatKeyStable(c);
-    if(!k) return;
+  window.setChatBadgeV8 = function(chatId, count){
+    const id = String(chatId || "");
+    const n = Math.max(0, Number(count || 0));
+    S.badgeCount[id] = n;
+    try{ localStorage.setItem(chatBadgeKey(id), String(n)); }catch(e){}
+  };
 
-    const old = map.get(k);
-    if(!old){
-      map.set(k, c);
+  window.clearChatBadgeV8 = function(chatId){
+    window.setChatBadgeV8(chatId, 0);
+  };
+
+  function countUserMessages(ms){
+    return (ms || []).filter(m => String(m.tipo_emisor || m.emisor || "").toUpperCase() === "USUARIO").length;
+  }
+
+  function stableKey(c){
+    return String(
+      c?.chat_id || c?.ID_CHAT || c?.id || c?.solicitud_id || c?.SOLICITUD_ID ||
+      ((c?.usuario || c?.USUARIO || "") + "|" + (c?.telefono || c?.TELEFONO || ""))
+    ).trim();
+  }
+
+  function dedupe(lista){
+    const map = new Map();
+    (lista || []).forEach(c=>{
+      const k = stableKey(c);
+      if(!k) return;
+      const old = map.get(k);
+      if(!old){
+        map.set(k,c);
+        return;
+      }
+      const od = new Date(old.FECHA_ULTIMO || old.FECHA || old.updated_at || old.created_at || 0).getTime() || 0;
+      const nd = new Date(c.FECHA_ULTIMO || c.FECHA || c.updated_at || c.created_at || 0).getTime() || 0;
+      const merged = nd >= od ? {...old,...c} : {...c,...old};
+      merged.SIN_LEER = Math.max(Number(old.SIN_LEER||0), Number(c.SIN_LEER||0));
+      merged.USER_COUNT = Math.max(Number(old.USER_COUNT||0), Number(c.USER_COUNT||0));
+      map.set(k, merged);
+    });
+    return [...map.values()];
+  }
+
+  function resumenPreview(texto, imagen){
+    if(imagen) return "📎 Imagen";
+    const t = String(texto || "").trim();
+    if(!t) return "";
+    if(t.startsWith("TRANSFER_CARD:")) return "💳 Tarjeta de transferencia enviada";
+    return t.length > 44 ? t.slice(0,44) + "..." : t;
+  }
+
+  function totalUnread(){
+    return (window.chats || chats || []).reduce((a,c)=>a + Number(window.getChatBadgeV8(chatIdOf(c)) || 0), 0);
+  }
+
+  window.updateBadgeChatLateralV8 = function(){
+    const total = totalUnread();
+    const badge = document.getElementById("badgeChat");
+    if(badge){
+      if(total > 0){
+        badge.classList.remove("hidden");
+        badge.textContent = total;
+      }else{
+        badge.classList.add("hidden");
+        badge.textContent = "0";
+      }
+    }
+    const stat = document.getElementById("statChats");
+    if(stat) stat.textContent = total;
+    return total;
+  };
+
+  function isChatVisible(){
+    const el = document.getElementById("viewChat");
+    return !!(el && !el.classList.contains("hidden"));
+  }
+
+  async function loadMensajesPc(){
+    const { data, error } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes_pc", {
+      p_session_token: requireSessionToken(),
+      p_pc_codigo: pcOperativa,
+      p_limit: 1500
+    });
+    if(error){
+      console.error("Error cargando chat_mensajes_pc:", error);
+      return [];
+    }
+    return data || [];
+  }
+
+  window.cargarChats = async function(silencioso=false){
+    const { data: sesiones, error } = await supabaseClient.rpc("panel_operativo_get_chat_sesiones", {
+      p_session_token: requireSessionToken(),
+      p_pc_codigo: pcOperativa
+    });
+
+    if(error){
+      console.error("Error cargando chat_sesiones RPC:", error);
       return;
     }
 
-    const oldDate = new Date(old.FECHA_ULTIMO || old.ultimo_mensaje || old.created_at || old.FECHA || 0).getTime() || 0;
-    const newDate = new Date(c.FECHA_ULTIMO || c.ultimo_mensaje || c.created_at || c.FECHA || 0).getTime() || 0;
+    const mensajes = await loadMensajesPc();
+    let nuevos = 0;
 
-    // Conserva el más nuevo y suma contadores si existían duplicados raros.
-    const merged = newDate >= oldDate ? {...old, ...c} : {...c, ...old};
-    merged.SIN_LEER = Math.max(Number(old.SIN_LEER || 0), Number(c.SIN_LEER || 0));
-    merged.USER_COUNT = Math.max(Number(old.USER_COUNT || 0), Number(c.USER_COUNT || 0));
-    map.set(k, merged);
-  });
+    const next = (sesiones || []).map(c=>{
+      const id = String(c.chat_id || c.id || "");
+      const ms = mensajes.filter(m => String(m.chat_id) === id);
+      const ultimo = ms.length ? ms[ms.length - 1] : null;
+      const userCount = countUserMessages(ms);
 
-  return [...map.values()];
-}
+      // Base: si ya lo vio, usa readCount. Si no, cuenta todo lo del usuario.
+      const readCount = (typeof getChatReadCount === "function") ? Number(getChatReadCount(id) || 0) : 0;
+      const prev = S.lastUserCount[id] !== undefined ? Number(S.lastUserCount[id] || 0) : readCount;
 
-function chatBadgeKeyV6(chatId){
-  return "nodo_chat_badge_v6_" + String(pcOperativa || "") + "_" + String(chatId || "");
-}
+      let badge = window.getChatBadgeV8(id);
 
-function getChatBadgeV6(chatId){
-  const mem = __chatBadgeCountById[String(chatId)];
-  if(mem !== undefined) return Number(mem || 0);
-  return Number(localStorage.getItem(chatBadgeKeyV6(chatId)) || 0);
-}
-
-function setChatBadgeV6(chatId, count){
-  const n = Math.max(0, Number(count || 0));
-  __chatBadgeCountById[String(chatId)] = n;
-  localStorage.setItem(chatBadgeKeyV6(chatId), String(n));
-}
-
-function clearChatBadgeV6(chatId){
-  setChatBadgeV6(chatId, 0);
-}
-
-function userMsgCountFromMensajesV6(ms){
-  return (ms || []).filter(m => String(m.tipo_emisor || m.emisor || "").toUpperCase() === "USUARIO").length;
-}
-
-function resumenMensajeChatPreviewV6(texto, imagen){
-  if(imagen) return "📎 Imagen";
-  const t = String(texto || "").trim();
-  if(!t) return "";
-  if(t.startsWith("TRANSFER_CARD:")) return "💳 Tarjeta de transferencia enviada";
-  return t.length > 42 ? t.slice(0,42) + "..." : t;
-}
-
-async function cargarChats(silencioso=false){
-  const { data: sesiones, error } = await supabaseClient.rpc("panel_operativo_get_chat_sesiones", {
-    p_session_token: requireSessionToken(),
-    p_pc_codigo: pcOperativa
-  });
-
-  if(error){
-    console.error("Error cargando chat_sesiones RPC:", error);
-    return;
-  }
-
-  const { data: mensajesData, error: errorMensajes } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes_pc", {
-    p_session_token: requireSessionToken(),
-    p_pc_codigo: pcOperativa,
-    p_limit: 1500
-  });
-
-  const mensajes = errorMensajes ? [] : (mensajesData || []);
-
-  if(errorMensajes){
-    console.error("Error cargando chat_mensajes RPC:", errorMensajes);
-  }
-
-  const prevBadgeTotal = Object.values(__chatBadgeCountById || {}).reduce((a,b)=>a+Number(b||0),0);
-  let nuevosParaAvisar = 0;
-
-  let nextChats = (sesiones || []).map(c => {
-    const chatId = String(c.chat_id || c.id || "");
-    const ms = mensajes.filter(m => String(m.chat_id) === chatId);
-    const ultimo = ms.length ? ms[ms.length - 1] : null;
-
-    const userCount = userMsgCountFromMensajesV6(ms);
-    const prevUserCount = Number(__chatLastUserCountById[chatId] ?? getChatReadCount(chatId) ?? 0);
-
-    let badge = getChatBadgeV6(chatId);
-
-    // Si aumentó la cantidad de mensajes del USUARIO, hay respuesta nueva.
-    // Esto aplica aunque el chat esté actualmente abierto.
-    if(userCount > prevUserCount){
-      const delta = userCount - prevUserCount;
-      badge += delta;
-      nuevosParaAvisar += delta;
-      setChatBadgeV6(chatId, badge);
-    }
-
-    __chatLastUserCountById[chatId] = userCount;
-
-    const chatObj = {
-      ID_CHAT: chatId,
-      chat_id: chatId,
-      USUARIO: c.usuario || "Usuario",
-      NOMBRE_COMPLETO: c.nombre_completo || c.usuario || "",
-      TELEFONO: c.telefono || "",
-      FECHA: c.created_at,
-      FECHA_ULTIMO: ultimo?.created_at || c.ultimo_mensaje || c.updated_at || c.created_at,
-      ULTIMO_MENSAJE: resumenMensajeChatPreviewV6(ultimo?.mensaje || "", ultimo?.imagen_url || ""),
-      SIN_LEER: badge,
-      USER_COUNT: userCount,
-      SOLICITUD_ID: c.solicitud_id || "",
-      ESTADO: c.estado || "ABIERTO",
-      PC: c.pc_codigo || pcOperativa
-    };
-
-    return chatObj;
-  });
-
-  chats = dedupeChatsV6(nextChats);
-
-  // Si el chat está abierto y tiene badge, igual debe verse el 1 hasta que el operador haga foco/click en ese chat.
-  // Si se está viendo y ya se llamó cargarChatActual desde abrirChat, se limpia desde abrirChat/cargarChatActual manual.
-  renderChatList();
-  renderInicio();
-
-  if(nuevosParaAvisar > 0 && silencioso){
-    try{
-      toast(`💬 ${nuevosParaAvisar} mensaje/s nuevo/s de usuario`, "blue");
-      if(typeof sonidoNotificacion === "function") sonidoNotificacion();
-      else {
-        const audio = new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=");
-        audio.play().catch(()=>{});
+      if(userCount > prev){
+        const delta = userCount - prev;
+        badge += delta;
+        nuevos += delta;
+        window.setChatBadgeV8(id, badge);
       }
-    }catch(e){}
-  }
 
-  if(!silencioso){
-    console.log("Chats cargados por RPC:", chats.length);
-  }
-}
+      S.lastUserCount[id] = userCount;
 
-async function abrirChat(id){
-  chatActualId = String(id || "");
-
-  // Abrir chat = atendido. Limpia badge visual.
-  clearChatBadgeV6(chatActualId);
-
-  const c = chats.find(x => String(x.ID_CHAT || x.chat_id) === chatActualId) || {};
-  setBox("chatTitulo", `
-    <span>${escapeHtml(c.USUARIO || "Usuario")}</span>
-    <button class="chat-icon-btn" title="Copiar usuario" onclick="copiarTextoOperativo('${escapeAttr(c.USUARIO || "")}','Usuario')">📋</button>
-    <button class="chat-icon-btn" title="Info usuario" onclick="abrirInfoChatUsuario()">ℹ️</button>
-  `);
-  setBox("chatSubtitulo", `${formatFecha(c.FECHA_ULTIMO || c.FECHA || "")}`);
-  setBox("chatEstado", c.SOLICITUD_ID ? `Solicitud: ${escapeHtml(c.SOLICITUD_ID)}` : "-");
-
-  await cargarChatActual(true);
-
-  // Marcamos leído local y backend al abrir.
-  const ms = (chatMensajes || []).filter(m => String(m.chat_id) === chatActualId);
-  const userCount = userMsgCountFromMensajesV6(ms);
-  setChatReadCount(chatActualId, userCount);
-  __chatLastUserCountById[chatActualId] = userCount;
-  clearChatBadgeV6(chatActualId);
-
-  try{
-    await supabaseClient.rpc("panel_operativo_marcar_chat_leido", {
-      p_session_token: requireSessionToken(),
-      p_chat_id: chatActualId
-    });
-  }catch(e){
-    console.warn("No se pudo marcar leído backend:", e);
-  }
-
-  renderChatList();
-  renderInicio();
-}
-
-async function cargarChatActual(scroll=true){
-  if(!chatActualId) return;
-
-  // Primero traemos todos los mensajes por PC, porque esa RPC ya probó ser la más estable.
-  const { data: mensajesData, error: errorPc } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes_pc", {
-    p_session_token: requireSessionToken(),
-    p_pc_codigo: pcOperativa,
-    p_limit: 1500
-  });
-
-  if(errorPc){
-    console.error("Error cargando mensajes PC:", errorPc);
-  }
-
-  let mensajes = (mensajesData || []).filter(m => String(m.chat_id) === String(chatActualId));
-
-  // Fallback individual, solo si la cache por PC vino vacía.
-  if(!mensajes.length){
-    const { data, error } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes", {
-      p_session_token: requireSessionToken(),
-      p_chat_id: chatActualId
+      return {
+        ID_CHAT: id,
+        chat_id: id,
+        USUARIO: c.usuario || "Usuario",
+        NOMBRE_COMPLETO: c.nombre_completo || c.usuario || "",
+        TELEFONO: c.telefono || "",
+        FECHA: c.created_at,
+        FECHA_ULTIMO: ultimo?.created_at || c.ultimo_mensaje || c.updated_at || c.created_at,
+        ULTIMO_MENSAJE: resumenPreview(ultimo?.mensaje || "", ultimo?.imagen_url || ""),
+        SIN_LEER: badge,
+        USER_COUNT: userCount,
+        SOLICITUD_ID: c.solicitud_id || "",
+        ESTADO: c.estado || "ABIERTO",
+        PC: c.pc_codigo || pcOperativa
+      };
     });
 
-    if(error){
-      console.error("Error cargando mensajes chat individual:", error);
-    }else{
-      mensajes = data || [];
-    }
-  }
-
-  chatMensajes = mensajes || [];
-
-  // Si el operador está mirando este chat, se considera leído y se limpia badge.
-  const userCount = userMsgCountFromMensajesV6(chatMensajes);
-  setChatReadCount(chatActualId, userCount);
-  __chatLastUserCountById[chatActualId] = userCount;
-  clearChatBadgeV6(chatActualId);
-
-  renderChatMensajes();
-
-  try{
-    await supabaseClient.rpc("panel_operativo_marcar_chat_leido", {
-      p_session_token: requireSessionToken(),
-      p_chat_id: chatActualId
-    });
-  }catch(e){}
-
-  renderChatList();
-  renderInicio();
-
-  if(scroll){
-    const body = document.getElementById("chatBody");
-    if(body) body.scrollTop = body.scrollHeight;
-  }
-}
-
-function renderChatList(){
-  if(!chats.length){
-    setBox("chatList",`<div class="alert-box">No hay chats activos.</div>`);
-    return;
-  }
-
-  chats = dedupeChatsV6(chats).sort((a,b)=>{
-    return new Date(b.FECHA_ULTIMO || b.FECHA || 0) - new Date(a.FECHA_ULTIMO || a.FECHA || 0);
-  });
-
-  let html="";
-  chats.forEach(c=>{
-    const id = String(c.ID_CHAT || c.chat_id || "");
-    const unread = getChatBadgeV6(id);
-    const active = String(chatActualId || "") === id ? "active" : "";
-    html += `
-      <div class="chat-item ${active}" onclick="abrirChat('${escapeAttr(id)}')">
-        <div class="chat-item-title">
-          <div>
-            <b>${escapeHtml(c.USUARIO || "Usuario")}</b>
-            <div class="small">${formatFecha(c.FECHA_ULTIMO || c.FECHA || "")}</div>
-          </div>
-          ${unread ? `<span class="chat-unread">${unread}</span>` : ""}
-        </div>
-        <div class="small">${escapeHtml(c.ULTIMO_MENSAJE || "")}</div>
-      </div>
-    `;
-  });
-
-  setBox("chatList", html);
-}
-
-function renderChatMensajes(){
-  const body = document.getElementById("chatBody");
-  if(!body) return;
-
-  if(!chatMensajes || !chatMensajes.length){
-    body.innerHTML = `<div class="alert-box">Sin mensajes todavía.</div>`;
-    return;
-  }
-
-  body.innerHTML = chatMensajes.map(m=>{
-    const tipo = String(m.tipo_emisor || m.emisor || "").toUpperCase();
-    const cls = tipo === "USUARIO" ? "user" : "op";
-    const texto = String(m.mensaje || "");
-    const imagen = m.imagen_url || "";
-
-    let contenido = "";
-
-    if(texto.startsWith("TRANSFER_CARD:")){
-      contenido = renderTransferCardChat(texto.replace("TRANSFER_CARD:",""));
-    }else{
-      contenido = escapeHtml(texto);
-    }
-
-    if(imagen){
-      contenido += `<img src="${escapeAttr(imagen)}" alt="imagen chat">`;
-    }
-
-    return `
-      <div class="chat-msg ${cls}">
-        <div class="chat-bubble">${contenido}</div>
-        <div class="chat-meta">${formatearHoraChat(m.created_at || m.fecha || "")}</div>
-      </div>
-    `;
-  }).join("");
-}
-
-function abrirInfoChatUsuario(){
-  if(!chatActualId) return;
-  const c = chats.find(x=>String(x.ID_CHAT || x.chat_id) === String(chatActualId)) || {};
-  const solicitud = solicitudes.find(s => String(s.ID || s.SOLICITUD_ID || "") === String(c.SOLICITUD_ID || ""));
-
-  abrirModal("Info del chat", `
-    <div class="verify-box">
-      <div class="verify-title">👤 Usuario</div>
-      <div class="verify-grid">
-        ${verifyRow("Usuario", c.USUARIO || "-", "", true)}
-        ${verifyRow("Teléfono", c.TELEFONO || "-", "", true)}
-        ${verifyRow("Nombre", c.NOMBRE_COMPLETO || "-", "", false)}
-        ${verifyRow("PC", c.PC || pcOperativa || "-")}
-        ${verifyRow("Solicitud", c.SOLICITUD_ID || "-")}
-        ${verifyRow("Estado", c.ESTADO || "-")}
-      </div>
-    </div>
-    ${solicitud ? renderDatosSolicitudModal(solicitud) : ""}
-  `, async()=>cerrarModal(), "Cerrar");
-}
-
-function renderInicio(){
-  const pendientes=solicitudes.filter(esPendiente);
-  const retiros=pendientes.filter(s=>normalizar(s.TIPO_SOLICITUD||s.TIPO)==="RETIRO");
-  const unread=chats.reduce((a,c)=>a+getChatBadgeV6(c.ID_CHAT || c.chat_id),0);
-  const bil=billeteras.find(b=>normalizar(b.SELECCIONADA_MANUAL)==="SI") || billeteras.find(b=>normalizar(b.ACTIVA)==="SI") || {};
-  const hoy = solicitudes.filter(s=>esMismoDiaBA(s.FECHA_CREACION||s.FECHA));
-  setBox("statPendientes",pendientes.length);
-  setBox("statRetiros",`Retiros: ${retiros.length}`);
-  setBox("statSolicitudesHoy",hoy.length);
-  setBox("statSolicitudesTotalPc",`Total PC: ${solicitudes.length}`);
-  setBox("statChats",unread);
-  setBox("statBilletera",bil.NOMBRE_VISIBLE||bil.BILLETERA_NOMBRE||"-");
-  setBox("statBilleteraTipo",bil.TIPO?`${bil.TIPO} · ${bil.PC||pcOperativa}`:"-");
-  setBox("alertas",`
-    ${pendientes.length?`<div class="alert-box">🔔 Hay ${pendientes.length} solicitud/es pendiente/s.</div>`:""}
-    ${unread?`<div class="alert-box">💬 Hay ${unread} mensaje/s de chat sin leer.</div>`:""}
-  `);
-  setBox("resumenTurnosOperativo",resumenTurnosOperativoHTML(solicitudes));
-  setBox("tablaSolicitudesInicio",tablaSolicitudesHTML(pendientes.slice(0,40)));
-}
-
-function verificarChats(silencioso=true){
-  // V6 ya notifica en cargarChats por delta real de USER_COUNT.
-  const unread = chats.reduce((a,c)=>a+getChatBadgeV6(c.ID_CHAT || c.chat_id),0);
-  const badge=document.getElementById("badgeChat");
-  if(unread){
-    badge.classList.remove("hidden");
-    badge.textContent=unread;
-  }else{
-    badge.classList.add("hidden");
-  }
-  lastChatUnread = unread;
-}
-
-
-/* =========================================================
-   OPERATIVO CHAT NOTIFY V7 · BADGE LATERAL REAL
-   Corrige el caso final:
-   - Los mensajes nuevos de usuario se acumulan en el botón lateral "Chat".
-   - Si salís a Inicio, NO se limpian por tener chatActualId abierto.
-   - Si el chat ya existe, igual suma notificación nueva.
-   - La limpieza del badge ocurre cuando el operador abre/clickea el chat
-     o cuando responde.
-========================================================= */
-
-let __vistaOperativaActualV7 = window.__vistaOperativaActualV7 || "inicio";
-
-function isChatViewActiveV7(){
-  const el = document.getElementById("viewChat");
-  return !!(el && !el.classList.contains("hidden"));
-}
-
-function updateBadgeChatLateralV7(){
-  const total = (chats || []).reduce((a,c)=>a + Number(getChatBadgeV6(c.ID_CHAT || c.chat_id) || 0), 0);
-
-  const badge = document.getElementById("badgeChat");
-  if(badge){
-    if(total > 0){
-      badge.classList.remove("hidden");
-      badge.textContent = total;
-    }else{
-      badge.classList.add("hidden");
-      badge.textContent = "0";
-    }
-  }
-
-  const stat = document.getElementById("statChats");
-  if(stat) stat.textContent = total;
-
-  return total;
-}
-
-const __oldMostrarVistaV7 = typeof mostrarVista === "function" ? mostrarVista : null;
-function mostrarVista(vista){
-  __vistaOperativaActualV7 = String(vista || "").toLowerCase();
-  if(__oldMostrarVistaV7) __oldMostrarVistaV7(vista);
-  updateBadgeChatLateralV7();
-
-  // Si entra a chat pero no clickea ningún chat, no limpiamos nada.
-  // Solo se limpia al abrirChat(id).
-}
-
-async function cargarChats(silencioso=false){
-  const { data: sesiones, error } = await supabaseClient.rpc("panel_operativo_get_chat_sesiones", {
-    p_session_token: requireSessionToken(),
-    p_pc_codigo: pcOperativa
-  });
-
-  if(error){
-    console.error("Error cargando chat_sesiones RPC:", error);
-    return;
-  }
-
-  const { data: mensajesData, error: errorMensajes } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes_pc", {
-    p_session_token: requireSessionToken(),
-    p_pc_codigo: pcOperativa,
-    p_limit: 1500
-  });
-
-  const mensajes = errorMensajes ? [] : (mensajesData || []);
-
-  if(errorMensajes){
-    console.error("Error cargando chat_mensajes RPC:", errorMensajes);
-  }
-
-  let nuevosParaAvisar = 0;
-
-  let nextChats = (sesiones || []).map(c => {
-    const chatId = String(c.chat_id || c.id || "");
-    const ms = mensajes.filter(m => String(m.chat_id) === chatId);
-    const ultimo = ms.length ? ms[ms.length - 1] : null;
-
-    const userCount = userMsgCountFromMensajesV6(ms);
-    const readCount = getChatReadCount(chatId);
-
-    // Primera vez: si el operador ya lo abrió antes, usamos readCount.
-    // Si no lo abrió nunca, todos los mensajes de usuario cuentan como pendientes.
-    const prevUserCount = Number(
-      __chatLastUserCountById[chatId] !== undefined
-        ? __chatLastUserCountById[chatId]
-        : readCount
-    );
-
-    let badge = getChatBadgeV6(chatId);
-
-    // Si aumenta la cantidad de mensajes del usuario, SIEMPRE suma badge lateral.
-    // Aunque el chat esté abierto o aunque el chat ya exista.
-    if(userCount > prevUserCount){
-      const delta = userCount - prevUserCount;
-      badge += delta;
-      nuevosParaAvisar += delta;
-      setChatBadgeV6(chatId, badge);
-    }
-
-    // Actualizamos contador observado para no repetir notificación del mismo mensaje.
-    __chatLastUserCountById[chatId] = userCount;
-
-    return {
-      ID_CHAT: chatId,
-      chat_id: chatId,
-      USUARIO: c.usuario || "Usuario",
-      NOMBRE_COMPLETO: c.nombre_completo || c.usuario || "",
-      TELEFONO: c.telefono || "",
-      FECHA: c.created_at,
-      FECHA_ULTIMO: ultimo?.created_at || c.ultimo_mensaje || c.updated_at || c.created_at,
-      ULTIMO_MENSAJE: resumenMensajeChatPreviewV6(ultimo?.mensaje || "", ultimo?.imagen_url || ""),
-      SIN_LEER: badge,
-      USER_COUNT: userCount,
-      SOLICITUD_ID: c.solicitud_id || "",
-      ESTADO: c.estado || "ABIERTO",
-      PC: c.pc_codigo || pcOperativa
-    };
-  });
-
-  chats = dedupeChatsV6(nextChats);
-
-  renderChatList();
-  verificarChats(true);
-  renderInicio();
-  updateBadgeChatLateralV7();
-
-  if(nuevosParaAvisar > 0 && silencioso){
-    try{
-      toast(`💬 ${nuevosParaAvisar} mensaje/s nuevo/s de usuario`, "blue");
-      if(typeof sonidoNotificacion === "function"){
-        sonidoNotificacion();
-      }else{
-        const a = new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=");
-        a.play().catch(()=>{});
-      }
-    }catch(e){}
-  }
-
-  if(!silencioso){
-    console.log("Chats cargados por RPC:", chats.length);
-  }
-}
-
-async function abrirChat(id){
-  chatActualId = String(id || "");
-
-  const c = chats.find(x => String(x.ID_CHAT || x.chat_id) === chatActualId) || {};
-
-  setBox("chatTitulo", `
-    <span>${escapeHtml(c.USUARIO || "Usuario")}</span>
-    <button class="chat-icon-btn" title="Copiar usuario" onclick="copiarTextoOperativo('${escapeAttr(c.USUARIO || "")}','Usuario')">📋</button>
-    <button class="chat-icon-btn" title="Info usuario" onclick="abrirInfoChatUsuario()">ℹ️</button>
-  `);
-
-  setBox("chatSubtitulo", `${formatFecha(c.FECHA_ULTIMO || c.FECHA || "")}`);
-  setBox("chatEstado", c.SOLICITUD_ID ? `Solicitud: ${escapeHtml(c.SOLICITUD_ID)}` : "-");
-
-  await cargarChatActual(true);
-
-  // Abrir/clickear chat = atendido. Recién acá limpiamos badge.
-  const ms = (chatMensajes || []).filter(m => String(m.chat_id) === chatActualId);
-  const userCount = userMsgCountFromMensajesV6(ms);
-
-  setChatReadCount(chatActualId, userCount);
-  __chatLastUserCountById[chatActualId] = userCount;
-  clearChatBadgeV6(chatActualId);
-
-  try{
-    await supabaseClient.rpc("panel_operativo_marcar_chat_leido", {
-      p_session_token: requireSessionToken(),
-      p_chat_id: chatActualId
-    });
-  }catch(e){
-    console.warn("No se pudo marcar leído backend:", e);
-  }
-
-  renderChatList();
-  verificarChats(true);
-  renderInicio();
-  updateBadgeChatLateralV7();
-}
-
-async function cargarChatActual(scroll=true){
-  if(!chatActualId) return;
-
-  // Si el operador NO está en vista Chat, no tocamos mensajes ni limpiamos lectura.
-  // Esto evita que al volver a Inicio se borren notificaciones nuevas.
-  if(!isChatViewActiveV7()){
-    return;
-  }
-
-  const { data: mensajesData, error: errorPc } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes_pc", {
-    p_session_token: requireSessionToken(),
-    p_pc_codigo: pcOperativa,
-    p_limit: 1500
-  });
-
-  if(errorPc){
-    console.error("Error cargando mensajes PC:", errorPc);
-  }
-
-  let mensajes = (mensajesData || []).filter(m => String(m.chat_id) === String(chatActualId));
-
-  if(!mensajes.length){
-    const { data, error } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes", {
-      p_session_token: requireSessionToken(),
-      p_chat_id: chatActualId
-    });
-
-    if(error){
-      console.error("Error cargando mensajes chat individual:", error);
-    }else{
-      mensajes = data || [];
-    }
-  }
-
-  chatMensajes = mensajes || [];
-  renderChatMensajes();
-
-  // Importante: acá NO limpiamos badge automáticamente.
-  // Si llega un mensaje mientras el chat está abierto, queremos que el lateral Chat marque 1.
-  renderChatList();
-  verificarChats(true);
-  renderInicio();
-  updateBadgeChatLateralV7();
-
-  if(scroll){
-    const body = document.getElementById("chatBody");
-    if(body) body.scrollTop = body.scrollHeight;
-  }
-}
-
-function verificarChats(silencioso=true){
-  updateBadgeChatLateralV7();
-  lastChatUnread = (chats || []).reduce((a,c)=>a + Number(getChatBadgeV6(c.ID_CHAT || c.chat_id) || 0), 0);
-}
-
-function renderInicio(){
-  const pendientes=solicitudes.filter(esPendiente);
-  const retiros=pendientes.filter(s=>normalizar(s.TIPO_SOLICITUD||s.TIPO)==="RETIRO");
-  const unread=(chats || []).reduce((a,c)=>a+Number(getChatBadgeV6(c.ID_CHAT || c.chat_id)||0),0);
-  const bil=billeteras.find(b=>normalizar(b.SELECCIONADA_MANUAL)==="SI") || billeteras.find(b=>normalizar(b.ACTIVA)==="SI") || {};
-  const hoy = solicitudes.filter(s=>esMismoDiaBA(s.FECHA_CREACION||s.FECHA));
-
-  setBox("statPendientes",pendientes.length);
-  setBox("statRetiros",`Retiros: ${retiros.length}`);
-  setBox("statSolicitudesHoy",hoy.length);
-  setBox("statSolicitudesTotalPc",`Total PC: ${solicitudes.length}`);
-  setBox("statChats",unread);
-  setBox("statBilletera",bil.NOMBRE_VISIBLE||bil.BILLETERA_NOMBRE||"-");
-  setBox("statBilleteraTipo",bil.TIPO?`${bil.TIPO} · ${bil.PC||pcOperativa}`:"-");
-  setBox("alertas",`
-    ${pendientes.length?`<div class="alert-box">🔔 Hay ${pendientes.length} solicitud/es pendiente/s.</div>`:""}
-    ${unread?`<div class="alert-box">💬 Hay ${unread} mensaje/s de chat sin leer.</div>`:""}
-  `);
-  setBox("resumenTurnosOperativo",resumenTurnosOperativoHTML(solicitudes));
-  setBox("tablaSolicitudesInicio",tablaSolicitudesHTML(pendientes.slice(0,40)));
-  updateBadgeChatLateralV7();
-}
-
-const __oldEnviarChatV7 = typeof enviarChat === "function" ? enviarChat : null;
-async function enviarChat(){
-  if(__oldEnviarChatV7){
-    await __oldEnviarChatV7();
-  }
-
-  // Cuando el operador responde, se considera atendido el chat abierto.
-  if(chatActualId){
-    const ms = (chatMensajes || []).filter(m => String(m.chat_id) === String(chatActualId));
-    const userCount = userMsgCountFromMensajesV6(ms);
-
-    setChatReadCount(chatActualId, userCount);
-    __chatLastUserCountById[chatActualId] = userCount;
-    clearChatBadgeV6(chatActualId);
+    window.chats = chats = dedupe(next);
 
     renderChatList();
     verificarChats(true);
     renderInicio();
-    updateBadgeChatLateralV7();
+    window.updateBadgeChatLateralV8();
+
+    if(nuevos > 0 && silencioso){
+      try{
+        toast(`💬 ${nuevos} mensaje/s nuevo/s de usuario`, "blue");
+        if(typeof sonidoNotificacion === "function") sonidoNotificacion();
+      }catch(e){}
+    }
+
+    if(!silencioso) console.log("Chats cargados por RPC:", chats.length);
+  };
+
+  window.renderChatList = function(){
+    if(!chats || !chats.length){
+      setBox("chatList",`<div class="alert-box">No hay chats activos.</div>`);
+      window.updateBadgeChatLateralV8();
+      return;
+    }
+
+    chats = window.chats = dedupe(chats).sort((a,b)=>{
+      return new Date(b.FECHA_ULTIMO || b.FECHA || 0) - new Date(a.FECHA_ULTIMO || a.FECHA || 0);
+    });
+
+    let html = "";
+    chats.forEach(c=>{
+      const id = chatIdOf(c);
+      const unread = window.getChatBadgeV8(id);
+      const active = String(chatActualId || "") === id ? "active" : "";
+      html += `
+        <div class="chat-item clean-chat-item ${active}" onclick="abrirChat('${escapeAttr(id)}')">
+          <div>
+            <div class="chat-item-title" style="display:block">
+              <b>${escapeHtml(c.USUARIO || "Usuario")}</b>
+              <div class="small">${formatFecha(c.FECHA_ULTIMO || c.FECHA || "")}</div>
+            </div>
+            <div class="small">${escapeHtml(c.ULTIMO_MENSAJE || "")}</div>
+          </div>
+          ${unread ? `<span class="chat-unread">${unread}</span>` : ""}
+        </div>
+      `;
+    });
+
+    setBox("chatList", html);
+    window.updateBadgeChatLateralV8();
+  };
+
+  window.abrirChat = async function(id){
+    chatActualId = String(id || "");
+
+    const c = (chats || []).find(x => String(x.ID_CHAT || x.chat_id) === chatActualId) || {};
+
+    setBox("chatTitulo", `
+      <span>${escapeHtml(c.USUARIO || "Usuario")}</span>
+      <button class="chat-icon-btn" title="Copiar usuario" onclick="copiarTextoOperativo('${escapeAttr(c.USUARIO || "")}','Usuario')">📋</button>
+      <button class="chat-icon-btn" title="Info usuario" onclick="abrirInfoChatUsuario()">ℹ️</button>
+    `);
+    setBox("chatSubtitulo", `${formatFecha(c.FECHA_ULTIMO || c.FECHA || "")}`);
+    setBox("chatEstado", c.SOLICITUD_ID ? `Solicitud: ${escapeHtml(c.SOLICITUD_ID)}` : "-");
+
+    await cargarChatActual(true);
+
+    // Clic en chat = atendido: limpia badge.
+    const ms = (chatMensajes || []).filter(m => String(m.chat_id) === chatActualId);
+    const userCount = countUserMessages(ms);
+
+    if(typeof setChatReadCount === "function") setChatReadCount(chatActualId, userCount);
+    S.lastUserCount[chatActualId] = userCount;
+    window.clearChatBadgeV8(chatActualId);
+
+    try{
+      await supabaseClient.rpc("panel_operativo_marcar_chat_leido", {
+        p_session_token: requireSessionToken(),
+        p_chat_id: chatActualId
+      });
+    }catch(e){ console.warn("No se pudo marcar leído backend:", e); }
+
+    renderChatList();
+    verificarChats(true);
+    renderInicio();
+    window.updateBadgeChatLateralV8();
+  };
+
+  window.cargarChatActual = async function(scroll=true){
+    if(!chatActualId) return;
+
+    // Si está en Inicio u otra sección, NO cargamos/limpiamos el chat abierto anterior.
+    if(!isChatVisible()) return;
+
+    const mensajes = await loadMensajesPc();
+    let ms = mensajes.filter(m => String(m.chat_id) === String(chatActualId));
+
+    if(!ms.length){
+      const { data, error } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes", {
+        p_session_token: requireSessionToken(),
+        p_chat_id: chatActualId
+      });
+      if(error) console.error("Error cargando mensajes chat individual:", error);
+      else ms = data || [];
+    }
+
+    window.chatMensajes = chatMensajes = ms || [];
+    renderChatMensajes();
+
+    // No limpia badge automáticamente acá. Solo abrirChat o enviarChat.
+    renderChatList();
+    verificarChats(true);
+    renderInicio();
+    window.updateBadgeChatLateralV8();
+
+    if(scroll){
+      const body = document.getElementById("chatBody");
+      if(body) body.scrollTop = body.scrollHeight;
+    }
+  };
+
+  window.renderChatMensajes = function(){
+    const body = document.getElementById("chatBody");
+    if(!body) return;
+
+    if(!chatMensajes || !chatMensajes.length){
+      body.innerHTML = `<div class="alert-box">Sin mensajes todavía.</div>`;
+      return;
+    }
+
+    body.innerHTML = chatMensajes.map(m=>{
+      const tipo = String(m.tipo_emisor || m.emisor || "").toUpperCase();
+      const cls = tipo === "USUARIO" ? "user" : "op";
+      const texto = String(m.mensaje || "");
+      const imagen = m.imagen_url || "";
+      let contenido = "";
+
+      if(texto.startsWith("TRANSFER_CARD:") && typeof renderTransferCardChat === "function"){
+        contenido = renderTransferCardChat(texto.replace("TRANSFER_CARD:",""));
+      }else{
+        contenido = escapeHtml(texto);
+      }
+
+      if(imagen){
+        contenido += `<img src="${escapeAttr(imagen)}" alt="imagen chat">`;
+      }
+
+      return `
+        <div class="chat-msg ${cls}">
+          <div class="chat-bubble">${contenido}</div>
+          <div class="chat-meta">${formatearHoraChat(m.created_at || m.fecha || "")}</div>
+        </div>
+      `;
+    }).join("");
+  };
+
+  window.verificarChats = function(silencioso=true){
+    lastChatUnread = window.updateBadgeChatLateralV8();
+  };
+
+  window.renderInicio = function(){
+    const pendientes=solicitudes.filter(esPendiente);
+    const retiros=pendientes.filter(s=>normalizar(s.TIPO_SOLICITUD||s.TIPO)==="RETIRO");
+    const unread=totalUnread();
+    const bil=billeteras.find(b=>normalizar(b.SELECCIONADA_MANUAL)==="SI") || billeteras.find(b=>normalizar(b.ACTIVA)==="SI") || {};
+    const hoy = solicitudes.filter(s=>esMismoDiaBA(s.FECHA_CREACION||s.FECHA));
+
+    setBox("statPendientes",pendientes.length);
+    setBox("statRetiros",`Retiros: ${retiros.length}`);
+    setBox("statSolicitudesHoy",hoy.length);
+    setBox("statSolicitudesTotalPc",`Total PC: ${solicitudes.length}`);
+    setBox("statChats",unread);
+    setBox("statBilletera",bil.NOMBRE_VISIBLE||bil.BILLETERA_NOMBRE||"-");
+    setBox("statBilleteraTipo",bil.TIPO?`${bil.TIPO} · ${bil.PC||pcOperativa}`:"-");
+    setBox("alertas",`
+      ${pendientes.length?`<div class="alert-box">🔔 Hay ${pendientes.length} solicitud/es pendiente/s.</div>`:""}
+      ${unread?`<div class="alert-box">💬 Hay ${unread} mensaje/s de chat sin leer.</div>`:""}
+    `);
+    setBox("resumenTurnosOperativo",resumenTurnosOperativoHTML(solicitudes));
+    setBox("tablaSolicitudesInicio",tablaSolicitudesHTML(pendientes.slice(0,40)));
+    window.updateBadgeChatLateralV8();
+  };
+
+  window.abrirInfoChatUsuario = function(){
+    if(!chatActualId) return;
+    const c = (chats || []).find(x=>String(x.ID_CHAT || x.chat_id) === String(chatActualId)) || {};
+    const solicitud = (solicitudes || []).find(s => String(s.ID || s.SOLICITUD_ID || "") === String(c.SOLICITUD_ID || ""));
+
+    abrirModal("Info del chat", `
+      <div class="verify-box">
+        <div class="verify-title">👤 Usuario</div>
+        <div class="verify-grid">
+          ${verifyRow("Usuario", c.USUARIO || "-", "", true)}
+          ${verifyRow("Teléfono", c.TELEFONO || "-", "", true)}
+          ${verifyRow("Nombre", c.NOMBRE_COMPLETO || "-", "", false)}
+          ${verifyRow("PC", c.PC || pcOperativa || "-")}
+          ${verifyRow("Solicitud", c.SOLICITUD_ID || "-")}
+          ${verifyRow("Estado", c.ESTADO || "-")}
+        </div>
+      </div>
+      ${solicitud ? renderDatosSolicitudModal(solicitud) : ""}
+    `, async()=>cerrarModal(), "Cerrar");
+  };
+
+  if(!window.__mostrarVistaOriginalV8 && typeof window.mostrarVista === "function"){
+    window.__mostrarVistaOriginalV8 = window.mostrarVista;
   }
-}
+
+  window.mostrarVista = function(vista){
+    S.currentView = String(vista || "").toLowerCase();
+    if(typeof window.__mostrarVistaOriginalV8 === "function"){
+      window.__mostrarVistaOriginalV8(vista);
+    }
+    window.updateBadgeChatLateralV8();
+  };
+
+  if(!window.__enviarChatOriginalV8 && typeof window.enviarChat === "function"){
+    window.__enviarChatOriginalV8 = window.enviarChat;
+  }
+
+  window.enviarChat = async function(){
+    if(typeof window.__enviarChatOriginalV8 === "function"){
+      await window.__enviarChatOriginalV8();
+    }
+
+    // Responder = atendido, limpia badge de ese chat.
+    if(chatActualId){
+      const ms = (chatMensajes || []).filter(m => String(m.chat_id) === String(chatActualId));
+      const userCount = countUserMessages(ms);
+      if(typeof setChatReadCount === "function") setChatReadCount(chatActualId, userCount);
+      S.lastUserCount[chatActualId] = userCount;
+      window.clearChatBadgeV8(chatActualId);
+      renderChatList();
+      verificarChats(true);
+      renderInicio();
+      window.updateBadgeChatLateralV8();
+    }
+  };
+
+})();
 
 </script>
 
@@ -3349,674 +2833,415 @@ async function enviarChat(){
 })();
 
 /* =========================================================
-   OPERATIVO CHAT NOTIFY V6
-   Corrige:
-   - Si el usuario responde en un chat ya abierto, vuelve a marcar badge 1.
-   - Mantiene sonido/toast.
-   - El badge representa mensajes de usuario nuevos no atendidos.
-   - Al hacer click/abrir el chat, se limpia el badge de ese chat.
-   - No crea chats duplicados: dedup por chat_id / solicitud_id / usuario+telefono.
+   OPERATIVO CHAT NOTIFY V8 · ESTABLE SIN REDECLARAR
+   - Sin let/const globales duplicados.
+   - Sin recursión en mostrarVista.
+   - Badge lateral Chat suma mensajes nuevos aunque estés en Inicio.
+   - Chat se limpia solo al abrir/clickearel chat o al responder.
+   - Carga mensajes desde RPC PC como fuente principal.
 ========================================================= */
+(function(){
+  const S = window.NODO_CHAT_V8 = window.NODO_CHAT_V8 || {
+    lastUserCount: {},
+    badgeCount: {},
+    currentView: "inicio",
+    installed: false
+  };
 
-let __chatLastUserCountById = window.__chatLastUserCountById || {};
-let __chatBadgeCountById = window.__chatBadgeCountById || {};
-let __chatKnownIds = window.__chatKnownIds || new Set();
+  function chatIdOf(c){
+    return String((c && (c.ID_CHAT || c.chat_id || c.id)) || "").trim();
+  }
 
-function chatKeyStable(c){
-  return String(
-    c?.chat_id ||
-    c?.ID_CHAT ||
-    c?.solicitud_id ||
-    c?.SOLICITUD_ID ||
-    ((c?.usuario || c?.USUARIO || "") + "|" + (c?.telefono || c?.TELEFONO || ""))
-  ).trim();
-}
+  function chatBadgeKey(chatId){
+    return "nodo_chat_badge_v8_" + String(window.pcOperativa || pcOperativa || "") + "_" + String(chatId || "");
+  }
 
-function dedupeChatsV6(lista){
-  const map = new Map();
+  window.getChatBadgeV8 = function(chatId){
+    const id = String(chatId || "");
+    if(S.badgeCount[id] !== undefined) return Number(S.badgeCount[id] || 0);
+    return Number(localStorage.getItem(chatBadgeKey(id)) || 0);
+  };
 
-  (lista || []).forEach(c=>{
-    const k = chatKeyStable(c);
-    if(!k) return;
+  window.setChatBadgeV8 = function(chatId, count){
+    const id = String(chatId || "");
+    const n = Math.max(0, Number(count || 0));
+    S.badgeCount[id] = n;
+    try{ localStorage.setItem(chatBadgeKey(id), String(n)); }catch(e){}
+  };
 
-    const old = map.get(k);
-    if(!old){
-      map.set(k, c);
+  window.clearChatBadgeV8 = function(chatId){
+    window.setChatBadgeV8(chatId, 0);
+  };
+
+  function countUserMessages(ms){
+    return (ms || []).filter(m => String(m.tipo_emisor || m.emisor || "").toUpperCase() === "USUARIO").length;
+  }
+
+  function stableKey(c){
+    return String(
+      c?.chat_id || c?.ID_CHAT || c?.id || c?.solicitud_id || c?.SOLICITUD_ID ||
+      ((c?.usuario || c?.USUARIO || "") + "|" + (c?.telefono || c?.TELEFONO || ""))
+    ).trim();
+  }
+
+  function dedupe(lista){
+    const map = new Map();
+    (lista || []).forEach(c=>{
+      const k = stableKey(c);
+      if(!k) return;
+      const old = map.get(k);
+      if(!old){
+        map.set(k,c);
+        return;
+      }
+      const od = new Date(old.FECHA_ULTIMO || old.FECHA || old.updated_at || old.created_at || 0).getTime() || 0;
+      const nd = new Date(c.FECHA_ULTIMO || c.FECHA || c.updated_at || c.created_at || 0).getTime() || 0;
+      const merged = nd >= od ? {...old,...c} : {...c,...old};
+      merged.SIN_LEER = Math.max(Number(old.SIN_LEER||0), Number(c.SIN_LEER||0));
+      merged.USER_COUNT = Math.max(Number(old.USER_COUNT||0), Number(c.USER_COUNT||0));
+      map.set(k, merged);
+    });
+    return [...map.values()];
+  }
+
+  function resumenPreview(texto, imagen){
+    if(imagen) return "📎 Imagen";
+    const t = String(texto || "").trim();
+    if(!t) return "";
+    if(t.startsWith("TRANSFER_CARD:")) return "💳 Tarjeta de transferencia enviada";
+    return t.length > 44 ? t.slice(0,44) + "..." : t;
+  }
+
+  function totalUnread(){
+    return (window.chats || chats || []).reduce((a,c)=>a + Number(window.getChatBadgeV8(chatIdOf(c)) || 0), 0);
+  }
+
+  window.updateBadgeChatLateralV8 = function(){
+    const total = totalUnread();
+    const badge = document.getElementById("badgeChat");
+    if(badge){
+      if(total > 0){
+        badge.classList.remove("hidden");
+        badge.textContent = total;
+      }else{
+        badge.classList.add("hidden");
+        badge.textContent = "0";
+      }
+    }
+    const stat = document.getElementById("statChats");
+    if(stat) stat.textContent = total;
+    return total;
+  };
+
+  function isChatVisible(){
+    const el = document.getElementById("viewChat");
+    return !!(el && !el.classList.contains("hidden"));
+  }
+
+  async function loadMensajesPc(){
+    const { data, error } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes_pc", {
+      p_session_token: requireSessionToken(),
+      p_pc_codigo: pcOperativa,
+      p_limit: 1500
+    });
+    if(error){
+      console.error("Error cargando chat_mensajes_pc:", error);
+      return [];
+    }
+    return data || [];
+  }
+
+  window.cargarChats = async function(silencioso=false){
+    const { data: sesiones, error } = await supabaseClient.rpc("panel_operativo_get_chat_sesiones", {
+      p_session_token: requireSessionToken(),
+      p_pc_codigo: pcOperativa
+    });
+
+    if(error){
+      console.error("Error cargando chat_sesiones RPC:", error);
       return;
     }
 
-    const oldDate = new Date(old.FECHA_ULTIMO || old.ultimo_mensaje || old.created_at || old.FECHA || 0).getTime() || 0;
-    const newDate = new Date(c.FECHA_ULTIMO || c.ultimo_mensaje || c.created_at || c.FECHA || 0).getTime() || 0;
+    const mensajes = await loadMensajesPc();
+    let nuevos = 0;
 
-    // Conserva el más nuevo y suma contadores si existían duplicados raros.
-    const merged = newDate >= oldDate ? {...old, ...c} : {...c, ...old};
-    merged.SIN_LEER = Math.max(Number(old.SIN_LEER || 0), Number(c.SIN_LEER || 0));
-    merged.USER_COUNT = Math.max(Number(old.USER_COUNT || 0), Number(c.USER_COUNT || 0));
-    map.set(k, merged);
-  });
+    const next = (sesiones || []).map(c=>{
+      const id = String(c.chat_id || c.id || "");
+      const ms = mensajes.filter(m => String(m.chat_id) === id);
+      const ultimo = ms.length ? ms[ms.length - 1] : null;
+      const userCount = countUserMessages(ms);
 
-  return [...map.values()];
-}
+      // Base: si ya lo vio, usa readCount. Si no, cuenta todo lo del usuario.
+      const readCount = (typeof getChatReadCount === "function") ? Number(getChatReadCount(id) || 0) : 0;
+      const prev = S.lastUserCount[id] !== undefined ? Number(S.lastUserCount[id] || 0) : readCount;
 
-function chatBadgeKeyV6(chatId){
-  return "nodo_chat_badge_v6_" + String(pcOperativa || "") + "_" + String(chatId || "");
-}
+      let badge = window.getChatBadgeV8(id);
 
-function getChatBadgeV6(chatId){
-  const mem = __chatBadgeCountById[String(chatId)];
-  if(mem !== undefined) return Number(mem || 0);
-  return Number(localStorage.getItem(chatBadgeKeyV6(chatId)) || 0);
-}
-
-function setChatBadgeV6(chatId, count){
-  const n = Math.max(0, Number(count || 0));
-  __chatBadgeCountById[String(chatId)] = n;
-  localStorage.setItem(chatBadgeKeyV6(chatId), String(n));
-}
-
-function clearChatBadgeV6(chatId){
-  setChatBadgeV6(chatId, 0);
-}
-
-function userMsgCountFromMensajesV6(ms){
-  return (ms || []).filter(m => String(m.tipo_emisor || m.emisor || "").toUpperCase() === "USUARIO").length;
-}
-
-function resumenMensajeChatPreviewV6(texto, imagen){
-  if(imagen) return "📎 Imagen";
-  const t = String(texto || "").trim();
-  if(!t) return "";
-  if(t.startsWith("TRANSFER_CARD:")) return "💳 Tarjeta de transferencia enviada";
-  return t.length > 42 ? t.slice(0,42) + "..." : t;
-}
-
-async function cargarChats(silencioso=false){
-  const { data: sesiones, error } = await supabaseClient.rpc("panel_operativo_get_chat_sesiones", {
-    p_session_token: requireSessionToken(),
-    p_pc_codigo: pcOperativa
-  });
-
-  if(error){
-    console.error("Error cargando chat_sesiones RPC:", error);
-    return;
-  }
-
-  const { data: mensajesData, error: errorMensajes } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes_pc", {
-    p_session_token: requireSessionToken(),
-    p_pc_codigo: pcOperativa,
-    p_limit: 1500
-  });
-
-  const mensajes = errorMensajes ? [] : (mensajesData || []);
-
-  if(errorMensajes){
-    console.error("Error cargando chat_mensajes RPC:", errorMensajes);
-  }
-
-  const prevBadgeTotal = Object.values(__chatBadgeCountById || {}).reduce((a,b)=>a+Number(b||0),0);
-  let nuevosParaAvisar = 0;
-
-  let nextChats = (sesiones || []).map(c => {
-    const chatId = String(c.chat_id || c.id || "");
-    const ms = mensajes.filter(m => String(m.chat_id) === chatId);
-    const ultimo = ms.length ? ms[ms.length - 1] : null;
-
-    const userCount = userMsgCountFromMensajesV6(ms);
-    const prevUserCount = Number(__chatLastUserCountById[chatId] ?? getChatReadCount(chatId) ?? 0);
-
-    let badge = getChatBadgeV6(chatId);
-
-    // Si aumentó la cantidad de mensajes del USUARIO, hay respuesta nueva.
-    // Esto aplica aunque el chat esté actualmente abierto.
-    if(userCount > prevUserCount){
-      const delta = userCount - prevUserCount;
-      badge += delta;
-      nuevosParaAvisar += delta;
-      setChatBadgeV6(chatId, badge);
-    }
-
-    __chatLastUserCountById[chatId] = userCount;
-
-    const chatObj = {
-      ID_CHAT: chatId,
-      chat_id: chatId,
-      USUARIO: c.usuario || "Usuario",
-      NOMBRE_COMPLETO: c.nombre_completo || c.usuario || "",
-      TELEFONO: c.telefono || "",
-      FECHA: c.created_at,
-      FECHA_ULTIMO: ultimo?.created_at || c.ultimo_mensaje || c.updated_at || c.created_at,
-      ULTIMO_MENSAJE: resumenMensajeChatPreviewV6(ultimo?.mensaje || "", ultimo?.imagen_url || ""),
-      SIN_LEER: badge,
-      USER_COUNT: userCount,
-      SOLICITUD_ID: c.solicitud_id || "",
-      ESTADO: c.estado || "ABIERTO",
-      PC: c.pc_codigo || pcOperativa
-    };
-
-    return chatObj;
-  });
-
-  chats = dedupeChatsV6(nextChats);
-
-  // Si el chat está abierto y tiene badge, igual debe verse el 1 hasta que el operador haga foco/click en ese chat.
-  // Si se está viendo y ya se llamó cargarChatActual desde abrirChat, se limpia desde abrirChat/cargarChatActual manual.
-  renderChatList();
-  renderInicio();
-
-  if(nuevosParaAvisar > 0 && silencioso){
-    try{
-      toast(`💬 ${nuevosParaAvisar} mensaje/s nuevo/s de usuario`, "blue");
-      if(typeof sonidoNotificacion === "function") sonidoNotificacion();
-      else {
-        const audio = new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=");
-        audio.play().catch(()=>{});
+      if(userCount > prev){
+        const delta = userCount - prev;
+        badge += delta;
+        nuevos += delta;
+        window.setChatBadgeV8(id, badge);
       }
-    }catch(e){}
-  }
 
-  if(!silencioso){
-    console.log("Chats cargados por RPC:", chats.length);
-  }
-}
+      S.lastUserCount[id] = userCount;
 
-async function abrirChat(id){
-  chatActualId = String(id || "");
-
-  // Abrir chat = atendido. Limpia badge visual.
-  clearChatBadgeV6(chatActualId);
-
-  const c = chats.find(x => String(x.ID_CHAT || x.chat_id) === chatActualId) || {};
-  setBox("chatTitulo", `
-    <span>${escapeHtml(c.USUARIO || "Usuario")}</span>
-    <button class="chat-icon-btn" title="Copiar usuario" onclick="copiarTextoOperativo('${escapeAttr(c.USUARIO || "")}','Usuario')">📋</button>
-    <button class="chat-icon-btn" title="Info usuario" onclick="abrirInfoChatUsuario()">ℹ️</button>
-  `);
-  setBox("chatSubtitulo", `${formatFecha(c.FECHA_ULTIMO || c.FECHA || "")}`);
-  setBox("chatEstado", c.SOLICITUD_ID ? `Solicitud: ${escapeHtml(c.SOLICITUD_ID)}` : "-");
-
-  await cargarChatActual(true);
-
-  // Marcamos leído local y backend al abrir.
-  const ms = (chatMensajes || []).filter(m => String(m.chat_id) === chatActualId);
-  const userCount = userMsgCountFromMensajesV6(ms);
-  setChatReadCount(chatActualId, userCount);
-  __chatLastUserCountById[chatActualId] = userCount;
-  clearChatBadgeV6(chatActualId);
-
-  try{
-    await supabaseClient.rpc("panel_operativo_marcar_chat_leido", {
-      p_session_token: requireSessionToken(),
-      p_chat_id: chatActualId
-    });
-  }catch(e){
-    console.warn("No se pudo marcar leído backend:", e);
-  }
-
-  renderChatList();
-  renderInicio();
-}
-
-async function cargarChatActual(scroll=true){
-  if(!chatActualId) return;
-
-  // Primero traemos todos los mensajes por PC, porque esa RPC ya probó ser la más estable.
-  const { data: mensajesData, error: errorPc } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes_pc", {
-    p_session_token: requireSessionToken(),
-    p_pc_codigo: pcOperativa,
-    p_limit: 1500
-  });
-
-  if(errorPc){
-    console.error("Error cargando mensajes PC:", errorPc);
-  }
-
-  let mensajes = (mensajesData || []).filter(m => String(m.chat_id) === String(chatActualId));
-
-  // Fallback individual, solo si la cache por PC vino vacía.
-  if(!mensajes.length){
-    const { data, error } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes", {
-      p_session_token: requireSessionToken(),
-      p_chat_id: chatActualId
+      return {
+        ID_CHAT: id,
+        chat_id: id,
+        USUARIO: c.usuario || "Usuario",
+        NOMBRE_COMPLETO: c.nombre_completo || c.usuario || "",
+        TELEFONO: c.telefono || "",
+        FECHA: c.created_at,
+        FECHA_ULTIMO: ultimo?.created_at || c.ultimo_mensaje || c.updated_at || c.created_at,
+        ULTIMO_MENSAJE: resumenPreview(ultimo?.mensaje || "", ultimo?.imagen_url || ""),
+        SIN_LEER: badge,
+        USER_COUNT: userCount,
+        SOLICITUD_ID: c.solicitud_id || "",
+        ESTADO: c.estado || "ABIERTO",
+        PC: c.pc_codigo || pcOperativa
+      };
     });
 
-    if(error){
-      console.error("Error cargando mensajes chat individual:", error);
-    }else{
-      mensajes = data || [];
-    }
-  }
-
-  chatMensajes = mensajes || [];
-
-  // Si el operador está mirando este chat, se considera leído y se limpia badge.
-  const userCount = userMsgCountFromMensajesV6(chatMensajes);
-  setChatReadCount(chatActualId, userCount);
-  __chatLastUserCountById[chatActualId] = userCount;
-  clearChatBadgeV6(chatActualId);
-
-  renderChatMensajes();
-
-  try{
-    await supabaseClient.rpc("panel_operativo_marcar_chat_leido", {
-      p_session_token: requireSessionToken(),
-      p_chat_id: chatActualId
-    });
-  }catch(e){}
-
-  renderChatList();
-  renderInicio();
-
-  if(scroll){
-    const body = document.getElementById("chatBody");
-    if(body) body.scrollTop = body.scrollHeight;
-  }
-}
-
-function renderChatList(){
-  if(!chats.length){
-    setBox("chatList",`<div class="alert-box">No hay chats activos.</div>`);
-    return;
-  }
-
-  chats = dedupeChatsV6(chats).sort((a,b)=>{
-    return new Date(b.FECHA_ULTIMO || b.FECHA || 0) - new Date(a.FECHA_ULTIMO || a.FECHA || 0);
-  });
-
-  let html="";
-  chats.forEach(c=>{
-    const id = String(c.ID_CHAT || c.chat_id || "");
-    const unread = getChatBadgeV6(id);
-    const active = String(chatActualId || "") === id ? "active" : "";
-    html += `
-      <div class="chat-item ${active}" onclick="abrirChat('${escapeAttr(id)}')">
-        <div class="chat-item-title">
-          <div>
-            <b>${escapeHtml(c.USUARIO || "Usuario")}</b>
-            <div class="small">${formatFecha(c.FECHA_ULTIMO || c.FECHA || "")}</div>
-          </div>
-          ${unread ? `<span class="chat-unread">${unread}</span>` : ""}
-        </div>
-        <div class="small">${escapeHtml(c.ULTIMO_MENSAJE || "")}</div>
-      </div>
-    `;
-  });
-
-  setBox("chatList", html);
-}
-
-function renderChatMensajes(){
-  const body = document.getElementById("chatBody");
-  if(!body) return;
-
-  if(!chatMensajes || !chatMensajes.length){
-    body.innerHTML = `<div class="alert-box">Sin mensajes todavía.</div>`;
-    return;
-  }
-
-  body.innerHTML = chatMensajes.map(m=>{
-    const tipo = String(m.tipo_emisor || m.emisor || "").toUpperCase();
-    const cls = tipo === "USUARIO" ? "user" : "op";
-    const texto = String(m.mensaje || "");
-    const imagen = m.imagen_url || "";
-
-    let contenido = "";
-
-    if(texto.startsWith("TRANSFER_CARD:")){
-      contenido = renderTransferCardChat(texto.replace("TRANSFER_CARD:",""));
-    }else{
-      contenido = escapeHtml(texto);
-    }
-
-    if(imagen){
-      contenido += `<img src="${escapeAttr(imagen)}" alt="imagen chat">`;
-    }
-
-    return `
-      <div class="chat-msg ${cls}">
-        <div class="chat-bubble">${contenido}</div>
-        <div class="chat-meta">${formatearHoraChat(m.created_at || m.fecha || "")}</div>
-      </div>
-    `;
-  }).join("");
-}
-
-function abrirInfoChatUsuario(){
-  if(!chatActualId) return;
-  const c = chats.find(x=>String(x.ID_CHAT || x.chat_id) === String(chatActualId)) || {};
-  const solicitud = solicitudes.find(s => String(s.ID || s.SOLICITUD_ID || "") === String(c.SOLICITUD_ID || ""));
-
-  abrirModal("Info del chat", `
-    <div class="verify-box">
-      <div class="verify-title">👤 Usuario</div>
-      <div class="verify-grid">
-        ${verifyRow("Usuario", c.USUARIO || "-", "", true)}
-        ${verifyRow("Teléfono", c.TELEFONO || "-", "", true)}
-        ${verifyRow("Nombre", c.NOMBRE_COMPLETO || "-", "", false)}
-        ${verifyRow("PC", c.PC || pcOperativa || "-")}
-        ${verifyRow("Solicitud", c.SOLICITUD_ID || "-")}
-        ${verifyRow("Estado", c.ESTADO || "-")}
-      </div>
-    </div>
-    ${solicitud ? renderDatosSolicitudModal(solicitud) : ""}
-  `, async()=>cerrarModal(), "Cerrar");
-}
-
-function renderInicio(){
-  const pendientes=solicitudes.filter(esPendiente);
-  const retiros=pendientes.filter(s=>normalizar(s.TIPO_SOLICITUD||s.TIPO)==="RETIRO");
-  const unread=chats.reduce((a,c)=>a+getChatBadgeV6(c.ID_CHAT || c.chat_id),0);
-  const bil=billeteras.find(b=>normalizar(b.SELECCIONADA_MANUAL)==="SI") || billeteras.find(b=>normalizar(b.ACTIVA)==="SI") || {};
-  const hoy = solicitudes.filter(s=>esMismoDiaBA(s.FECHA_CREACION||s.FECHA));
-  setBox("statPendientes",pendientes.length);
-  setBox("statRetiros",`Retiros: ${retiros.length}`);
-  setBox("statSolicitudesHoy",hoy.length);
-  setBox("statSolicitudesTotalPc",`Total PC: ${solicitudes.length}`);
-  setBox("statChats",unread);
-  setBox("statBilletera",bil.NOMBRE_VISIBLE||bil.BILLETERA_NOMBRE||"-");
-  setBox("statBilleteraTipo",bil.TIPO?`${bil.TIPO} · ${bil.PC||pcOperativa}`:"-");
-  setBox("alertas",`
-    ${pendientes.length?`<div class="alert-box">🔔 Hay ${pendientes.length} solicitud/es pendiente/s.</div>`:""}
-    ${unread?`<div class="alert-box">💬 Hay ${unread} mensaje/s de chat sin leer.</div>`:""}
-  `);
-  setBox("resumenTurnosOperativo",resumenTurnosOperativoHTML(solicitudes));
-  setBox("tablaSolicitudesInicio",tablaSolicitudesHTML(pendientes.slice(0,40)));
-}
-
-function verificarChats(silencioso=true){
-  // V6 ya notifica en cargarChats por delta real de USER_COUNT.
-  const unread = chats.reduce((a,c)=>a+getChatBadgeV6(c.ID_CHAT || c.chat_id),0);
-  const badge=document.getElementById("badgeChat");
-  if(unread){
-    badge.classList.remove("hidden");
-    badge.textContent=unread;
-  }else{
-    badge.classList.add("hidden");
-  }
-  lastChatUnread = unread;
-}
-
-
-/* =========================================================
-   OPERATIVO CHAT NOTIFY V7 · BADGE LATERAL REAL
-   Corrige el caso final:
-   - Los mensajes nuevos de usuario se acumulan en el botón lateral "Chat".
-   - Si salís a Inicio, NO se limpian por tener chatActualId abierto.
-   - Si el chat ya existe, igual suma notificación nueva.
-   - La limpieza del badge ocurre cuando el operador abre/clickea el chat
-     o cuando responde.
-========================================================= */
-
-let __vistaOperativaActualV7 = window.__vistaOperativaActualV7 || "inicio";
-
-function isChatViewActiveV7(){
-  const el = document.getElementById("viewChat");
-  return !!(el && !el.classList.contains("hidden"));
-}
-
-function updateBadgeChatLateralV7(){
-  const total = (chats || []).reduce((a,c)=>a + Number(getChatBadgeV6(c.ID_CHAT || c.chat_id) || 0), 0);
-
-  const badge = document.getElementById("badgeChat");
-  if(badge){
-    if(total > 0){
-      badge.classList.remove("hidden");
-      badge.textContent = total;
-    }else{
-      badge.classList.add("hidden");
-      badge.textContent = "0";
-    }
-  }
-
-  const stat = document.getElementById("statChats");
-  if(stat) stat.textContent = total;
-
-  return total;
-}
-
-const __oldMostrarVistaV7 = typeof mostrarVista === "function" ? mostrarVista : null;
-function mostrarVista(vista){
-  __vistaOperativaActualV7 = String(vista || "").toLowerCase();
-  if(__oldMostrarVistaV7) __oldMostrarVistaV7(vista);
-  updateBadgeChatLateralV7();
-
-  // Si entra a chat pero no clickea ningún chat, no limpiamos nada.
-  // Solo se limpia al abrirChat(id).
-}
-
-async function cargarChats(silencioso=false){
-  const { data: sesiones, error } = await supabaseClient.rpc("panel_operativo_get_chat_sesiones", {
-    p_session_token: requireSessionToken(),
-    p_pc_codigo: pcOperativa
-  });
-
-  if(error){
-    console.error("Error cargando chat_sesiones RPC:", error);
-    return;
-  }
-
-  const { data: mensajesData, error: errorMensajes } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes_pc", {
-    p_session_token: requireSessionToken(),
-    p_pc_codigo: pcOperativa,
-    p_limit: 1500
-  });
-
-  const mensajes = errorMensajes ? [] : (mensajesData || []);
-
-  if(errorMensajes){
-    console.error("Error cargando chat_mensajes RPC:", errorMensajes);
-  }
-
-  let nuevosParaAvisar = 0;
-
-  let nextChats = (sesiones || []).map(c => {
-    const chatId = String(c.chat_id || c.id || "");
-    const ms = mensajes.filter(m => String(m.chat_id) === chatId);
-    const ultimo = ms.length ? ms[ms.length - 1] : null;
-
-    const userCount = userMsgCountFromMensajesV6(ms);
-    const readCount = getChatReadCount(chatId);
-
-    // Primera vez: si el operador ya lo abrió antes, usamos readCount.
-    // Si no lo abrió nunca, todos los mensajes de usuario cuentan como pendientes.
-    const prevUserCount = Number(
-      __chatLastUserCountById[chatId] !== undefined
-        ? __chatLastUserCountById[chatId]
-        : readCount
-    );
-
-    let badge = getChatBadgeV6(chatId);
-
-    // Si aumenta la cantidad de mensajes del usuario, SIEMPRE suma badge lateral.
-    // Aunque el chat esté abierto o aunque el chat ya exista.
-    if(userCount > prevUserCount){
-      const delta = userCount - prevUserCount;
-      badge += delta;
-      nuevosParaAvisar += delta;
-      setChatBadgeV6(chatId, badge);
-    }
-
-    // Actualizamos contador observado para no repetir notificación del mismo mensaje.
-    __chatLastUserCountById[chatId] = userCount;
-
-    return {
-      ID_CHAT: chatId,
-      chat_id: chatId,
-      USUARIO: c.usuario || "Usuario",
-      NOMBRE_COMPLETO: c.nombre_completo || c.usuario || "",
-      TELEFONO: c.telefono || "",
-      FECHA: c.created_at,
-      FECHA_ULTIMO: ultimo?.created_at || c.ultimo_mensaje || c.updated_at || c.created_at,
-      ULTIMO_MENSAJE: resumenMensajeChatPreviewV6(ultimo?.mensaje || "", ultimo?.imagen_url || ""),
-      SIN_LEER: badge,
-      USER_COUNT: userCount,
-      SOLICITUD_ID: c.solicitud_id || "",
-      ESTADO: c.estado || "ABIERTO",
-      PC: c.pc_codigo || pcOperativa
-    };
-  });
-
-  chats = dedupeChatsV6(nextChats);
-
-  renderChatList();
-  verificarChats(true);
-  renderInicio();
-  updateBadgeChatLateralV7();
-
-  if(nuevosParaAvisar > 0 && silencioso){
-    try{
-      toast(`💬 ${nuevosParaAvisar} mensaje/s nuevo/s de usuario`, "blue");
-      if(typeof sonidoNotificacion === "function"){
-        sonidoNotificacion();
-      }else{
-        const a = new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=");
-        a.play().catch(()=>{});
-      }
-    }catch(e){}
-  }
-
-  if(!silencioso){
-    console.log("Chats cargados por RPC:", chats.length);
-  }
-}
-
-async function abrirChat(id){
-  chatActualId = String(id || "");
-
-  const c = chats.find(x => String(x.ID_CHAT || x.chat_id) === chatActualId) || {};
-
-  setBox("chatTitulo", `
-    <span>${escapeHtml(c.USUARIO || "Usuario")}</span>
-    <button class="chat-icon-btn" title="Copiar usuario" onclick="copiarTextoOperativo('${escapeAttr(c.USUARIO || "")}','Usuario')">📋</button>
-    <button class="chat-icon-btn" title="Info usuario" onclick="abrirInfoChatUsuario()">ℹ️</button>
-  `);
-
-  setBox("chatSubtitulo", `${formatFecha(c.FECHA_ULTIMO || c.FECHA || "")}`);
-  setBox("chatEstado", c.SOLICITUD_ID ? `Solicitud: ${escapeHtml(c.SOLICITUD_ID)}` : "-");
-
-  await cargarChatActual(true);
-
-  // Abrir/clickear chat = atendido. Recién acá limpiamos badge.
-  const ms = (chatMensajes || []).filter(m => String(m.chat_id) === chatActualId);
-  const userCount = userMsgCountFromMensajesV6(ms);
-
-  setChatReadCount(chatActualId, userCount);
-  __chatLastUserCountById[chatActualId] = userCount;
-  clearChatBadgeV6(chatActualId);
-
-  try{
-    await supabaseClient.rpc("panel_operativo_marcar_chat_leido", {
-      p_session_token: requireSessionToken(),
-      p_chat_id: chatActualId
-    });
-  }catch(e){
-    console.warn("No se pudo marcar leído backend:", e);
-  }
-
-  renderChatList();
-  verificarChats(true);
-  renderInicio();
-  updateBadgeChatLateralV7();
-}
-
-async function cargarChatActual(scroll=true){
-  if(!chatActualId) return;
-
-  // Si el operador NO está en vista Chat, no tocamos mensajes ni limpiamos lectura.
-  // Esto evita que al volver a Inicio se borren notificaciones nuevas.
-  if(!isChatViewActiveV7()){
-    return;
-  }
-
-  const { data: mensajesData, error: errorPc } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes_pc", {
-    p_session_token: requireSessionToken(),
-    p_pc_codigo: pcOperativa,
-    p_limit: 1500
-  });
-
-  if(errorPc){
-    console.error("Error cargando mensajes PC:", errorPc);
-  }
-
-  let mensajes = (mensajesData || []).filter(m => String(m.chat_id) === String(chatActualId));
-
-  if(!mensajes.length){
-    const { data, error } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes", {
-      p_session_token: requireSessionToken(),
-      p_chat_id: chatActualId
-    });
-
-    if(error){
-      console.error("Error cargando mensajes chat individual:", error);
-    }else{
-      mensajes = data || [];
-    }
-  }
-
-  chatMensajes = mensajes || [];
-  renderChatMensajes();
-
-  // Importante: acá NO limpiamos badge automáticamente.
-  // Si llega un mensaje mientras el chat está abierto, queremos que el lateral Chat marque 1.
-  renderChatList();
-  verificarChats(true);
-  renderInicio();
-  updateBadgeChatLateralV7();
-
-  if(scroll){
-    const body = document.getElementById("chatBody");
-    if(body) body.scrollTop = body.scrollHeight;
-  }
-}
-
-function verificarChats(silencioso=true){
-  updateBadgeChatLateralV7();
-  lastChatUnread = (chats || []).reduce((a,c)=>a + Number(getChatBadgeV6(c.ID_CHAT || c.chat_id) || 0), 0);
-}
-
-function renderInicio(){
-  const pendientes=solicitudes.filter(esPendiente);
-  const retiros=pendientes.filter(s=>normalizar(s.TIPO_SOLICITUD||s.TIPO)==="RETIRO");
-  const unread=(chats || []).reduce((a,c)=>a+Number(getChatBadgeV6(c.ID_CHAT || c.chat_id)||0),0);
-  const bil=billeteras.find(b=>normalizar(b.SELECCIONADA_MANUAL)==="SI") || billeteras.find(b=>normalizar(b.ACTIVA)==="SI") || {};
-  const hoy = solicitudes.filter(s=>esMismoDiaBA(s.FECHA_CREACION||s.FECHA));
-
-  setBox("statPendientes",pendientes.length);
-  setBox("statRetiros",`Retiros: ${retiros.length}`);
-  setBox("statSolicitudesHoy",hoy.length);
-  setBox("statSolicitudesTotalPc",`Total PC: ${solicitudes.length}`);
-  setBox("statChats",unread);
-  setBox("statBilletera",bil.NOMBRE_VISIBLE||bil.BILLETERA_NOMBRE||"-");
-  setBox("statBilleteraTipo",bil.TIPO?`${bil.TIPO} · ${bil.PC||pcOperativa}`:"-");
-  setBox("alertas",`
-    ${pendientes.length?`<div class="alert-box">🔔 Hay ${pendientes.length} solicitud/es pendiente/s.</div>`:""}
-    ${unread?`<div class="alert-box">💬 Hay ${unread} mensaje/s de chat sin leer.</div>`:""}
-  `);
-  setBox("resumenTurnosOperativo",resumenTurnosOperativoHTML(solicitudes));
-  setBox("tablaSolicitudesInicio",tablaSolicitudesHTML(pendientes.slice(0,40)));
-  updateBadgeChatLateralV7();
-}
-
-const __oldEnviarChatV7 = typeof enviarChat === "function" ? enviarChat : null;
-async function enviarChat(){
-  if(__oldEnviarChatV7){
-    await __oldEnviarChatV7();
-  }
-
-  // Cuando el operador responde, se considera atendido el chat abierto.
-  if(chatActualId){
-    const ms = (chatMensajes || []).filter(m => String(m.chat_id) === String(chatActualId));
-    const userCount = userMsgCountFromMensajesV6(ms);
-
-    setChatReadCount(chatActualId, userCount);
-    __chatLastUserCountById[chatActualId] = userCount;
-    clearChatBadgeV6(chatActualId);
+    window.chats = chats = dedupe(next);
 
     renderChatList();
     verificarChats(true);
     renderInicio();
-    updateBadgeChatLateralV7();
+    window.updateBadgeChatLateralV8();
+
+    if(nuevos > 0 && silencioso){
+      try{
+        toast(`💬 ${nuevos} mensaje/s nuevo/s de usuario`, "blue");
+        if(typeof sonidoNotificacion === "function") sonidoNotificacion();
+      }catch(e){}
+    }
+
+    if(!silencioso) console.log("Chats cargados por RPC:", chats.length);
+  };
+
+  window.renderChatList = function(){
+    if(!chats || !chats.length){
+      setBox("chatList",`<div class="alert-box">No hay chats activos.</div>`);
+      window.updateBadgeChatLateralV8();
+      return;
+    }
+
+    chats = window.chats = dedupe(chats).sort((a,b)=>{
+      return new Date(b.FECHA_ULTIMO || b.FECHA || 0) - new Date(a.FECHA_ULTIMO || a.FECHA || 0);
+    });
+
+    let html = "";
+    chats.forEach(c=>{
+      const id = chatIdOf(c);
+      const unread = window.getChatBadgeV8(id);
+      const active = String(chatActualId || "") === id ? "active" : "";
+      html += `
+        <div class="chat-item clean-chat-item ${active}" onclick="abrirChat('${escapeAttr(id)}')">
+          <div>
+            <div class="chat-item-title" style="display:block">
+              <b>${escapeHtml(c.USUARIO || "Usuario")}</b>
+              <div class="small">${formatFecha(c.FECHA_ULTIMO || c.FECHA || "")}</div>
+            </div>
+            <div class="small">${escapeHtml(c.ULTIMO_MENSAJE || "")}</div>
+          </div>
+          ${unread ? `<span class="chat-unread">${unread}</span>` : ""}
+        </div>
+      `;
+    });
+
+    setBox("chatList", html);
+    window.updateBadgeChatLateralV8();
+  };
+
+  window.abrirChat = async function(id){
+    chatActualId = String(id || "");
+
+    const c = (chats || []).find(x => String(x.ID_CHAT || x.chat_id) === chatActualId) || {};
+
+    setBox("chatTitulo", `
+      <span>${escapeHtml(c.USUARIO || "Usuario")}</span>
+      <button class="chat-icon-btn" title="Copiar usuario" onclick="copiarTextoOperativo('${escapeAttr(c.USUARIO || "")}','Usuario')">📋</button>
+      <button class="chat-icon-btn" title="Info usuario" onclick="abrirInfoChatUsuario()">ℹ️</button>
+    `);
+    setBox("chatSubtitulo", `${formatFecha(c.FECHA_ULTIMO || c.FECHA || "")}`);
+    setBox("chatEstado", c.SOLICITUD_ID ? `Solicitud: ${escapeHtml(c.SOLICITUD_ID)}` : "-");
+
+    await cargarChatActual(true);
+
+    // Clic en chat = atendido: limpia badge.
+    const ms = (chatMensajes || []).filter(m => String(m.chat_id) === chatActualId);
+    const userCount = countUserMessages(ms);
+
+    if(typeof setChatReadCount === "function") setChatReadCount(chatActualId, userCount);
+    S.lastUserCount[chatActualId] = userCount;
+    window.clearChatBadgeV8(chatActualId);
+
+    try{
+      await supabaseClient.rpc("panel_operativo_marcar_chat_leido", {
+        p_session_token: requireSessionToken(),
+        p_chat_id: chatActualId
+      });
+    }catch(e){ console.warn("No se pudo marcar leído backend:", e); }
+
+    renderChatList();
+    verificarChats(true);
+    renderInicio();
+    window.updateBadgeChatLateralV8();
+  };
+
+  window.cargarChatActual = async function(scroll=true){
+    if(!chatActualId) return;
+
+    // Si está en Inicio u otra sección, NO cargamos/limpiamos el chat abierto anterior.
+    if(!isChatVisible()) return;
+
+    const mensajes = await loadMensajesPc();
+    let ms = mensajes.filter(m => String(m.chat_id) === String(chatActualId));
+
+    if(!ms.length){
+      const { data, error } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes", {
+        p_session_token: requireSessionToken(),
+        p_chat_id: chatActualId
+      });
+      if(error) console.error("Error cargando mensajes chat individual:", error);
+      else ms = data || [];
+    }
+
+    window.chatMensajes = chatMensajes = ms || [];
+    renderChatMensajes();
+
+    // No limpia badge automáticamente acá. Solo abrirChat o enviarChat.
+    renderChatList();
+    verificarChats(true);
+    renderInicio();
+    window.updateBadgeChatLateralV8();
+
+    if(scroll){
+      const body = document.getElementById("chatBody");
+      if(body) body.scrollTop = body.scrollHeight;
+    }
+  };
+
+  window.renderChatMensajes = function(){
+    const body = document.getElementById("chatBody");
+    if(!body) return;
+
+    if(!chatMensajes || !chatMensajes.length){
+      body.innerHTML = `<div class="alert-box">Sin mensajes todavía.</div>`;
+      return;
+    }
+
+    body.innerHTML = chatMensajes.map(m=>{
+      const tipo = String(m.tipo_emisor || m.emisor || "").toUpperCase();
+      const cls = tipo === "USUARIO" ? "user" : "op";
+      const texto = String(m.mensaje || "");
+      const imagen = m.imagen_url || "";
+      let contenido = "";
+
+      if(texto.startsWith("TRANSFER_CARD:") && typeof renderTransferCardChat === "function"){
+        contenido = renderTransferCardChat(texto.replace("TRANSFER_CARD:",""));
+      }else{
+        contenido = escapeHtml(texto);
+      }
+
+      if(imagen){
+        contenido += `<img src="${escapeAttr(imagen)}" alt="imagen chat">`;
+      }
+
+      return `
+        <div class="chat-msg ${cls}">
+          <div class="chat-bubble">${contenido}</div>
+          <div class="chat-meta">${formatearHoraChat(m.created_at || m.fecha || "")}</div>
+        </div>
+      `;
+    }).join("");
+  };
+
+  window.verificarChats = function(silencioso=true){
+    lastChatUnread = window.updateBadgeChatLateralV8();
+  };
+
+  window.renderInicio = function(){
+    const pendientes=solicitudes.filter(esPendiente);
+    const retiros=pendientes.filter(s=>normalizar(s.TIPO_SOLICITUD||s.TIPO)==="RETIRO");
+    const unread=totalUnread();
+    const bil=billeteras.find(b=>normalizar(b.SELECCIONADA_MANUAL)==="SI") || billeteras.find(b=>normalizar(b.ACTIVA)==="SI") || {};
+    const hoy = solicitudes.filter(s=>esMismoDiaBA(s.FECHA_CREACION||s.FECHA));
+
+    setBox("statPendientes",pendientes.length);
+    setBox("statRetiros",`Retiros: ${retiros.length}`);
+    setBox("statSolicitudesHoy",hoy.length);
+    setBox("statSolicitudesTotalPc",`Total PC: ${solicitudes.length}`);
+    setBox("statChats",unread);
+    setBox("statBilletera",bil.NOMBRE_VISIBLE||bil.BILLETERA_NOMBRE||"-");
+    setBox("statBilleteraTipo",bil.TIPO?`${bil.TIPO} · ${bil.PC||pcOperativa}`:"-");
+    setBox("alertas",`
+      ${pendientes.length?`<div class="alert-box">🔔 Hay ${pendientes.length} solicitud/es pendiente/s.</div>`:""}
+      ${unread?`<div class="alert-box">💬 Hay ${unread} mensaje/s de chat sin leer.</div>`:""}
+    `);
+    setBox("resumenTurnosOperativo",resumenTurnosOperativoHTML(solicitudes));
+    setBox("tablaSolicitudesInicio",tablaSolicitudesHTML(pendientes.slice(0,40)));
+    window.updateBadgeChatLateralV8();
+  };
+
+  window.abrirInfoChatUsuario = function(){
+    if(!chatActualId) return;
+    const c = (chats || []).find(x=>String(x.ID_CHAT || x.chat_id) === String(chatActualId)) || {};
+    const solicitud = (solicitudes || []).find(s => String(s.ID || s.SOLICITUD_ID || "") === String(c.SOLICITUD_ID || ""));
+
+    abrirModal("Info del chat", `
+      <div class="verify-box">
+        <div class="verify-title">👤 Usuario</div>
+        <div class="verify-grid">
+          ${verifyRow("Usuario", c.USUARIO || "-", "", true)}
+          ${verifyRow("Teléfono", c.TELEFONO || "-", "", true)}
+          ${verifyRow("Nombre", c.NOMBRE_COMPLETO || "-", "", false)}
+          ${verifyRow("PC", c.PC || pcOperativa || "-")}
+          ${verifyRow("Solicitud", c.SOLICITUD_ID || "-")}
+          ${verifyRow("Estado", c.ESTADO || "-")}
+        </div>
+      </div>
+      ${solicitud ? renderDatosSolicitudModal(solicitud) : ""}
+    `, async()=>cerrarModal(), "Cerrar");
+  };
+
+  if(!window.__mostrarVistaOriginalV8 && typeof window.mostrarVista === "function"){
+    window.__mostrarVistaOriginalV8 = window.mostrarVista;
   }
-}
+
+  window.mostrarVista = function(vista){
+    S.currentView = String(vista || "").toLowerCase();
+    if(typeof window.__mostrarVistaOriginalV8 === "function"){
+      window.__mostrarVistaOriginalV8(vista);
+    }
+    window.updateBadgeChatLateralV8();
+  };
+
+  if(!window.__enviarChatOriginalV8 && typeof window.enviarChat === "function"){
+    window.__enviarChatOriginalV8 = window.enviarChat;
+  }
+
+  window.enviarChat = async function(){
+    if(typeof window.__enviarChatOriginalV8 === "function"){
+      await window.__enviarChatOriginalV8();
+    }
+
+    // Responder = atendido, limpia badge de ese chat.
+    if(chatActualId){
+      const ms = (chatMensajes || []).filter(m => String(m.chat_id) === String(chatActualId));
+      const userCount = countUserMessages(ms);
+      if(typeof setChatReadCount === "function") setChatReadCount(chatActualId, userCount);
+      S.lastUserCount[chatActualId] = userCount;
+      window.clearChatBadgeV8(chatActualId);
+      renderChatList();
+      verificarChats(true);
+      renderInicio();
+      window.updateBadgeChatLateralV8();
+    }
+  };
+
+})();
 
 </script>
 
