@@ -756,6 +756,289 @@ function verificarChats(silencioso=true){
   lastChatUnread = unread;
 }
 
+
+/* =========================================================
+   OPERATIVO CHAT NOTIFY V7 · BADGE LATERAL REAL
+   Corrige el caso final:
+   - Los mensajes nuevos de usuario se acumulan en el botón lateral "Chat".
+   - Si salís a Inicio, NO se limpian por tener chatActualId abierto.
+   - Si el chat ya existe, igual suma notificación nueva.
+   - La limpieza del badge ocurre cuando el operador abre/clickea el chat
+     o cuando responde.
+========================================================= */
+
+let __vistaOperativaActualV7 = window.__vistaOperativaActualV7 || "inicio";
+
+function isChatViewActiveV7(){
+  const el = document.getElementById("viewChat");
+  return !!(el && !el.classList.contains("hidden"));
+}
+
+function updateBadgeChatLateralV7(){
+  const total = (chats || []).reduce((a,c)=>a + Number(getChatBadgeV6(c.ID_CHAT || c.chat_id) || 0), 0);
+
+  const badge = document.getElementById("badgeChat");
+  if(badge){
+    if(total > 0){
+      badge.classList.remove("hidden");
+      badge.textContent = total;
+    }else{
+      badge.classList.add("hidden");
+      badge.textContent = "0";
+    }
+  }
+
+  const stat = document.getElementById("statChats");
+  if(stat) stat.textContent = total;
+
+  return total;
+}
+
+const __oldMostrarVistaV7 = typeof mostrarVista === "function" ? mostrarVista : null;
+function mostrarVista(vista){
+  __vistaOperativaActualV7 = String(vista || "").toLowerCase();
+  if(__oldMostrarVistaV7) __oldMostrarVistaV7(vista);
+  updateBadgeChatLateralV7();
+
+  // Si entra a chat pero no clickea ningún chat, no limpiamos nada.
+  // Solo se limpia al abrirChat(id).
+}
+
+async function cargarChats(silencioso=false){
+  const { data: sesiones, error } = await supabaseClient.rpc("panel_operativo_get_chat_sesiones", {
+    p_session_token: requireSessionToken(),
+    p_pc_codigo: pcOperativa
+  });
+
+  if(error){
+    console.error("Error cargando chat_sesiones RPC:", error);
+    return;
+  }
+
+  const { data: mensajesData, error: errorMensajes } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes_pc", {
+    p_session_token: requireSessionToken(),
+    p_pc_codigo: pcOperativa,
+    p_limit: 1500
+  });
+
+  const mensajes = errorMensajes ? [] : (mensajesData || []);
+
+  if(errorMensajes){
+    console.error("Error cargando chat_mensajes RPC:", errorMensajes);
+  }
+
+  let nuevosParaAvisar = 0;
+
+  let nextChats = (sesiones || []).map(c => {
+    const chatId = String(c.chat_id || c.id || "");
+    const ms = mensajes.filter(m => String(m.chat_id) === chatId);
+    const ultimo = ms.length ? ms[ms.length - 1] : null;
+
+    const userCount = userMsgCountFromMensajesV6(ms);
+    const readCount = getChatReadCount(chatId);
+
+    // Primera vez: si el operador ya lo abrió antes, usamos readCount.
+    // Si no lo abrió nunca, todos los mensajes de usuario cuentan como pendientes.
+    const prevUserCount = Number(
+      __chatLastUserCountById[chatId] !== undefined
+        ? __chatLastUserCountById[chatId]
+        : readCount
+    );
+
+    let badge = getChatBadgeV6(chatId);
+
+    // Si aumenta la cantidad de mensajes del usuario, SIEMPRE suma badge lateral.
+    // Aunque el chat esté abierto o aunque el chat ya exista.
+    if(userCount > prevUserCount){
+      const delta = userCount - prevUserCount;
+      badge += delta;
+      nuevosParaAvisar += delta;
+      setChatBadgeV6(chatId, badge);
+    }
+
+    // Actualizamos contador observado para no repetir notificación del mismo mensaje.
+    __chatLastUserCountById[chatId] = userCount;
+
+    return {
+      ID_CHAT: chatId,
+      chat_id: chatId,
+      USUARIO: c.usuario || "Usuario",
+      NOMBRE_COMPLETO: c.nombre_completo || c.usuario || "",
+      TELEFONO: c.telefono || "",
+      FECHA: c.created_at,
+      FECHA_ULTIMO: ultimo?.created_at || c.ultimo_mensaje || c.updated_at || c.created_at,
+      ULTIMO_MENSAJE: resumenMensajeChatPreviewV6(ultimo?.mensaje || "", ultimo?.imagen_url || ""),
+      SIN_LEER: badge,
+      USER_COUNT: userCount,
+      SOLICITUD_ID: c.solicitud_id || "",
+      ESTADO: c.estado || "ABIERTO",
+      PC: c.pc_codigo || pcOperativa
+    };
+  });
+
+  chats = dedupeChatsV6(nextChats);
+
+  renderChatList();
+  verificarChats(true);
+  renderInicio();
+  updateBadgeChatLateralV7();
+
+  if(nuevosParaAvisar > 0 && silencioso){
+    try{
+      toast(`💬 ${nuevosParaAvisar} mensaje/s nuevo/s de usuario`, "blue");
+      if(typeof sonidoNotificacion === "function"){
+        sonidoNotificacion();
+      }else{
+        const a = new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=");
+        a.play().catch(()=>{});
+      }
+    }catch(e){}
+  }
+
+  if(!silencioso){
+    console.log("Chats cargados por RPC:", chats.length);
+  }
+}
+
+async function abrirChat(id){
+  chatActualId = String(id || "");
+
+  const c = chats.find(x => String(x.ID_CHAT || x.chat_id) === chatActualId) || {};
+
+  setBox("chatTitulo", `
+    <span>${escapeHtml(c.USUARIO || "Usuario")}</span>
+    <button class="chat-icon-btn" title="Copiar usuario" onclick="copiarTextoOperativo('${escapeAttr(c.USUARIO || "")}','Usuario')">📋</button>
+    <button class="chat-icon-btn" title="Info usuario" onclick="abrirInfoChatUsuario()">ℹ️</button>
+  `);
+
+  setBox("chatSubtitulo", `${formatFecha(c.FECHA_ULTIMO || c.FECHA || "")}`);
+  setBox("chatEstado", c.SOLICITUD_ID ? `Solicitud: ${escapeHtml(c.SOLICITUD_ID)}` : "-");
+
+  await cargarChatActual(true);
+
+  // Abrir/clickear chat = atendido. Recién acá limpiamos badge.
+  const ms = (chatMensajes || []).filter(m => String(m.chat_id) === chatActualId);
+  const userCount = userMsgCountFromMensajesV6(ms);
+
+  setChatReadCount(chatActualId, userCount);
+  __chatLastUserCountById[chatActualId] = userCount;
+  clearChatBadgeV6(chatActualId);
+
+  try{
+    await supabaseClient.rpc("panel_operativo_marcar_chat_leido", {
+      p_session_token: requireSessionToken(),
+      p_chat_id: chatActualId
+    });
+  }catch(e){
+    console.warn("No se pudo marcar leído backend:", e);
+  }
+
+  renderChatList();
+  verificarChats(true);
+  renderInicio();
+  updateBadgeChatLateralV7();
+}
+
+async function cargarChatActual(scroll=true){
+  if(!chatActualId) return;
+
+  // Si el operador NO está en vista Chat, no tocamos mensajes ni limpiamos lectura.
+  // Esto evita que al volver a Inicio se borren notificaciones nuevas.
+  if(!isChatViewActiveV7()){
+    return;
+  }
+
+  const { data: mensajesData, error: errorPc } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes_pc", {
+    p_session_token: requireSessionToken(),
+    p_pc_codigo: pcOperativa,
+    p_limit: 1500
+  });
+
+  if(errorPc){
+    console.error("Error cargando mensajes PC:", errorPc);
+  }
+
+  let mensajes = (mensajesData || []).filter(m => String(m.chat_id) === String(chatActualId));
+
+  if(!mensajes.length){
+    const { data, error } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes", {
+      p_session_token: requireSessionToken(),
+      p_chat_id: chatActualId
+    });
+
+    if(error){
+      console.error("Error cargando mensajes chat individual:", error);
+    }else{
+      mensajes = data || [];
+    }
+  }
+
+  chatMensajes = mensajes || [];
+  renderChatMensajes();
+
+  // Importante: acá NO limpiamos badge automáticamente.
+  // Si llega un mensaje mientras el chat está abierto, queremos que el lateral Chat marque 1.
+  renderChatList();
+  verificarChats(true);
+  renderInicio();
+  updateBadgeChatLateralV7();
+
+  if(scroll){
+    const body = document.getElementById("chatBody");
+    if(body) body.scrollTop = body.scrollHeight;
+  }
+}
+
+function verificarChats(silencioso=true){
+  updateBadgeChatLateralV7();
+  lastChatUnread = (chats || []).reduce((a,c)=>a + Number(getChatBadgeV6(c.ID_CHAT || c.chat_id) || 0), 0);
+}
+
+function renderInicio(){
+  const pendientes=solicitudes.filter(esPendiente);
+  const retiros=pendientes.filter(s=>normalizar(s.TIPO_SOLICITUD||s.TIPO)==="RETIRO");
+  const unread=(chats || []).reduce((a,c)=>a+Number(getChatBadgeV6(c.ID_CHAT || c.chat_id)||0),0);
+  const bil=billeteras.find(b=>normalizar(b.SELECCIONADA_MANUAL)==="SI") || billeteras.find(b=>normalizar(b.ACTIVA)==="SI") || {};
+  const hoy = solicitudes.filter(s=>esMismoDiaBA(s.FECHA_CREACION||s.FECHA));
+
+  setBox("statPendientes",pendientes.length);
+  setBox("statRetiros",`Retiros: ${retiros.length}`);
+  setBox("statSolicitudesHoy",hoy.length);
+  setBox("statSolicitudesTotalPc",`Total PC: ${solicitudes.length}`);
+  setBox("statChats",unread);
+  setBox("statBilletera",bil.NOMBRE_VISIBLE||bil.BILLETERA_NOMBRE||"-");
+  setBox("statBilleteraTipo",bil.TIPO?`${bil.TIPO} · ${bil.PC||pcOperativa}`:"-");
+  setBox("alertas",`
+    ${pendientes.length?`<div class="alert-box">🔔 Hay ${pendientes.length} solicitud/es pendiente/s.</div>`:""}
+    ${unread?`<div class="alert-box">💬 Hay ${unread} mensaje/s de chat sin leer.</div>`:""}
+  `);
+  setBox("resumenTurnosOperativo",resumenTurnosOperativoHTML(solicitudes));
+  setBox("tablaSolicitudesInicio",tablaSolicitudesHTML(pendientes.slice(0,40)));
+  updateBadgeChatLateralV7();
+}
+
+const __oldEnviarChatV7 = typeof enviarChat === "function" ? enviarChat : null;
+async function enviarChat(){
+  if(__oldEnviarChatV7){
+    await __oldEnviarChatV7();
+  }
+
+  // Cuando el operador responde, se considera atendido el chat abierto.
+  if(chatActualId){
+    const ms = (chatMensajes || []).filter(m => String(m.chat_id) === String(chatActualId));
+    const userCount = userMsgCountFromMensajesV6(ms);
+
+    setChatReadCount(chatActualId, userCount);
+    __chatLastUserCountById[chatActualId] = userCount;
+    clearChatBadgeV6(chatActualId);
+
+    renderChatList();
+    verificarChats(true);
+    renderInicio();
+    updateBadgeChatLateralV7();
+  }
+}
+
 </script>
 
 <script>
@@ -2713,6 +2996,289 @@ function verificarChats(silencioso=true){
   lastChatUnread = unread;
 }
 
+
+/* =========================================================
+   OPERATIVO CHAT NOTIFY V7 · BADGE LATERAL REAL
+   Corrige el caso final:
+   - Los mensajes nuevos de usuario se acumulan en el botón lateral "Chat".
+   - Si salís a Inicio, NO se limpian por tener chatActualId abierto.
+   - Si el chat ya existe, igual suma notificación nueva.
+   - La limpieza del badge ocurre cuando el operador abre/clickea el chat
+     o cuando responde.
+========================================================= */
+
+let __vistaOperativaActualV7 = window.__vistaOperativaActualV7 || "inicio";
+
+function isChatViewActiveV7(){
+  const el = document.getElementById("viewChat");
+  return !!(el && !el.classList.contains("hidden"));
+}
+
+function updateBadgeChatLateralV7(){
+  const total = (chats || []).reduce((a,c)=>a + Number(getChatBadgeV6(c.ID_CHAT || c.chat_id) || 0), 0);
+
+  const badge = document.getElementById("badgeChat");
+  if(badge){
+    if(total > 0){
+      badge.classList.remove("hidden");
+      badge.textContent = total;
+    }else{
+      badge.classList.add("hidden");
+      badge.textContent = "0";
+    }
+  }
+
+  const stat = document.getElementById("statChats");
+  if(stat) stat.textContent = total;
+
+  return total;
+}
+
+const __oldMostrarVistaV7 = typeof mostrarVista === "function" ? mostrarVista : null;
+function mostrarVista(vista){
+  __vistaOperativaActualV7 = String(vista || "").toLowerCase();
+  if(__oldMostrarVistaV7) __oldMostrarVistaV7(vista);
+  updateBadgeChatLateralV7();
+
+  // Si entra a chat pero no clickea ningún chat, no limpiamos nada.
+  // Solo se limpia al abrirChat(id).
+}
+
+async function cargarChats(silencioso=false){
+  const { data: sesiones, error } = await supabaseClient.rpc("panel_operativo_get_chat_sesiones", {
+    p_session_token: requireSessionToken(),
+    p_pc_codigo: pcOperativa
+  });
+
+  if(error){
+    console.error("Error cargando chat_sesiones RPC:", error);
+    return;
+  }
+
+  const { data: mensajesData, error: errorMensajes } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes_pc", {
+    p_session_token: requireSessionToken(),
+    p_pc_codigo: pcOperativa,
+    p_limit: 1500
+  });
+
+  const mensajes = errorMensajes ? [] : (mensajesData || []);
+
+  if(errorMensajes){
+    console.error("Error cargando chat_mensajes RPC:", errorMensajes);
+  }
+
+  let nuevosParaAvisar = 0;
+
+  let nextChats = (sesiones || []).map(c => {
+    const chatId = String(c.chat_id || c.id || "");
+    const ms = mensajes.filter(m => String(m.chat_id) === chatId);
+    const ultimo = ms.length ? ms[ms.length - 1] : null;
+
+    const userCount = userMsgCountFromMensajesV6(ms);
+    const readCount = getChatReadCount(chatId);
+
+    // Primera vez: si el operador ya lo abrió antes, usamos readCount.
+    // Si no lo abrió nunca, todos los mensajes de usuario cuentan como pendientes.
+    const prevUserCount = Number(
+      __chatLastUserCountById[chatId] !== undefined
+        ? __chatLastUserCountById[chatId]
+        : readCount
+    );
+
+    let badge = getChatBadgeV6(chatId);
+
+    // Si aumenta la cantidad de mensajes del usuario, SIEMPRE suma badge lateral.
+    // Aunque el chat esté abierto o aunque el chat ya exista.
+    if(userCount > prevUserCount){
+      const delta = userCount - prevUserCount;
+      badge += delta;
+      nuevosParaAvisar += delta;
+      setChatBadgeV6(chatId, badge);
+    }
+
+    // Actualizamos contador observado para no repetir notificación del mismo mensaje.
+    __chatLastUserCountById[chatId] = userCount;
+
+    return {
+      ID_CHAT: chatId,
+      chat_id: chatId,
+      USUARIO: c.usuario || "Usuario",
+      NOMBRE_COMPLETO: c.nombre_completo || c.usuario || "",
+      TELEFONO: c.telefono || "",
+      FECHA: c.created_at,
+      FECHA_ULTIMO: ultimo?.created_at || c.ultimo_mensaje || c.updated_at || c.created_at,
+      ULTIMO_MENSAJE: resumenMensajeChatPreviewV6(ultimo?.mensaje || "", ultimo?.imagen_url || ""),
+      SIN_LEER: badge,
+      USER_COUNT: userCount,
+      SOLICITUD_ID: c.solicitud_id || "",
+      ESTADO: c.estado || "ABIERTO",
+      PC: c.pc_codigo || pcOperativa
+    };
+  });
+
+  chats = dedupeChatsV6(nextChats);
+
+  renderChatList();
+  verificarChats(true);
+  renderInicio();
+  updateBadgeChatLateralV7();
+
+  if(nuevosParaAvisar > 0 && silencioso){
+    try{
+      toast(`💬 ${nuevosParaAvisar} mensaje/s nuevo/s de usuario`, "blue");
+      if(typeof sonidoNotificacion === "function"){
+        sonidoNotificacion();
+      }else{
+        const a = new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=");
+        a.play().catch(()=>{});
+      }
+    }catch(e){}
+  }
+
+  if(!silencioso){
+    console.log("Chats cargados por RPC:", chats.length);
+  }
+}
+
+async function abrirChat(id){
+  chatActualId = String(id || "");
+
+  const c = chats.find(x => String(x.ID_CHAT || x.chat_id) === chatActualId) || {};
+
+  setBox("chatTitulo", `
+    <span>${escapeHtml(c.USUARIO || "Usuario")}</span>
+    <button class="chat-icon-btn" title="Copiar usuario" onclick="copiarTextoOperativo('${escapeAttr(c.USUARIO || "")}','Usuario')">📋</button>
+    <button class="chat-icon-btn" title="Info usuario" onclick="abrirInfoChatUsuario()">ℹ️</button>
+  `);
+
+  setBox("chatSubtitulo", `${formatFecha(c.FECHA_ULTIMO || c.FECHA || "")}`);
+  setBox("chatEstado", c.SOLICITUD_ID ? `Solicitud: ${escapeHtml(c.SOLICITUD_ID)}` : "-");
+
+  await cargarChatActual(true);
+
+  // Abrir/clickear chat = atendido. Recién acá limpiamos badge.
+  const ms = (chatMensajes || []).filter(m => String(m.chat_id) === chatActualId);
+  const userCount = userMsgCountFromMensajesV6(ms);
+
+  setChatReadCount(chatActualId, userCount);
+  __chatLastUserCountById[chatActualId] = userCount;
+  clearChatBadgeV6(chatActualId);
+
+  try{
+    await supabaseClient.rpc("panel_operativo_marcar_chat_leido", {
+      p_session_token: requireSessionToken(),
+      p_chat_id: chatActualId
+    });
+  }catch(e){
+    console.warn("No se pudo marcar leído backend:", e);
+  }
+
+  renderChatList();
+  verificarChats(true);
+  renderInicio();
+  updateBadgeChatLateralV7();
+}
+
+async function cargarChatActual(scroll=true){
+  if(!chatActualId) return;
+
+  // Si el operador NO está en vista Chat, no tocamos mensajes ni limpiamos lectura.
+  // Esto evita que al volver a Inicio se borren notificaciones nuevas.
+  if(!isChatViewActiveV7()){
+    return;
+  }
+
+  const { data: mensajesData, error: errorPc } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes_pc", {
+    p_session_token: requireSessionToken(),
+    p_pc_codigo: pcOperativa,
+    p_limit: 1500
+  });
+
+  if(errorPc){
+    console.error("Error cargando mensajes PC:", errorPc);
+  }
+
+  let mensajes = (mensajesData || []).filter(m => String(m.chat_id) === String(chatActualId));
+
+  if(!mensajes.length){
+    const { data, error } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes", {
+      p_session_token: requireSessionToken(),
+      p_chat_id: chatActualId
+    });
+
+    if(error){
+      console.error("Error cargando mensajes chat individual:", error);
+    }else{
+      mensajes = data || [];
+    }
+  }
+
+  chatMensajes = mensajes || [];
+  renderChatMensajes();
+
+  // Importante: acá NO limpiamos badge automáticamente.
+  // Si llega un mensaje mientras el chat está abierto, queremos que el lateral Chat marque 1.
+  renderChatList();
+  verificarChats(true);
+  renderInicio();
+  updateBadgeChatLateralV7();
+
+  if(scroll){
+    const body = document.getElementById("chatBody");
+    if(body) body.scrollTop = body.scrollHeight;
+  }
+}
+
+function verificarChats(silencioso=true){
+  updateBadgeChatLateralV7();
+  lastChatUnread = (chats || []).reduce((a,c)=>a + Number(getChatBadgeV6(c.ID_CHAT || c.chat_id) || 0), 0);
+}
+
+function renderInicio(){
+  const pendientes=solicitudes.filter(esPendiente);
+  const retiros=pendientes.filter(s=>normalizar(s.TIPO_SOLICITUD||s.TIPO)==="RETIRO");
+  const unread=(chats || []).reduce((a,c)=>a+Number(getChatBadgeV6(c.ID_CHAT || c.chat_id)||0),0);
+  const bil=billeteras.find(b=>normalizar(b.SELECCIONADA_MANUAL)==="SI") || billeteras.find(b=>normalizar(b.ACTIVA)==="SI") || {};
+  const hoy = solicitudes.filter(s=>esMismoDiaBA(s.FECHA_CREACION||s.FECHA));
+
+  setBox("statPendientes",pendientes.length);
+  setBox("statRetiros",`Retiros: ${retiros.length}`);
+  setBox("statSolicitudesHoy",hoy.length);
+  setBox("statSolicitudesTotalPc",`Total PC: ${solicitudes.length}`);
+  setBox("statChats",unread);
+  setBox("statBilletera",bil.NOMBRE_VISIBLE||bil.BILLETERA_NOMBRE||"-");
+  setBox("statBilleteraTipo",bil.TIPO?`${bil.TIPO} · ${bil.PC||pcOperativa}`:"-");
+  setBox("alertas",`
+    ${pendientes.length?`<div class="alert-box">🔔 Hay ${pendientes.length} solicitud/es pendiente/s.</div>`:""}
+    ${unread?`<div class="alert-box">💬 Hay ${unread} mensaje/s de chat sin leer.</div>`:""}
+  `);
+  setBox("resumenTurnosOperativo",resumenTurnosOperativoHTML(solicitudes));
+  setBox("tablaSolicitudesInicio",tablaSolicitudesHTML(pendientes.slice(0,40)));
+  updateBadgeChatLateralV7();
+}
+
+const __oldEnviarChatV7 = typeof enviarChat === "function" ? enviarChat : null;
+async function enviarChat(){
+  if(__oldEnviarChatV7){
+    await __oldEnviarChatV7();
+  }
+
+  // Cuando el operador responde, se considera atendido el chat abierto.
+  if(chatActualId){
+    const ms = (chatMensajes || []).filter(m => String(m.chat_id) === String(chatActualId));
+    const userCount = userMsgCountFromMensajesV6(ms);
+
+    setChatReadCount(chatActualId, userCount);
+    __chatLastUserCountById[chatActualId] = userCount;
+    clearChatBadgeV6(chatActualId);
+
+    renderChatList();
+    verificarChats(true);
+    renderInicio();
+    updateBadgeChatLateralV7();
+  }
+}
+
 </script>
 
 <script>
@@ -3167,6 +3733,289 @@ function verificarChats(silencioso=true){
     badge.classList.add("hidden");
   }
   lastChatUnread = unread;
+}
+
+
+/* =========================================================
+   OPERATIVO CHAT NOTIFY V7 · BADGE LATERAL REAL
+   Corrige el caso final:
+   - Los mensajes nuevos de usuario se acumulan en el botón lateral "Chat".
+   - Si salís a Inicio, NO se limpian por tener chatActualId abierto.
+   - Si el chat ya existe, igual suma notificación nueva.
+   - La limpieza del badge ocurre cuando el operador abre/clickea el chat
+     o cuando responde.
+========================================================= */
+
+let __vistaOperativaActualV7 = window.__vistaOperativaActualV7 || "inicio";
+
+function isChatViewActiveV7(){
+  const el = document.getElementById("viewChat");
+  return !!(el && !el.classList.contains("hidden"));
+}
+
+function updateBadgeChatLateralV7(){
+  const total = (chats || []).reduce((a,c)=>a + Number(getChatBadgeV6(c.ID_CHAT || c.chat_id) || 0), 0);
+
+  const badge = document.getElementById("badgeChat");
+  if(badge){
+    if(total > 0){
+      badge.classList.remove("hidden");
+      badge.textContent = total;
+    }else{
+      badge.classList.add("hidden");
+      badge.textContent = "0";
+    }
+  }
+
+  const stat = document.getElementById("statChats");
+  if(stat) stat.textContent = total;
+
+  return total;
+}
+
+const __oldMostrarVistaV7 = typeof mostrarVista === "function" ? mostrarVista : null;
+function mostrarVista(vista){
+  __vistaOperativaActualV7 = String(vista || "").toLowerCase();
+  if(__oldMostrarVistaV7) __oldMostrarVistaV7(vista);
+  updateBadgeChatLateralV7();
+
+  // Si entra a chat pero no clickea ningún chat, no limpiamos nada.
+  // Solo se limpia al abrirChat(id).
+}
+
+async function cargarChats(silencioso=false){
+  const { data: sesiones, error } = await supabaseClient.rpc("panel_operativo_get_chat_sesiones", {
+    p_session_token: requireSessionToken(),
+    p_pc_codigo: pcOperativa
+  });
+
+  if(error){
+    console.error("Error cargando chat_sesiones RPC:", error);
+    return;
+  }
+
+  const { data: mensajesData, error: errorMensajes } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes_pc", {
+    p_session_token: requireSessionToken(),
+    p_pc_codigo: pcOperativa,
+    p_limit: 1500
+  });
+
+  const mensajes = errorMensajes ? [] : (mensajesData || []);
+
+  if(errorMensajes){
+    console.error("Error cargando chat_mensajes RPC:", errorMensajes);
+  }
+
+  let nuevosParaAvisar = 0;
+
+  let nextChats = (sesiones || []).map(c => {
+    const chatId = String(c.chat_id || c.id || "");
+    const ms = mensajes.filter(m => String(m.chat_id) === chatId);
+    const ultimo = ms.length ? ms[ms.length - 1] : null;
+
+    const userCount = userMsgCountFromMensajesV6(ms);
+    const readCount = getChatReadCount(chatId);
+
+    // Primera vez: si el operador ya lo abrió antes, usamos readCount.
+    // Si no lo abrió nunca, todos los mensajes de usuario cuentan como pendientes.
+    const prevUserCount = Number(
+      __chatLastUserCountById[chatId] !== undefined
+        ? __chatLastUserCountById[chatId]
+        : readCount
+    );
+
+    let badge = getChatBadgeV6(chatId);
+
+    // Si aumenta la cantidad de mensajes del usuario, SIEMPRE suma badge lateral.
+    // Aunque el chat esté abierto o aunque el chat ya exista.
+    if(userCount > prevUserCount){
+      const delta = userCount - prevUserCount;
+      badge += delta;
+      nuevosParaAvisar += delta;
+      setChatBadgeV6(chatId, badge);
+    }
+
+    // Actualizamos contador observado para no repetir notificación del mismo mensaje.
+    __chatLastUserCountById[chatId] = userCount;
+
+    return {
+      ID_CHAT: chatId,
+      chat_id: chatId,
+      USUARIO: c.usuario || "Usuario",
+      NOMBRE_COMPLETO: c.nombre_completo || c.usuario || "",
+      TELEFONO: c.telefono || "",
+      FECHA: c.created_at,
+      FECHA_ULTIMO: ultimo?.created_at || c.ultimo_mensaje || c.updated_at || c.created_at,
+      ULTIMO_MENSAJE: resumenMensajeChatPreviewV6(ultimo?.mensaje || "", ultimo?.imagen_url || ""),
+      SIN_LEER: badge,
+      USER_COUNT: userCount,
+      SOLICITUD_ID: c.solicitud_id || "",
+      ESTADO: c.estado || "ABIERTO",
+      PC: c.pc_codigo || pcOperativa
+    };
+  });
+
+  chats = dedupeChatsV6(nextChats);
+
+  renderChatList();
+  verificarChats(true);
+  renderInicio();
+  updateBadgeChatLateralV7();
+
+  if(nuevosParaAvisar > 0 && silencioso){
+    try{
+      toast(`💬 ${nuevosParaAvisar} mensaje/s nuevo/s de usuario`, "blue");
+      if(typeof sonidoNotificacion === "function"){
+        sonidoNotificacion();
+      }else{
+        const a = new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=");
+        a.play().catch(()=>{});
+      }
+    }catch(e){}
+  }
+
+  if(!silencioso){
+    console.log("Chats cargados por RPC:", chats.length);
+  }
+}
+
+async function abrirChat(id){
+  chatActualId = String(id || "");
+
+  const c = chats.find(x => String(x.ID_CHAT || x.chat_id) === chatActualId) || {};
+
+  setBox("chatTitulo", `
+    <span>${escapeHtml(c.USUARIO || "Usuario")}</span>
+    <button class="chat-icon-btn" title="Copiar usuario" onclick="copiarTextoOperativo('${escapeAttr(c.USUARIO || "")}','Usuario')">📋</button>
+    <button class="chat-icon-btn" title="Info usuario" onclick="abrirInfoChatUsuario()">ℹ️</button>
+  `);
+
+  setBox("chatSubtitulo", `${formatFecha(c.FECHA_ULTIMO || c.FECHA || "")}`);
+  setBox("chatEstado", c.SOLICITUD_ID ? `Solicitud: ${escapeHtml(c.SOLICITUD_ID)}` : "-");
+
+  await cargarChatActual(true);
+
+  // Abrir/clickear chat = atendido. Recién acá limpiamos badge.
+  const ms = (chatMensajes || []).filter(m => String(m.chat_id) === chatActualId);
+  const userCount = userMsgCountFromMensajesV6(ms);
+
+  setChatReadCount(chatActualId, userCount);
+  __chatLastUserCountById[chatActualId] = userCount;
+  clearChatBadgeV6(chatActualId);
+
+  try{
+    await supabaseClient.rpc("panel_operativo_marcar_chat_leido", {
+      p_session_token: requireSessionToken(),
+      p_chat_id: chatActualId
+    });
+  }catch(e){
+    console.warn("No se pudo marcar leído backend:", e);
+  }
+
+  renderChatList();
+  verificarChats(true);
+  renderInicio();
+  updateBadgeChatLateralV7();
+}
+
+async function cargarChatActual(scroll=true){
+  if(!chatActualId) return;
+
+  // Si el operador NO está en vista Chat, no tocamos mensajes ni limpiamos lectura.
+  // Esto evita que al volver a Inicio se borren notificaciones nuevas.
+  if(!isChatViewActiveV7()){
+    return;
+  }
+
+  const { data: mensajesData, error: errorPc } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes_pc", {
+    p_session_token: requireSessionToken(),
+    p_pc_codigo: pcOperativa,
+    p_limit: 1500
+  });
+
+  if(errorPc){
+    console.error("Error cargando mensajes PC:", errorPc);
+  }
+
+  let mensajes = (mensajesData || []).filter(m => String(m.chat_id) === String(chatActualId));
+
+  if(!mensajes.length){
+    const { data, error } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes", {
+      p_session_token: requireSessionToken(),
+      p_chat_id: chatActualId
+    });
+
+    if(error){
+      console.error("Error cargando mensajes chat individual:", error);
+    }else{
+      mensajes = data || [];
+    }
+  }
+
+  chatMensajes = mensajes || [];
+  renderChatMensajes();
+
+  // Importante: acá NO limpiamos badge automáticamente.
+  // Si llega un mensaje mientras el chat está abierto, queremos que el lateral Chat marque 1.
+  renderChatList();
+  verificarChats(true);
+  renderInicio();
+  updateBadgeChatLateralV7();
+
+  if(scroll){
+    const body = document.getElementById("chatBody");
+    if(body) body.scrollTop = body.scrollHeight;
+  }
+}
+
+function verificarChats(silencioso=true){
+  updateBadgeChatLateralV7();
+  lastChatUnread = (chats || []).reduce((a,c)=>a + Number(getChatBadgeV6(c.ID_CHAT || c.chat_id) || 0), 0);
+}
+
+function renderInicio(){
+  const pendientes=solicitudes.filter(esPendiente);
+  const retiros=pendientes.filter(s=>normalizar(s.TIPO_SOLICITUD||s.TIPO)==="RETIRO");
+  const unread=(chats || []).reduce((a,c)=>a+Number(getChatBadgeV6(c.ID_CHAT || c.chat_id)||0),0);
+  const bil=billeteras.find(b=>normalizar(b.SELECCIONADA_MANUAL)==="SI") || billeteras.find(b=>normalizar(b.ACTIVA)==="SI") || {};
+  const hoy = solicitudes.filter(s=>esMismoDiaBA(s.FECHA_CREACION||s.FECHA));
+
+  setBox("statPendientes",pendientes.length);
+  setBox("statRetiros",`Retiros: ${retiros.length}`);
+  setBox("statSolicitudesHoy",hoy.length);
+  setBox("statSolicitudesTotalPc",`Total PC: ${solicitudes.length}`);
+  setBox("statChats",unread);
+  setBox("statBilletera",bil.NOMBRE_VISIBLE||bil.BILLETERA_NOMBRE||"-");
+  setBox("statBilleteraTipo",bil.TIPO?`${bil.TIPO} · ${bil.PC||pcOperativa}`:"-");
+  setBox("alertas",`
+    ${pendientes.length?`<div class="alert-box">🔔 Hay ${pendientes.length} solicitud/es pendiente/s.</div>`:""}
+    ${unread?`<div class="alert-box">💬 Hay ${unread} mensaje/s de chat sin leer.</div>`:""}
+  `);
+  setBox("resumenTurnosOperativo",resumenTurnosOperativoHTML(solicitudes));
+  setBox("tablaSolicitudesInicio",tablaSolicitudesHTML(pendientes.slice(0,40)));
+  updateBadgeChatLateralV7();
+}
+
+const __oldEnviarChatV7 = typeof enviarChat === "function" ? enviarChat : null;
+async function enviarChat(){
+  if(__oldEnviarChatV7){
+    await __oldEnviarChatV7();
+  }
+
+  // Cuando el operador responde, se considera atendido el chat abierto.
+  if(chatActualId){
+    const ms = (chatMensajes || []).filter(m => String(m.chat_id) === String(chatActualId));
+    const userCount = userMsgCountFromMensajesV6(ms);
+
+    setChatReadCount(chatActualId, userCount);
+    __chatLastUserCountById[chatActualId] = userCount;
+    clearChatBadgeV6(chatActualId);
+
+    renderChatList();
+    verificarChats(true);
+    renderInicio();
+    updateBadgeChatLateralV7();
+  }
 }
 
 </script>
