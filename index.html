@@ -479,7 +479,44 @@ async function abrirChatLite(){if(!userLogin?.usuario){msg("loginMsg","Primero i
 function cerrarChatLite(){$("chatLite").classList.add("hidden")}function iniciarTimerChatLite(){if(chatLiteTimer)clearInterval(chatLiteTimer);chatLiteTimer=setInterval(cargarChatLite,2500)}
 async function cargarChatLite(){if(!chatSessionId||!chatSessionToken)return;const {data,error}=await supabaseClient.rpc("landing_leer_chat_v2",{p_chat_id:Number(chatSessionId),p_chat_token:chatSessionToken});if(error){console.error(error);return}renderChatLite((data||[]).map(m=>({TIPO_EMISOR:m.tipo_emisor,MENSAJE:m.mensaje,IMAGEN_URL:m.imagen_url,FECHA:m.created_at,LEIDO:m.leido?"SI":"NO"})))}
 async function enviarChatLite(){const input=$("chatLiteInput");const mensaje=(input.value||"").trim();if(!mensaje&&!chatLiteImagenBase64)return;try{await asegurarChatLite()}catch(e){alert("No se pudo enviar el mensaje.");return}const {error}=await supabaseClient.rpc("landing_enviar_mensaje_v2",{p_chat_id:Number(chatSessionId),p_chat_token:chatSessionToken,p_emisor:userLogin?.usuario||"Usuario",p_mensaje:mensaje||"",p_imagen_url:chatLiteImagenBase64||""});if(error){console.error(error);alert("No se pudo enviar el mensaje.");return}input.value="";chatLiteImagenBase64="";quitarImagenChatLite();await cargarChatLite()}
-function renderChatLite(mensajes){const box=$("chatLiteBody");let html=`<div class="chat-day">Chat de soporte</div>`;if(!mensajes.length)html+=`<div class="chat-msg operator"><div class="chat-bubble">Hola 👋 Escribinos tu consulta o adjuntá el comprobante si necesitás ayuda.</div><div class="chat-meta">Soporte</div></div>`;mensajes.forEach(m=>{const es=String(m.TIPO_EMISOR||"").toUpperCase()==="USUARIO", cls=es?"user":"operator", h=formatearHoraChat(m.FECHA), leido=String(m.LEIDO||"").toUpperCase()==="SI";html+=`<div class="chat-msg ${cls}"><div class="chat-bubble">${escapeHtml(m.MENSAJE||"")}${m.IMAGEN_URL?`<img src="${normalizarImagenUrl(m.IMAGEN_URL)}" alt="Imagen adjunta">`:""}</div><div class="chat-meta">${es?(leido?"✓✓ recibido":"✓ enviado"):"Soporte"} · ${h}</div></div>`});box.innerHTML=html;box.scrollTop=box.scrollHeight}
+function renderMensajeChatLite(texto){
+  const raw = String(texto || "");
+
+  if(!raw.startsWith("::TRANSFER_CARD::")){
+    return escapeHtml(raw);
+  }
+
+  try{
+    const data = JSON.parse(raw.replace("::TRANSFER_CARD::","").trim());
+
+    const nombre = escapeHtml(data.nombre_visible || data.nombre || "Billetera");
+    const titular = escapeHtml(data.titular || "");
+    const alias = escapeHtml(data.alias || "");
+    const cbu = escapeHtml(data.cbu || "");
+    const banco = escapeHtml(data.banco || "");
+
+    return `
+      <div style="
+        border:1px solid rgba(212,175,55,.35);
+        background:rgba(212,175,55,.08);
+        border-radius:14px;
+        padding:12px;
+        min-width:230px;
+      ">
+        <div style="font-weight:900;color:#f7d774;margin-bottom:8px;">💳 ${nombre}</div>
+        ${alias ? `<div style="font-size:12px;color:#94a3b8;">ALIAS</div><div style="font-weight:900;margin-bottom:7px;">${alias}</div>` : ""}
+        ${cbu ? `<div style="font-size:12px;color:#94a3b8;">CBU / CVU</div><div style="font-weight:900;margin-bottom:7px;word-break:break-all;">${cbu}</div>` : ""}
+        ${titular ? `<div style="font-size:12px;color:#94a3b8;">TITULAR</div><div style="font-weight:900;margin-bottom:7px;">${titular}</div>` : ""}
+        ${banco ? `<div style="font-size:12px;color:#94a3b8;">Banco: ${banco}</div>` : ""}
+      </div>
+    `;
+  }catch(e){
+    return escapeHtml(raw);
+  }
+}
+  
+  
+function renderChatLite(mensajes){const box=$("chatLiteBody");let html=`<div class="chat-day">Chat de soporte</div>`;if(!mensajes.length)html+=`<div class="chat-msg operator"><div class="chat-bubble">Hola 👋 Escribinos tu consulta o adjuntá el comprobante si necesitás ayuda.</div><div class="chat-meta">Soporte</div></div>`;mensajes.forEach(m=>{const es=String(m.TIPO_EMISOR||"").toUpperCase()==="USUARIO", cls=es?"user":"operator", h=formatearHoraChat(m.FECHA), leido=String(m.LEIDO||"").toUpperCase()==="SI";html+=`<div class="chat-msg ${cls}"><div class="chat-bubble">${renderMensajeChatLite(m.MENSAJE||"")}${m.IMAGEN_URL?`<img src="${normalizarImagenUrl(m.IMAGEN_URL)}" alt="Imagen adjunta">`:""}</div><div class="chat-meta">${es?(leido?"✓✓ recibido":"✓ enviado"):"Soporte"} · ${h}</div></div>`});box.innerHTML=html;box.scrollTop=box.scrollHeight}
 function normalizarImagenUrl(u){u=String(u||"");return u.startsWith("data:image")?u:u}
 function formatearHoraChat(f){try{return new Date(f).toLocaleTimeString("es-AR",{timeZone:"America/Argentina/Buenos_Aires",hour:"2-digit",minute:"2-digit",hour12:false})}catch(e){return""}}
 function comprimirImagenChat(file,cb){const img=new Image(),reader=new FileReader();reader.onload=()=>{img.onload=()=>{const max=560;let w=img.width,h=img.height;if(w>h&&w>max){h=Math.round(h*max/w);w=max}else if(h>=w&&h>max){w=Math.round(w*max/h);h=max}const canvas=document.createElement("canvas");canvas.width=w;canvas.height=h;const ctx=canvas.getContext("2d");ctx.drawImage(img,0,0,w,h);cb(canvas.toDataURL("image/jpeg",.52))};img.src=reader.result};reader.readAsDataURL(file)}
