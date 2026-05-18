@@ -3,1026 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>NODO · ADMIN LOGIN OBLIGATORIO</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
-/* =========================================================
-   ADMIN V16A FIX1 · OPERADORES
-   Fallback robusto para que guardar/editar/eliminar use RPC sí o sí
-   y muestre errores visibles.
-========================================================= */
-
-window.__submitOperadorFallback = function(ev){
-  // Dejamos que el submit normal corra, pero si el navegador no dispara submit,
-  // llamamos la función manualmente.
-  setTimeout(()=>{
-    if(window.__lastOperadorSubmitAt && Date.now() - window.__lastOperadorSubmitAt < 900) return;
-    try{ saveOperador(ev); }catch(e){ console.error(e); alert("Error guardando operador: "+(e.message||e)); }
-  },50);
-  return true;
-};
-
-async function saveOperador(e){
-  if(e && e.preventDefault)e.preventDefault();
-  window.__lastOperadorSubmitAt = Date.now();
-
-  try{
-    const id = val("op_id");
-    const usuario = val("op_usuario").trim();
-    const nombre = val("op_nombre").trim();
-
-    if(!usuario || !nombre){
-      toast("Completá usuario y nombre.", "err");
-      return false;
-    }
-
-    const payload = {
-      p_session_token: requireAdminToken(),
-      p_operador_id: id ? Number(id) : null,
-      p_usuario: usuario,
-      p_nombre: nombre,
-      p_clave: val("op_clave"),
-      p_password: val("op_password"),
-      p_rol: val("op_rol") || "OPERADOR",
-      p_tipo: val("op_tipo") || "FIJO",
-      p_pc_codigo: val("op_pc_codigo"),
-      p_turno: val("op_turno"),
-      p_telefono: val("op_telefono"),
-      p_email: val("op_email"),
-      p_activo: bool("op_activo"),
-      p_observaciones: val("op_observaciones")
-    };
-
-    console.log("RPC admin_guardar_operador payload", payload);
-
-    const {data,error}=await supabaseClient.rpc("admin_guardar_operador", payload);
-
-    if(error){
-      console.error("admin_guardar_operador", error);
-      toast("Error operador: " + (error.message || "error desconocido"), "err");
-      alert("Error operador: " + (error.message || "error desconocido"));
-      return false;
-    }
-
-    const row = Array.isArray(data) ? data[0] : data;
-
-    resetOperadorForm();
-    await loadOperadores(true);
-    renderOperadores();
-    toast(row?.mensaje || "Operador guardado por RPC", "okb");
-    alert(row?.mensaje || "Operador guardado");
-    return false;
-
-  }catch(err){
-    console.error("saveOperador exception", err);
-    toast("Error operador: " + (err.message || err), "err");
-    alert("Error operador: " + (err.message || err));
-    return false;
-  }
-}
-
-async function adminToggleOperador(id, activo){
-  try{
-    const accion = activo ? "activar" : "desactivar";
-    if(!confirm(`¿Querés ${accion} este operador?`))return;
-
-    const {data,error}=await supabaseClient.rpc("admin_cambiar_estado_operador", {
-      p_session_token: requireAdminToken(),
-      p_operador_id: Number(id),
-      p_activo: !!activo
-    });
-
-    if(error){
-      console.error("admin_cambiar_estado_operador", error);
-      toast("Error: " + (error.message || "error desconocido"), "err");
-      alert("Error: " + (error.message || "error desconocido"));
-      return;
-    }
-
-    const row = Array.isArray(data) ? data[0] : data;
-    await loadOperadores(true);
-    renderOperadores();
-    toast(row?.mensaje || "Operador actualizado", "okb");
-  }catch(err){
-    console.error(err);
-    alert("Error cambiando estado: "+(err.message||err));
-  }
-}
-
-async function adminDeleteOperador(id){
-  try{
-    if(!confirm("¿Seguro que querés eliminar este operador? Esta acción no se puede deshacer."))return;
-
-    const {data,error}=await supabaseClient.rpc("admin_eliminar_operador", {
-      p_session_token: requireAdminToken(),
-      p_operador_id: Number(id)
-    });
-
-    if(error){
-      console.error("admin_eliminar_operador", error);
-      toast("Error al eliminar: " + (error.message || "error desconocido"), "err");
-      alert("Error al eliminar: " + (error.message || "error desconocido"));
-      return;
-    }
-
-    const row = Array.isArray(data) ? data[0] : data;
-    await loadOperadores(true);
-    renderOperadores();
-    toast(row?.mensaje || "Operador eliminado", "okb");
-  }catch(err){
-    console.error(err);
-    alert("Error eliminando: "+(err.message||err));
-  }
-}
-
-function renderOperadores(){
-  const q=norm(val("op_search")),rol=val("op_filter_rol"),pc=val("op_filter_pc"),act=val("op_filter_activo");
-  let rows=operadores.filter(o=>
-    (!q||norm([o.id,o.usuario,o.nombre,o.rol,o.tipo,o.pc_codigo,o.turno,o.telefono,o.email].join(" ")).includes(q))&&
-    (!rol||o.rol===rol)&&
-    (!pc||o.pc_codigo===pc)&&
-    (act===""||String(!!o.activo)===act)
-  );
-
-  if(!rows.length)return empty("operadoresBody",9,"No hay operadores.");
-
-  $("operadoresBody").innerHTML=rows.map(o=>`<tr>
-    <td>${safe(o.id)}</td>
-    <td>${safe(o.usuario)}</td>
-    <td><strong>${safe(o.nombre)}</strong></td>
-    <td>${pill(o.rol||'-','vio')}</td>
-    <td>${safe(o.tipo)}</td>
-    <td>${safe(o.pc_codigo)}</td>
-    <td>${safe(o.turno)}</td>
-    <td>${o.activo?pill('Activo','ok'):pill('Inactivo','off')}</td>
-    <td><div class="rowActions">
-      <button class="small blue" onclick="editOperador('${o.id}')">Editar</button>
-      <button class="small ${o.activo?'warning':'primary'}" onclick="adminToggleOperador('${o.id}',${!o.activo})">${o.activo?'Desactivar':'Activar'}</button>
-      <button class="small danger" onclick="adminDeleteOperador('${o.id}')">Eliminar</button>
-    </div></td>
-  </tr>`).join("");
-}
-
-function editOperador(id){
-  const o=operadores.find(x=>String(x.id)===String(id));
-  if(!o)return;
-
-  setVals({
-    op_id:o.id,
-    op_usuario:o.usuario,
-    op_nombre:o.nombre,
-    op_clave:"",
-    op_password:"",
-    op_rol:o.rol||'OPERADOR',
-    op_tipo:o.tipo||'FIJO',
-    op_pc_codigo:o.pc_codigo,
-    op_turno:o.turno,
-    op_telefono:o.telefono,
-    op_email:o.email,
-    op_activo:String(!!o.activo),
-    op_observaciones:o.observaciones
-  });
-
-  $("opFormTitle").textContent="Editar operador";
-  showSection("operadores");
-  scrollTo(0,0);
-}
-
-
-/* =========================================================
-   ADMIN V16A FIX2 · TOKEN HELPER
-   Corrige: requireAdminToken is not defined.
-========================================================= */
-
-if(typeof window.LS_ADMIN_TOKEN === "undefined"){
-  window.LS_ADMIN_TOKEN = "nodo_admin_session_token";
-}
-
-window.requireAdminToken = function(){
-  // Caso normal: variable global creada por el login nuevo.
-  if(typeof adminSessionToken !== "undefined" && adminSessionToken){
-    return adminSessionToken;
-  }
-
-  // Fallback: token guardado en localStorage.
-  const token = localStorage.getItem(window.LS_ADMIN_TOKEN || "nodo_admin_session_token");
-
-  if(token){
-    try{
-      if(typeof adminSessionToken !== "undefined"){
-        adminSessionToken = token;
-      }
-    }catch(e){}
-    return token;
-  }
-
-  throw new Error("Sesión admin no iniciada. Cerrá sesión y volvé a ingresar.");
-};
-
-// Reforzamos saveOperador para que use window.requireAdminToken explícitamente.
-async function saveOperador(e){
-  if(e && e.preventDefault)e.preventDefault();
-  window.__lastOperadorSubmitAt = Date.now();
-
-  try{
-    const id = val("op_id");
-    const usuario = val("op_usuario").trim();
-    const nombre = val("op_nombre").trim();
-
-    if(!usuario || !nombre){
-      toast("Completá usuario y nombre.", "err");
-      return false;
-    }
-
-    const payload = {
-      p_session_token: window.requireAdminToken(),
-      p_operador_id: id ? Number(id) : null,
-      p_usuario: usuario,
-      p_nombre: nombre,
-      p_clave: val("op_clave"),
-      p_password: val("op_password"),
-      p_rol: val("op_rol") || "OPERADOR",
-      p_tipo: val("op_tipo") || "FIJO",
-      p_pc_codigo: val("op_pc_codigo"),
-      p_turno: val("op_turno"),
-      p_telefono: val("op_telefono"),
-      p_email: val("op_email"),
-      p_activo: bool("op_activo"),
-      p_observaciones: val("op_observaciones")
-    };
-
-    const {data,error}=await supabaseClient.rpc("admin_guardar_operador", payload);
-
-    if(error){
-      console.error("admin_guardar_operador", error);
-      toast("Error operador: " + (error.message || "error desconocido"), "err");
-      alert("Error operador: " + (error.message || "error desconocido"));
-      return false;
-    }
-
-    const row = Array.isArray(data) ? data[0] : data;
-
-    resetOperadorForm();
-    await loadOperadores(true);
-    renderOperadores();
-    toast(row?.mensaje || "Operador guardado por RPC", "okb");
-    alert(row?.mensaje || "Operador guardado");
-    return false;
-
-  }catch(err){
-    console.error("saveOperador exception", err);
-    toast("Error operador: " + (err.message || err), "err");
-    alert("Error operador: " + (err.message || err));
-    return false;
-  }
-}
-
-async function adminToggleOperador(id, activo){
-  try{
-    const accion = activo ? "activar" : "desactivar";
-    if(!confirm(`¿Querés ${accion} este operador?`))return;
-
-    const {data,error}=await supabaseClient.rpc("admin_cambiar_estado_operador", {
-      p_session_token: window.requireAdminToken(),
-      p_operador_id: Number(id),
-      p_activo: !!activo
-    });
-
-    if(error){
-      console.error("admin_cambiar_estado_operador", error);
-      toast("Error: " + (error.message || "error desconocido"), "err");
-      alert("Error: " + (error.message || "error desconocido"));
-      return;
-    }
-
-    const row = Array.isArray(data) ? data[0] : data;
-    await loadOperadores(true);
-    renderOperadores();
-    toast(row?.mensaje || "Operador actualizado", "okb");
-  }catch(err){
-    console.error(err);
-    alert("Error cambiando estado: "+(err.message||err));
-  }
-}
-
-async function adminDeleteOperador(id){
-  try{
-    if(!confirm("¿Seguro que querés eliminar este operador? Esta acción no se puede deshacer."))return;
-
-    const {data,error}=await supabaseClient.rpc("admin_eliminar_operador", {
-      p_session_token: window.requireAdminToken(),
-      p_operador_id: Number(id)
-    });
-
-    if(error){
-      console.error("admin_eliminar_operador", error);
-      toast("Error al eliminar: " + (error.message || "error desconocido"), "err");
-      alert("Error al eliminar: " + (error.message || "error desconocido"));
-      return;
-    }
-
-    const row = Array.isArray(data) ? data[0] : data;
-    await loadOperadores(true);
-    renderOperadores();
-    toast(row?.mensaje || "Operador eliminado", "okb");
-  }catch(err){
-    console.error(err);
-    alert("Error eliminando: "+(err.message||err));
-  }
-}
-
-
-/* =========================================================
-   ADMIN V16B · BILLETERAS POR RPC
-   Migra guardar/editar, activar/pausar, manual y eliminar.
-========================================================= */
-
-async function saveBilletera(e){
-  if(e && e.preventDefault)e.preventDefault();
-
-  try{
-    const id = val("bi_id");
-
-    const payload = {
-      p_session_token: window.requireAdminToken ? window.requireAdminToken() : requireAdminToken(),
-      p_billetera_id: id ? Number(id) : null,
-      p_pc_codigo: val("bi_pc_codigo"),
-      p_nombre_visible: val("bi_nombre_visible"),
-      p_titular: val("bi_titular"),
-      p_alias: val("bi_alias"),
-      p_cbu: val("bi_cbu"),
-      p_banco: val("bi_banco"),
-      p_estado: val("bi_estado") || "activa",
-      p_prioridad: num("bi_prioridad"),
-      p_activa: bool("bi_activa"),
-      p_seleccionada_manual: bool("bi_manual"),
-      p_orden: num("bi_orden"),
-      p_observaciones: val("bi_observaciones")
-    };
-
-    const {data,error}=await supabaseClient.rpc("admin_guardar_billetera", payload);
-
-    if(error){
-      console.error("admin_guardar_billetera", error);
-      toast("Error billetera: " + (error.message || "error desconocido"), "err");
-      alert("Error billetera: " + (error.message || "error desconocido"));
-      return false;
-    }
-
-    const row = Array.isArray(data) ? data[0] : data;
-
-    resetBilleteraForm();
-    await loadBilleteras(true);
-    renderBilleteras();
-    toast(row?.mensaje || "Billetera guardada", "okb");
-    alert(row?.mensaje || "Billetera guardada");
-    return false;
-
-  }catch(err){
-    console.error("saveBilletera exception", err);
-    toast("Error billetera: " + (err.message || err), "err");
-    alert("Error billetera: " + (err.message || err));
-    return false;
-  }
-}
-
-async function toggleBilletera(id, activa){
-  try{
-    const accion = activa ? "activar" : "pausar";
-    if(!confirm(`¿Querés ${accion} esta billetera?`))return;
-
-    const {data,error}=await supabaseClient.rpc("admin_cambiar_estado_billetera", {
-      p_session_token: window.requireAdminToken ? window.requireAdminToken() : requireAdminToken(),
-      p_billetera_id: Number(id),
-      p_activa: !!activa
-    });
-
-    if(error){
-      console.error("admin_cambiar_estado_billetera", error);
-      toast("Error: " + (error.message || "error desconocido"), "err");
-      alert("Error: " + (error.message || "error desconocido"));
-      return;
-    }
-
-    const row = Array.isArray(data) ? data[0] : data;
-    await loadBilleteras(true);
-    renderBilleteras();
-    toast(row?.mensaje || "Billetera actualizada", "okb");
-  }catch(err){
-    console.error(err);
-    alert("Error cambiando estado: "+(err.message||err));
-  }
-}
-
-async function setManual(id){
-  try{
-    if(!confirm("¿Poner esta billetera como manual para landing en su PC?"))return;
-
-    const {data,error}=await supabaseClient.rpc("admin_seleccionar_billetera_manual", {
-      p_session_token: window.requireAdminToken ? window.requireAdminToken() : requireAdminToken(),
-      p_billetera_id: Number(id)
-    });
-
-    if(error){
-      console.error("admin_seleccionar_billetera_manual", error);
-      toast("Error: " + (error.message || "error desconocido"), "err");
-      alert("Error: " + (error.message || "error desconocido"));
-      return;
-    }
-
-    const row = Array.isArray(data) ? data[0] : data;
-    await loadBilleteras(true);
-    renderBilleteras();
-    toast(row?.mensaje || "Billetera seleccionada", "okb");
-  }catch(err){
-    console.error(err);
-    alert("Error seleccionando manual: "+(err.message||err));
-  }
-}
-
-async function adminDeleteBilletera(id){
-  try{
-    if(!confirm("¿Seguro que querés eliminar esta billetera? Esta acción no se puede deshacer."))return;
-
-    const {data,error}=await supabaseClient.rpc("admin_eliminar_billetera", {
-      p_session_token: window.requireAdminToken ? window.requireAdminToken() : requireAdminToken(),
-      p_billetera_id: Number(id)
-    });
-
-    if(error){
-      console.error("admin_eliminar_billetera", error);
-      toast("Error al eliminar: " + (error.message || "error desconocido"), "err");
-      alert("Error al eliminar: " + (error.message || "error desconocido"));
-      return;
-    }
-
-    const row = Array.isArray(data) ? data[0] : data;
-    await loadBilleteras(true);
-    renderBilleteras();
-    toast(row?.mensaje || "Billetera eliminada", "okb");
-  }catch(err){
-    console.error(err);
-    alert("Error eliminando billetera: "+(err.message||err));
-  }
-}
-
-function renderBilleteras(){
-  const q=norm(val("bi_search")),banco=val("bi_filter_banco"),pc=val("bi_filter_pc"),act=val("bi_filter_activa");
-  let rows=billeteras.filter(b=>
-    (!q||norm([b.id,b.pc_codigo,b.nombre_visible,b.titular,b.alias,b.cbu,b.banco,b.estado].join(" ")).includes(q))&&
-    (!banco||b.banco===banco)&&
-    (!pc||b.pc_codigo===pc)&&
-    (act===""||String(!!b.activa)===act)
-  );
-
-  if(!rows.length)return empty("billeterasBody",11,"No hay billeteras para el filtro actual.");
-
-  $("billeterasBody").innerHTML=rows.map(b=>`<tr>
-    <td>${safe(b.id)}</td>
-    <td>${safe(b.pc_codigo)}</td>
-    <td><strong>${safe(b.nombre_visible)}</strong></td>
-    <td>${safe(b.titular)}</td>
-    <td>${safe(b.banco)}</td>
-    <td>${safe(b.alias)}</td>
-    <td>${estadoBi(b)}</td>
-    <td>${mpBadge(b)}</td>
-    <td>${safe(b.prioridad||0)}</td>
-    <td>${b.seleccionada_manual?pill('Manual','warn'):'<span class="muted">No</span>'}</td>
-    <td><div class="rowActions">
-      <button class="small blue" onclick="editBilletera('${b.id}')">Editar</button>
-      <button class="small ${b.activa?'warning':'primary'}" onclick="toggleBilletera('${b.id}',${!b.activa})">${b.activa?'Pausar':'Activar'}</button>
-      <button class="small violet" onclick="setManual('${b.id}')">Manual</button>
-      <button class="small danger" onclick="adminDeleteBilletera('${b.id}')">Eliminar</button>
-    </div></td>
-  </tr>`).join("");
-}
-
-
-/* =========================================================
-   ADMIN V16B FIX LOGOUT
-   Cerrar sesión robusto para cambiar de admi a nahuel.
-========================================================= */
-
-async function adminLogout(){
-  try{
-    const token = (typeof adminSessionToken !== "undefined" && adminSessionToken)
-      ? adminSessionToken
-      : localStorage.getItem("nodo_admin_session_token");
-
-    if(token){
-      try{
-        await supabaseClient.rpc("panel_logout", { p_session_token: token });
-      }catch(e){
-        console.warn("No se pudo cerrar sesión en backend:", e);
-      }
-    }
-  }finally{
-    try{ localStorage.removeItem("nodo_admin_session_token"); }catch(e){}
-    try{ localStorage.removeItem("LS_ADMIN_TOKEN"); }catch(e){}
-    try{ sessionStorage.clear(); }catch(e){}
-    location.reload();
-  }
-}
-
-// Botón flotante de emergencia, por si la barra superior queda fuera de vista.
-document.addEventListener("DOMContentLoaded",()=>{
-  setTimeout(()=>{
-    if(document.getElementById("logoutFloatingBtn"))return;
-    const btn=document.createElement("button");
-    btn.id="logoutFloatingBtn";
-    btn.textContent="Cerrar sesión";
-    btn.onclick=adminLogout;
-    btn.style.position="fixed";
-    btn.style.right="18px";
-    btn.style.bottom="18px";
-    btn.style.zIndex="99999";
-    btn.style.background="#ef4444";
-    btn.style.color="#fff";
-    btn.style.border="0";
-    btn.style.borderRadius="14px";
-    btn.style.padding="12px 16px";
-    btn.style.fontWeight="900";
-    btn.style.boxShadow="0 12px 35px rgba(0,0,0,.35)";
-    document.body.appendChild(btn);
-  },800);
-});
-
-
-/* =========================================================
-   ADMIN V16B FIX LOGOUT 2
-   Cierre real: borra todos los tokens posibles y evita auto-login.
-========================================================= */
-
-function limpiarSesionAdminLocal(){
-  const keysToRemove = [];
-
-  try{
-    for(let i=0;i<localStorage.length;i++){
-      const k = localStorage.key(i);
-      if(!k) continue;
-      const lk = k.toLowerCase();
-      if(
-        lk.includes("nodo_admin") ||
-        lk.includes("admin_session") ||
-        lk.includes("session_token") ||
-        lk.includes("supabase") ||
-        lk.includes("sb-")
-      ){
-        keysToRemove.push(k);
-      }
-    }
-    keysToRemove.forEach(k=>localStorage.removeItem(k));
-    localStorage.removeItem("nodo_admin_session_token");
-    localStorage.removeItem("LS_ADMIN_TOKEN");
-  }catch(e){
-    console.warn("No pude limpiar localStorage completo:", e);
-  }
-
-  try{
-    sessionStorage.clear();
-  }catch(e){}
-}
-
-async function adminLogout(){
-  const token =
-    (typeof adminSessionToken !== "undefined" && adminSessionToken)
-      ? adminSessionToken
-      : localStorage.getItem("nodo_admin_session_token");
-
-  try{
-    if(token){
-      await supabaseClient.rpc("panel_logout", { p_session_token: token });
-    }
-  }catch(e){
-    console.warn("No se pudo cerrar en backend, igual limpio local:", e);
-  }
-
-  try{
-    if(typeof adminSessionToken !== "undefined") adminSessionToken = "";
-    if(typeof adminScope !== "undefined") adminScope = null;
-  }catch(e){}
-
-  limpiarSesionAdminLocal();
-
-  // Esta marca evita que initAdminSession intente reusar algo en el próximo reload.
-  sessionStorage.setItem("admin_force_login", "1");
-
-  // Recarga sin conservar estado.
-  window.location.replace(window.location.pathname + "?logout=1&t=" + Date.now());
-}
-
-// Override de initAdminSession para respetar logout forzado.
-async function initAdminSession(){
-  const urlParams = new URLSearchParams(window.location.search);
-  const forcedLogout = urlParams.get("logout") === "1" || sessionStorage.getItem("admin_force_login") === "1";
-
-  if(forcedLogout){
-    limpiarSesionAdminLocal();
-    sessionStorage.removeItem("admin_force_login");
-
-    if($("loginView"))$("loginView").classList.remove("hidden");
-    if($("appView"))$("appView").classList.add("hidden");
-
-    // Limpia URL.
-    if(window.history && window.history.replaceState){
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-    return;
-  }
-
-  const token = localStorage.getItem("nodo_admin_session_token");
-  if(token){
-    const ok = await validarAdminToken(token);
-    if(ok)return;
-  }
-
-  limpiarSesionAdminLocal();
-
-  if($("loginView"))$("loginView").classList.remove("hidden");
-  if($("appView"))$("appView").classList.add("hidden");
-}
-
-// Botón flotante fijo visible siempre dentro del panel.
-document.addEventListener("DOMContentLoaded",()=>{
-  setTimeout(()=>{
-    let btn=document.getElementById("logoutFloatingBtn");
-    if(!btn){
-      btn=document.createElement("button");
-      btn.id="logoutFloatingBtn";
-      btn.textContent="Cerrar sesión";
-      document.body.appendChild(btn);
-    }
-    btn.onclick=adminLogout;
-    btn.style.position="fixed";
-    btn.style.right="18px";
-    btn.style.bottom="18px";
-    btn.style.zIndex="999999";
-    btn.style.background="#ef4444";
-    btn.style.color="#fff";
-    btn.style.border="0";
-    btn.style.borderRadius="14px";
-    btn.style.padding="12px 16px";
-    btn.style.fontWeight="900";
-    btn.style.boxShadow="0 12px 35px rgba(0,0,0,.35)";
-  },700);
-});
-
-
-/* =========================================================
-   ADMIN V16B FIX3 · SIN AUTOLOGIN
-   Esta versión NO reutiliza localStorage para entrar sola.
-   Cada pestaña nueva pide usuario y clave.
-========================================================= */
-
-function limpiarSesionAdminLocal(){
-  try{
-    const keys=[];
-    for(let i=0;i<localStorage.length;i++){
-      const k=localStorage.key(i);
-      if(!k)continue;
-      const lk=k.toLowerCase();
-      if(
-        lk.includes("nodo") ||
-        lk.includes("admin") ||
-        lk.includes("session") ||
-        lk.includes("token") ||
-        lk.includes("supabase") ||
-        lk.includes("sb-")
-      ){
-        keys.push(k);
-      }
-    }
-    keys.forEach(k=>localStorage.removeItem(k));
-    localStorage.removeItem("nodo_admin_session_token");
-    localStorage.removeItem("LS_ADMIN_TOKEN");
-  }catch(e){console.warn(e)}
-
-  try{sessionStorage.clear()}catch(e){}
-}
-
-function mostrarLoginAdmin(){
-  try{
-    if(typeof adminSessionToken !== "undefined") adminSessionToken="";
-    if(typeof adminScope !== "undefined") adminScope=null;
-  }catch(e){}
-
-  if($("loginView"))$("loginView").classList.remove("hidden");
-  if($("appView"))$("appView").classList.add("hidden");
-
-  const msg=$("adminLoginMsg");
-  if(msg)msg.innerHTML="";
-}
-
-// IMPORTANTE: reemplaza el init anterior.
-// Ya no mira localStorage. Siempre pide login al abrir.
-async function initAdminSession(){
-  limpiarSesionAdminLocal();
-  mostrarLoginAdmin();
-}
-
-// Login sin guardar token en localStorage.
-async function adminLogin(){
-  const usuario=val("adminLoginUsuario").trim();
-  const clave=val("adminLoginClave").trim();
-
-  if(!usuario||!clave){
-    $("adminLoginMsg").innerHTML='<div class="notice">Completá usuario y clave.</div>';
-    return;
-  }
-
-  $("adminLoginMsg").innerHTML='<div class="notice">Validando acceso...</div>';
-
-  const {data,error}=await supabaseClient.rpc("panel_login",{
-    p_usuario:usuario,
-    p_clave:clave,
-    p_ip:null,
-    p_user_agent:navigator.userAgent||"admin"
-  });
-
-  if(error){
-    $("adminLoginMsg").innerHTML='<div class="notice" style="border-color:rgba(239,68,68,.7);color:#fecaca">Error: '+safe(error.message)+'</div>';
-    return;
-  }
-
-  const row=Array.isArray(data)?data[0]:data;
-  if(!row||row.ok!==true){
-    $("adminLoginMsg").innerHTML='<div class="notice" style="border-color:rgba(239,68,68,.7);color:#fecaca">'+safe(row?.mensaje||"Usuario o clave incorrectos")+'</div>';
-    return;
-  }
-
-  const ok=await validarAdminToken(row.session_token);
-  if(!ok){
-    try{await supabaseClient.rpc("panel_logout",{p_session_token:row.session_token})}catch(e){}
-    return;
-  }
-
-  // NO guardar en localStorage.
-  try{localStorage.removeItem("nodo_admin_session_token")}catch(e){}
-}
-
-// Validación usando variable de memoria.
-async function validarAdminToken(token){
-  const {data,error}=await supabaseClient.rpc("panel_validar_admin_session",{
-    p_session_token:token
-  });
-
-  if(error){
-    $("adminLoginMsg").innerHTML='<div class="notice" style="border-color:rgba(239,68,68,.7);color:#fecaca">'+safe(error.message||"Sin permisos admin")+'</div>';
-    return false;
-  }
-
-  const row=Array.isArray(data)?data[0]:data;
-  if(!row||row.ok!==true){
-    $("adminLoginMsg").innerHTML='<div class="notice" style="border-color:rgba(239,68,68,.7);color:#fecaca">Sesión inválida.</div>';
-    return false;
-  }
-
-  adminSessionToken=token;
-  adminScope=row;
-
-  $("loginView").classList.add("hidden");
-  $("appView").classList.remove("hidden");
-
-  $("adminInfo").classList.remove("hidden");
-  $("adminInfo").innerHTML=`<b>${safe(row.nombre||row.usuario)}</b><br>
-    <span class="pill info">${safe(row.rol)}</span>
-    <span class="pill ${row.puede_todas?'ok':'warn'}">${row.puede_todas?'TODAS LAS PCs':'PC '+safe(row.pc_codigo)}</span>`;
-
-  aplicarScopeAdmin();
-  await reloadAll();
-  return true;
-}
-
-window.requireAdminToken=function(){
-  if(typeof adminSessionToken !== "undefined" && adminSessionToken){
-    return adminSessionToken;
-  }
-  throw new Error("Sesión admin no iniciada. Volvé a ingresar usuario y clave.");
-};
-
-async function adminLogout(){
-  const token=(typeof adminSessionToken !== "undefined" && adminSessionToken) ? adminSessionToken : "";
-  try{
-    if(token) await supabaseClient.rpc("panel_logout",{p_session_token:token});
-  }catch(e){console.warn(e)}
-
-  limpiarSesionAdminLocal();
-  mostrarLoginAdmin();
-
-  // Limpia formularios de login.
-  try{
-    if($("adminLoginUsuario"))$("adminLoginUsuario").value="";
-    if($("adminLoginClave"))$("adminLoginClave").value="";
-  }catch(e){}
-}
-
-// Botón flotante fijo.
-document.addEventListener("DOMContentLoaded",()=>{
-  setTimeout(()=>{
-    let btn=document.getElementById("logoutFloatingBtn");
-    if(!btn){
-      btn=document.createElement("button");
-      btn.id="logoutFloatingBtn";
-      btn.textContent="Cerrar sesión";
-      document.body.appendChild(btn);
-    }
-    btn.onclick=adminLogout;
-    btn.style.position="fixed";
-    btn.style.right="18px";
-    btn.style.bottom="18px";
-    btn.style.zIndex="999999";
-    btn.style.background="#ef4444";
-    btn.style.color="#fff";
-    btn.style.border="0";
-    btn.style.borderRadius="14px";
-    btn.style.padding="12px 16px";
-    btn.style.fontWeight="900";
-    btn.style.boxShadow="0 12px 35px rgba(0,0,0,.35)";
-  },700);
-});
-
-
-/* =========================================================
-   ADMIN V16B FIX4 · LOGIN OBLIGATORIO REAL
-   No localStorage. No autologin. Siempre pide usuario y clave.
-========================================================= */
-
-function nodoWipeAdminStorage(){
-  try{
-    const ks=[];
-    for(let i=0;i<localStorage.length;i++){
-      const k=localStorage.key(i);
-      if(!k)continue;
-      const lk=k.toLowerCase();
-      if(lk.includes("nodo") || lk.includes("admin") || lk.includes("session") || lk.includes("token") || lk.includes("supabase") || lk.includes("sb-")){
-        ks.push(k);
-      }
-    }
-    ks.forEach(k=>localStorage.removeItem(k));
-    localStorage.removeItem("nodo_admin_session_token");
-    localStorage.removeItem("LS_ADMIN_TOKEN");
-  }catch(e){}
-  try{sessionStorage.clear()}catch(e){}
-}
-
-function mostrarLoginAdmin(){
-  try{ adminSessionToken=""; adminScope=null; }catch(e){}
-  nodoWipeAdminStorage();
-
-  const login=$("loginView");
-  const app=$("appView");
-
-  if(login){
-    login.classList.remove("hidden");
-    login.style.display="flex";
-  }
-  if(app){
-    app.classList.add("hidden");
-    app.style.display="none";
-  }
-
-  document.body.classList.add("force-login-lock");
-}
-
-function mostrarAppAdmin(){
-  const login=$("loginView");
-  const app=$("appView");
-
-  document.body.classList.remove("force-login-lock");
-  document.documentElement.classList.remove("force-login-lock");
-
-  if(login){
-    login.classList.add("hidden");
-    login.style.display="none";
-  }
-  if(app){
-    app.classList.remove("hidden");
-    app.style.display="";
-  }
-}
-
-// Override total: al abrir, siempre login.
-async function initAdminSession(){
-  mostrarLoginAdmin();
-}
-
-async function adminLogin(){
-  const usuario=val("adminLoginUsuario").trim();
-  const clave=val("adminLoginClave").trim();
-
-  if(!usuario||!clave){
-    $("adminLoginMsg").innerHTML='<div class="notice">Completá usuario y clave.</div>';
-    return;
-  }
-
-  $("adminLoginMsg").innerHTML='<div class="notice">Validando acceso...</div>';
-
-  const {data,error}=await supabaseClient.rpc("panel_login",{
-    p_usuario:usuario,
-    p_clave:clave,
-    p_ip:null,
-    p_user_agent:navigator.userAgent||"admin"
-  });
-
-  if(error){
-    $("adminLoginMsg").innerHTML='<div class="notice" style="border-color:rgba(239,68,68,.7);color:#fecaca">Error: '+safe(error.message)+'</div>';
-    return;
-  }
-
-  const row=Array.isArray(data)?data[0]:data;
-  if(!row||row.ok!==true){
-    $("adminLoginMsg").innerHTML='<div class="notice" style="border-color:rgba(239,68,68,.7);color:#fecaca">'+safe(row?.mensaje||"Usuario o clave incorrectos")+'</div>';
-    return;
-  }
-
-  const ok=await validarAdminToken(row.session_token);
-  if(!ok){
-    try{await supabaseClient.rpc("panel_logout",{p_session_token:row.session_token})}catch(e){}
-    return;
-  }
-
-  nodoWipeAdminStorage();
-}
-
-async function validarAdminToken(token){
-  const {data,error}=await supabaseClient.rpc("panel_validar_admin_session",{
-    p_session_token:token
-  });
-
-  if(error){
-    $("adminLoginMsg").innerHTML='<div class="notice" style="border-color:rgba(239,68,68,.7);color:#fecaca">'+safe(error.message||"Sin permisos admin")+'</div>';
-    return false;
-  }
-
-  const row=Array.isArray(data)?data[0]:data;
-  if(!row||row.ok!==true){
-    $("adminLoginMsg").innerHTML='<div class="notice" style="border-color:rgba(239,68,68,.7);color:#fecaca">Sesión inválida.</div>';
-    return false;
-  }
-
-  adminSessionToken=token;
-  adminScope=row;
-
-  mostrarAppAdmin();
-
-  $("adminInfo").classList.remove("hidden");
-  $("adminInfo").innerHTML=`<b>${safe(row.nombre||row.usuario)}</b><br>
-    <span class="pill info">${safe(row.rol)}</span>
-    <span class="pill ${row.puede_todas?'ok':'warn'}">${row.puede_todas?'TODAS LAS PCs':'PC '+safe(row.pc_codigo)}</span>`;
-
-  aplicarScopeAdmin();
-  await reloadAll();
-  return true;
-}
-
-window.requireAdminToken=function(){
-  if(typeof adminSessionToken !== "undefined" && adminSessionToken){
-    return adminSessionToken;
-  }
-  throw new Error("Sesión admin no iniciada. Ingresá usuario y clave.");
-};
-
-async function adminLogout(){
-  const token=(typeof adminSessionToken !== "undefined" && adminSessionToken) ? adminSessionToken : "";
-  try{
-    if(token) await supabaseClient.rpc("panel_logout",{p_session_token:token});
-  }catch(e){console.warn(e)}
-
-  try{
-    if($("adminLoginUsuario"))$("adminLoginUsuario").value="";
-    if($("adminLoginClave"))$("adminLoginClave").value="";
-    if($("adminLoginMsg"))$("adminLoginMsg").innerHTML="";
-  }catch(e){}
-
-  mostrarLoginAdmin();
-}
-
-document.addEventListener("DOMContentLoaded",()=>{
-  setTimeout(()=>mostrarLoginAdmin(),50);
-
-  setTimeout(()=>{
-    let btn=document.getElementById("logoutFloatingBtn");
-    if(!btn){
-      btn=document.createElement("button");
-      btn.id="logoutFloatingBtn";
-      btn.textContent="Cerrar sesión";
-      document.body.appendChild(btn);
-    }
-    btn.onclick=adminLogout;
-    btn.style.position="fixed";
-    btn.style.right="18px";
-    btn.style.bottom="18px";
-    btn.style.zIndex="999999";
-    btn.style.background="#ef4444";
-    btn.style.color="#fff";
-    btn.style.border="0";
-    btn.style.borderRadius="14px";
-    btn.style.padding="12px 16px";
-    btn.style.fontWeight="900";
-    btn.style.boxShadow="0 12px 35px rgba(0,0,0,.35)";
-  },700);
-});
-
-</script>
+<title>NODO · ADMIN FINAL BLINDADO</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
 :root{--bg:#020617;--panel:#0f172a;--card:#111827;--card2:#1f2937;--line:#334155;--muted:#94a3b8;--txt:#f8fafc;--green:#22c55e;--red:#ef4444;--yellow:#f59e0b;--blue:#3b82f6;--violet:#8b5cf6}
@@ -3203,5 +2185,185 @@ document.addEventListener("DOMContentLoaded",()=>{
   }, 300);
 })();
 </script>   
+
+<script>
+/* =========================================================
+   NODO ADMIN · FINAL GATE + SCOPE FIX
+   - Login obligatorio real.
+   - No autologin por localStorage.
+   - ENCARGADO queda forzado a su PC.
+   - ADMIN ve todas.
+========================================================= */
+(function(){
+  function q(id){ return document.getElementById(id); }
+  function htmlSafe(v){
+    return String(v ?? "").replace(/[&<>'"]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[s]));
+  }
+  function clearLocalSessions(){
+    try{
+      const keys=[];
+      for(let i=0;i<localStorage.length;i++){
+        const k=localStorage.key(i); if(!k) continue;
+        const lk=k.toLowerCase();
+        if(lk.includes('nodo') || lk.includes('admin') || lk.includes('session') || lk.includes('token') || lk.includes('supabase') || lk.includes('sb-')) keys.push(k);
+      }
+      keys.forEach(k=>localStorage.removeItem(k));
+      localStorage.removeItem('nodo_admin_session_token');
+      localStorage.removeItem('LS_ADMIN_TOKEN');
+    }catch(e){}
+    try{ sessionStorage.clear(); }catch(e){}
+  }
+  function appEl(){ return q('appView') || document.querySelector('.app'); }
+  function loginEl(){ return q('loginView') || q('adminLoginGate'); }
+  function hideApp(){
+    const app=appEl();
+    if(app){ app.classList.add('hidden'); app.style.display='none'; }
+  }
+  function showApp(){
+    const app=appEl();
+    const gate=q('adminLoginGate');
+    const login=q('loginView');
+    if(gate) gate.remove();
+    if(login){ login.classList.add('hidden'); login.style.display='none'; }
+    if(app){ app.classList.remove('hidden'); app.style.display=''; }
+  }
+  function createGate(){
+    hideApp();
+    let old=q('adminLoginGate'); if(old) old.remove();
+    const gate=document.createElement('div');
+    gate.id='adminLoginGate';
+    gate.style.cssText='position:fixed;inset:0;z-index:9999999;background:#020617;display:flex;align-items:center;justify-content:center;padding:20px;color:white';
+    gate.innerHTML=`
+      <div style="width:min(430px,94vw);background:#111827;border:1px solid #334155;border-radius:20px;padding:24px;box-shadow:0 20px 70px rgba(0,0,0,.45)">
+        <h2 style="font-size:26px;margin:0 0 6px">NODO ADMIN</h2>
+        <p style="margin:0 0 18px;color:#94a3b8">Ingreso seguro al panel.</p>
+        <label style="display:block;margin:10px 0 6px;font-weight:800">Usuario</label>
+        <input id="gateAdminUsuario" autocomplete="username" style="width:100%;padding:13px;border-radius:12px;border:1px solid #334155;background:#020617;color:white">
+        <label style="display:block;margin:12px 0 6px;font-weight:800">Clave</label>
+        <input id="gateAdminClave" type="password" autocomplete="current-password" style="width:100%;padding:13px;border-radius:12px;border:1px solid #334155;background:#020617;color:white">
+        <button id="gateAdminBtn" style="width:100%;margin-top:18px;padding:14px;border:0;border-radius:12px;background:#22c55e;color:#03120a;font-weight:900;cursor:pointer">Ingresar</button>
+        <div id="gateAdminMsg" style="margin-top:14px;color:#facc15;font-weight:700"></div>
+      </div>`;
+    document.body.appendChild(gate);
+    q('gateAdminBtn').onclick=loginGate;
+    q('gateAdminClave').addEventListener('keydown', e=>{ if(e.key==='Enter') loginGate(); });
+  }
+  async function loginGate(){
+    const usuario=(q('gateAdminUsuario')?.value||'').trim();
+    const clave=(q('gateAdminClave')?.value||'').trim();
+    const msg=q('gateAdminMsg');
+    if(!usuario || !clave){ msg.textContent='Completá usuario y clave.'; return; }
+    msg.textContent='Validando acceso...';
+    const {data,error}=await supabaseClient.rpc('panel_login',{p_usuario:usuario,p_clave:clave,p_ip:null,p_user_agent:navigator.userAgent||'admin'});
+    if(error){ msg.textContent='Error: '+error.message; return; }
+    const login=Array.isArray(data)?data[0]:data;
+    if(!login || login.ok!==true){ msg.textContent=login?.mensaje||'Usuario o clave incorrectos.'; return; }
+    const {data:val,error:e2}=await supabaseClient.rpc('panel_validar_admin_session',{p_session_token:login.session_token});
+    if(e2){ msg.textContent=e2.message||'No tenés permisos de Admin.'; try{await supabaseClient.rpc('panel_logout',{p_session_token:login.session_token});}catch(e){} return; }
+    const scope=Array.isArray(val)?val[0]:val;
+    if(!scope || scope.ok!==true){ msg.textContent='Sesión admin inválida.'; return; }
+    window.adminSessionToken=login.session_token;
+    window.adminScope=scope;
+    clearLocalSessions();
+    showApp();
+    const info=q('adminInfo');
+    if(info){
+      info.classList.remove('hidden');
+      info.innerHTML=`<b>${htmlSafe(scope.nombre||scope.usuario)}</b><br><span class="pill info">${htmlSafe(scope.rol)}</span> <span class="pill ${scope.puede_todas?'ok':'warn'}">${scope.puede_todas?'TODAS LAS PCs':'PC '+htmlSafe(scope.pc_codigo)}</span>`;
+    }
+    applyScopeLock();
+    if(typeof reloadAll==='function') await reloadAll();
+    setTimeout(applyScopeLock,250);
+  }
+  function forcedPc(){
+    const s=window.adminScope;
+    if(s && s.puede_todas===false) return String(s.pc_codigo||'').trim().toUpperCase();
+    return '';
+  }
+  function setOnlyPc(id,pc){
+    const el=q(id); if(!el || !pc) return;
+    el.innerHTML=`<option value="${pc}">${pc}</option>`;
+    el.value=pc;
+    el.disabled=true;
+  }
+  function applyScopeLock(){
+    const pc=forcedPc();
+    if(!pc) return;
+    ['globalPc','op_filter_pc','bi_filter_pc','wk_filter_pc','op_pc_codigo','bi_pc_codigo'].forEach(id=>setOnlyPc(id,pc));
+    const configBtn=document.querySelector('[data-section="config"]');
+    if(configBtn) configBtn.style.display='none';
+  }
+  function filterScope(arr, field='pc_codigo'){
+    const pc=forcedPc();
+    if(!pc) return arr||[];
+    return (arr||[]).filter(x=>String(x?.[field]||'').trim().toUpperCase()===pc);
+  }
+  window.requireAdminToken=function(){
+    if(window.adminSessionToken) return window.adminSessionToken;
+    throw new Error('Sesión admin no iniciada. Ingresá usuario y clave.');
+  };
+  window.adminLogout=async function(){
+    const token=window.adminSessionToken;
+    try{ if(token) await supabaseClient.rpc('panel_logout',{p_session_token:token}); }catch(e){}
+    window.adminSessionToken=''; window.adminScope=null; clearLocalSessions(); createGate();
+  };
+  window.initAdminSession=async function(){ clearLocalSessions(); createGate(); };
+  window.pcSeleccionada=function(){ return forcedPc() || (q('globalPc')?q('globalPc').value:''); };
+  const oldFill=window.fillPcSelects;
+  window.fillPcSelects=function(){ if(typeof oldFill==='function') oldFill(); applyScopeLock(); };
+  const oldRender=window.renderAll;
+  window.renderAll=function(){
+    if(Array.isArray(window.operadores)) window.operadores=filterScope(window.operadores);
+    if(Array.isArray(window.billeteras)) window.billeteras=filterScope(window.billeteras);
+    if(Array.isArray(window.solicitudes)) window.solicitudes=filterScope(window.solicitudes);
+    if(Array.isArray(window.workerJobs)) window.workerJobs=filterScope(window.workerJobs);
+    if(Array.isArray(window.chatSesiones)) window.chatSesiones=filterScope(window.chatSesiones);
+    if(typeof oldRender==='function') oldRender();
+    applyScopeLock();
+  };
+  const oldLoadB=window.loadBilleteras;
+  window.loadBilleteras=async function(render=true){
+    const pc=forcedPc() || (q('globalPc')?q('globalPc').value:null);
+    const {data,error}=await supabaseClient.rpc('admin_get_billeteras',{p_session_token:window.requireAdminToken(),p_pc_codigo:pc||null});
+    if(error){ console.error(error); if(typeof toast==='function') toast('Error billeteras: '+error.message,'err'); return; }
+    window.billeteras=filterScope(data||[]);
+    if(render && typeof renderAll==='function') renderAll();
+  };
+  const oldLoadS=window.loadSolicitudes;
+  window.loadSolicitudes=async function(render=true){
+    const pc=forcedPc() || (q('globalPc')?q('globalPc').value:null);
+    const {data,error}=await supabaseClient.rpc('admin_get_solicitudes',{p_session_token:window.requireAdminToken(),p_pc_codigo:pc||null,p_limit:1000});
+    if(error){ console.error(error); if(typeof toast==='function') toast('Error solicitudes: '+error.message,'err'); return; }
+    window.solicitudes=filterScope(data||[]);
+    if(render && typeof renderAll==='function') renderAll();
+  };
+  const oldLoadO=window.loadOperadores;
+  window.loadOperadores=async function(render=true){
+    const {data,error}=await supabaseClient.rpc('admin_get_operadores',{p_session_token:window.requireAdminToken()});
+    if(error){ console.error(error); if(typeof toast==='function') toast('Error operadores: '+error.message,'err'); return; }
+    window.operadores=filterScope(data||[]);
+    if(render && typeof renderAll==='function') renderAll();
+  };
+  const oldLoadP=window.loadPcs;
+  window.loadPcs=async function(render=true){
+    const {data,error}=await supabaseClient.rpc('admin_get_pcs',{p_session_token:window.requireAdminToken()});
+    if(error){ console.error(error); if(typeof toast==='function') toast('Error PCs: '+error.message,'err'); return; }
+    const pc=forcedPc();
+    window.pcs=pc?(data||[]).filter(p=>String(p.codigo||'').trim().toUpperCase()===pc):(data||[]);
+    if(render && typeof renderAll==='function') renderAll();
+  };
+  const oldLoadW=window.loadWorkerJobs;
+  window.loadWorkerJobs=async function(render=true){
+    const pc=forcedPc() || (q('globalPc')?q('globalPc').value:null);
+    const {data,error}=await supabaseClient.rpc('admin_get_worker_jobs',{p_session_token:window.requireAdminToken(),p_pc_codigo:pc||null,p_limit:1500});
+    if(error){ console.error(error); if(typeof toast==='function') toast('Error worker: '+error.message,'err'); return; }
+    window.workerJobs=filterScope(data||[]);
+    if(render && typeof renderAll==='function') renderAll();
+  };
+  document.addEventListener('DOMContentLoaded',()=>{ clearLocalSessions(); createGate(); setInterval(applyScopeLock,1000); });
+  setTimeout(()=>{ clearLocalSessions(); createGate(); },300);
+})();
+</script>
+
 </body>
 </html>
