@@ -667,7 +667,24 @@ button:disabled{
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
+/* =========================================================
+   FASE 19A FRONTEND · CHAT TOKEN
+   Validación final de seguridad para chat público.
+========================================================= */
+function limpiarChatSeguroSiFaltaToken(){
+  if(chatSessionId && !chatSessionToken){
+    console.warn("Chat local sin token detectado. Se limpia para evitar acceso inseguro.");
+    localStorage.removeItem(LS_CHAT);
+    localStorage.removeItem(LS_CHAT_TOKEN);
+    chatSessionId = "";
+    chatSessionToken = "";
+  }
+}
+
+limpiarChatSeguroSiFaltaToken();
+
+</script>
 
 <script>
 // Landing 100% Supabase: no usa Apps Script.
@@ -676,7 +693,7 @@ const SUPABASE_URL = "https://pjvvyvfcwjoocjqvdror.supabase.co";
 const SUPABASE_KEY = "sb_publishable_NYqRoKptTgcL90VAVF2kqA_Gl06mEUF";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-console.log("Landing blindada RPC v2 DNI + validación Agentes + MP preparada conectada ✅ · sin Apps Script · sin .from() directo en tablas públicas");
+console.log("Landing blindada RPC v3 chat token + DNI + validación Agentes + MP preparada conectada ✅ · sin Apps Script · sin .from() directo en tablas públicas");
 
 const WHATSAPP_POR_PC = {
   P1: "5492235181171",
@@ -838,6 +855,10 @@ function mostrarCarga() {
 
 function cambiarDatos() {
   localStorage.removeItem(LS_USER);
+  localStorage.removeItem(LS_CHAT);
+  localStorage.removeItem(LS_CHAT_TOKEN);
+  chatSessionId = "";
+  chatSessionToken = "";
   userData = null;
 
   document.getElementById("registroCard").classList.remove("hidden");
@@ -1328,11 +1349,13 @@ async function crearSolicitud() {
     return;
   }
 
-  guardarSolicitudLocal(r.solicitud.id, r.solicitud.chat_id, tipo);
+  guardarSolicitudLocal(r.solicitud.id, r.solicitud.chat_id, r.solicitud.chat_token, tipo);
 
-  if(r.solicitud.chat_id){
-    chatSessionId = r.solicitud.chat_id;
+  if(r.solicitud.chat_id && r.solicitud.chat_token){
+    chatSessionId = String(r.solicitud.chat_id);
+    chatSessionToken = String(r.solicitud.chat_token);
     localStorage.setItem(LS_CHAT, chatSessionId);
+    localStorage.setItem(LS_CHAT_TOKEN, chatSessionToken);
     iniciarRealtimeChatLanding();
   }
 
@@ -1435,12 +1458,19 @@ function renderProgresoSolicitud(estado){
 }
 
 
-function guardarSolicitudLocal(id, chatId, tipo){
+function guardarSolicitudLocal(id, chatId, chatToken, tipo){
   solicitudActual = id ? String(id) : null;
   solicitudChatId = chatId ? String(chatId) : "";
+
+  if(chatToken){
+    chatSessionToken = String(chatToken);
+    localStorage.setItem(LS_CHAT_TOKEN, chatSessionToken);
+  }
+
   localStorage.setItem(LS_SOLICITUD, JSON.stringify({
     id: solicitudActual,
     chat_id: solicitudChatId,
+    chat_token: chatToken ? String(chatToken) : "",
     tipo: tipo || tipoSolicitudActual || "CARGA"
   }));
 }
@@ -1454,11 +1484,16 @@ function recuperarSolicitudPendiente() {
     const obj = JSON.parse(guardada);
     solicitudActual = obj.id ? String(obj.id) : null;
     solicitudChatId = obj.chat_id ? String(obj.chat_id) : "";
+    if(obj.chat_token){
+      chatSessionToken = String(obj.chat_token);
+      localStorage.setItem(LS_CHAT_TOKEN, chatSessionToken);
+    }
     if(obj.tipo) tipoSolicitudActual = String(obj.tipo).toUpperCase();
   } catch(e) {
     // Compatibilidad con versión vieja que guardaba solo el ID.
     solicitudActual = String(guardada || "");
     solicitudChatId = localStorage.getItem(LS_CHAT) || "";
+    chatSessionToken = localStorage.getItem(LS_CHAT_TOKEN) || "";
   }
 
   if (solicitudActual) {
@@ -1574,7 +1609,7 @@ async function crearSolicitudSupabase(monto, tipo="CARGA"){
     p_cuenta_retiro_id: esRetiro && cuentaRetiroVerificada?.cuenta_id ? Number(cuentaRetiroVerificada.cuenta_id) : null
   };
 
-  const { data, error } = await supabaseClient.rpc("landing_crear_solicitud_v2", params);
+  const { data, error } = await supabaseClient.rpc("landing_crear_solicitud_v3", params);
 
   if(error){
     console.error("Error creando solicitud RPC v2:", error);
@@ -1601,6 +1636,7 @@ async function crearSolicitudSupabase(monto, tipo="CARGA"){
     solicitud:{
       id: row.solicitud_id,
       chat_id: row.chat_id,
+      chat_token: row.chat_token || "",
       estado: row.estado || "PENDIENTE",
       created_at: row.created_at,
       tipo: esRetiro ? "RETIRO" : "CARGA",
@@ -1646,15 +1682,26 @@ async function crearSolicitudSupabase(monto, tipo="CARGA"){
   seleccionarTipoSolicitud("CARGA");
 } 
 /* === CHAT LITE PRO === */
-const LS_CHAT="bet300_chat_"+PC;let chatSessionId=localStorage.getItem(LS_CHAT)||"";let chatLiteImagenBase64="";let chatLiteImagenNombre="";let chatLiteTimer=null;let chatLiteMensajesCount=0;
+const LS_CHAT="bet300_chat_"+PC;const LS_CHAT_TOKEN="bet300_chat_token_"+PC;let chatSessionId=localStorage.getItem(LS_CHAT)||"";let chatSessionToken=localStorage.getItem(LS_CHAT_TOKEN)||"";let chatLiteImagenBase64="";let chatLiteImagenNombre="";let chatLiteTimer=null;let chatLiteMensajesCount=0;
 async function asegurarChatLite(){
 
-  if(chatSessionId){
+  // Seguridad Fase 19A:
+  // El chat público ahora requiere chat_id + chat_public_token.
+  // Si hay chat viejo sin token, se descarta y se crea uno nuevo por RPC v2.
+  if(chatSessionId && chatSessionToken){
     iniciarRealtimeChatLanding();
     return chatSessionId;
   }
 
-  const { data, error } = await supabaseClient.rpc("landing_crear_chat", {
+  if(chatSessionId && !chatSessionToken){
+    console.warn("Chat anterior sin token. Se limpia para recrearlo con seguridad v2.");
+    localStorage.removeItem(LS_CHAT);
+    localStorage.removeItem(LS_CHAT_TOKEN);
+    chatSessionId = "";
+    chatSessionToken = "";
+  }
+
+  const { data, error } = await supabaseClient.rpc("landing_crear_chat_v2", {
     p_usuario: userData?.usuario || "",
     p_telefono: userData?.telefono || "",
     p_pc_codigo: PC,
@@ -1662,18 +1709,21 @@ async function asegurarChatLite(){
   });
 
   if(error){
-    console.error("Error creando chat RPC:", error);
+    console.error("Error creando chat RPC v2:", error);
     throw new Error("No se pudo iniciar el chat.");
   }
 
   const row = Array.isArray(data) ? data[0] : data;
 
-  if(!row || !row.chat_id){
-    throw new Error("No se pudo iniciar el chat.");
+  if(!row || !row.chat_id || !row.chat_token){
+    throw new Error("No se pudo iniciar el chat seguro.");
   }
 
-  chatSessionId = row.chat_id;
+  chatSessionId = String(row.chat_id);
+  chatSessionToken = String(row.chat_token);
+
   localStorage.setItem(LS_CHAT, chatSessionId);
+  localStorage.setItem(LS_CHAT_TOKEN, chatSessionToken);
 
   iniciarRealtimeChatLanding();
 
@@ -1686,8 +1736,14 @@ async function cargarChatLite(){
 
   if(!chatSessionId) return;
 
-  const { data, error } = await supabaseClient.rpc("landing_leer_chat", {
-    p_chat_id: chatSessionId
+  if(!chatSessionToken){
+    console.warn("Chat sin token. Se recreará al abrir/enviar.");
+    return;
+  }
+
+  const { data, error } = await supabaseClient.rpc("landing_leer_chat_v2", {
+    p_chat_id: Number(chatSessionId),
+    p_chat_token: chatSessionToken
   });
 
   if(error){
@@ -1892,8 +1948,9 @@ async function enviarChatLite(){
   box.scrollTop = box.scrollHeight;
   input.value = "";
 
-  const { error } = await supabaseClient.rpc("landing_enviar_mensaje", {
-    p_chat_id: chatSessionId,
+  const { error } = await supabaseClient.rpc("landing_enviar_mensaje_v2", {
+    p_chat_id: Number(chatSessionId),
+    p_chat_token: chatSessionToken,
     p_emisor: userData?.usuario || "Usuario",
     p_mensaje: mensaje || "",
     p_imagen_url: chatLiteImagenBase64 || ""
@@ -1936,6 +1993,23 @@ async function vincularChatLiteASolicitud(idSolicitud){
   // La solicitud creada por landing_crear_solicitud ya devuelve y vincula su chat_id.
   return;
 }
+
+
+/* =========================================================
+   FASE 19A FRONTEND · CHAT TOKEN
+   Validación final de seguridad para chat público.
+========================================================= */
+function limpiarChatSeguroSiFaltaToken(){
+  if(chatSessionId && !chatSessionToken){
+    console.warn("Chat local sin token detectado. Se limpia para evitar acceso inseguro.");
+    localStorage.removeItem(LS_CHAT);
+    localStorage.removeItem(LS_CHAT_TOKEN);
+    chatSessionId = "";
+    chatSessionToken = "";
+  }
+}
+
+limpiarChatSeguroSiFaltaToken();
 
 </script>
 </body>
