@@ -157,7 +157,7 @@ const SUPABASE_URL = "https://pjvvyvfcwjoocjqvdror.supabase.co";
 const SUPABASE_KEY = "sb_publishable_NYqRoKptTgcL90VAVF2kqA_Gl06mEUF";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-console.log("Landing blindada v1 · usuario primero · chat token · sin acceso directo a tablas ✅");
+console.log("Landing blindada v2 · usuario primero + validación final de datos · chat token · sin acceso directo a tablas ✅");
 
 const WHATSAPP_POR_PC = {P1:"5492235181171",P2:"5491157718506",P3:"5491127140155",P4:"5492233391195",P5:"5491166587968"};
 const LINKS_PLATAFORMA = {P1:"https://www.bet-300.pw/",P2:"https://www.bet-300.pw/",P3:"https://www.bet-300.pw/",P4:"https://www.bet-300.pw/",P5:"https://www.bet-300.pw/"};
@@ -213,9 +213,12 @@ async function verificarUsuarioInicial(){
   // Usamos placeholders solo para iniciar worker. La solicitud real no avanza hasta que se completen los datos finales.
   const {data,error}=await supabaseClient.rpc("landing_solicitar_validacion_usuario",{
     p_usuario:usuario,
-    p_nombre_completo:"",
-    p_telefono:"",
-    p_dni:"",
+    // Fase login: la RPC actual exige datos no vacíos.
+    // Usamos datos técnicos mínimos solo para validar existencia del usuario.
+    // La validación final con nombre/teléfono/DNI reales se hace en el paso 2.
+    p_nombre_completo:usuario,
+    p_telefono:"00000000",
+    p_dni:"0000000",
     p_pc_codigo:PC
   });
 
@@ -270,16 +273,117 @@ function mostrarDatos(){
   if(userData){$("regNombre").value=userData.nombre||"";$("regTelefono").value=userData.telefono||"";$("regDni").value=userData.dni||""}
 }
 
-function guardarDatosCuenta(){
+async function guardarDatosCuenta(){
   const nombre=$("regNombre").value.trim();
   const telefono=normalizarTelefono($("regTelefono").value);
   const dni=normalizarDni($("regDni").value);
-  if(!userLogin?.usuario||!userLogin?.validacion_id){msg("datosMsg","Primero verificá tu usuario.","err");setVista("loginCard");return}
-  if(!nombre||telefono.length<8||dni.length<7){msg("datosMsg","Completá nombre, WhatsApp válido y DNI válido.","err");return}
-  userData={usuario:userLogin.usuario,nombre,telefono,dni,usuario_validado:true,validacion_id:userLogin.validacion_id,validado_at:userLogin.validado_at};
+
+  if(!userLogin?.usuario){
+    msg("datosMsg","Primero verificá tu usuario.","err");
+    setVista("loginCard");
+    return;
+  }
+
+  if(!nombre||telefono.length<8||dni.length<7){
+    msg("datosMsg","Completá nombre, WhatsApp válido y DNI válido.","err");
+    return;
+  }
+
+  $("btnGuardarDatos").disabled = true;
+  $("btnGuardarDatos").innerText = "Validando datos...";
+  msg("datosMsg", renderValidacionUsuarioBox(20, "Confirmando tus datos con el usuario validado. No cierres esta ventana."), "info");
+
+  const validacionFinal = await validarUsuarioConDatosFinales(userLogin.usuario, nombre, telefono, dni);
+
+  $("btnGuardarDatos").disabled = false;
+  $("btnGuardarDatos").innerText = "Continuar";
+
+  if(!validacionFinal.ok){
+    msg("datosMsg", validacionFinal.error || "No pudimos confirmar tus datos. Consultanos por chat.", "err");
+    return;
+  }
+
+  userLogin.validacion_id = validacionFinal.validacion_id;
+  localStorage.setItem(LS_LOGIN, JSON.stringify(userLogin));
+
+  userData={
+    usuario:userLogin.usuario,
+    nombre,
+    telefono,
+    dni,
+    usuario_validado:true,
+    validacion_id:validacionFinal.validacion_id,
+    validado_at:new Date().toISOString()
+  };
+
   localStorage.setItem(LS_USER,JSON.stringify(userData));
-  msg("datosMsg","Datos guardados correctamente ✅","ok");
+  msg("datosMsg","Datos confirmados correctamente ✅","ok");
   mostrarCarga();
+}
+
+async function validarUsuarioConDatosFinales(usuario,nombre,telefono,dni){
+  const {data,error}=await supabaseClient.rpc("landing_solicitar_validacion_usuario",{
+    p_usuario:usuario,
+    p_nombre_completo:nombre,
+    p_telefono:telefono,
+    p_dni:dni,
+    p_pc_codigo:PC
+  });
+
+  if(error){
+    console.error("Error validando datos finales:", error);
+    return {ok:false,error:"No pudimos iniciar la validación final. Intentá nuevamente o consultanos por chat."};
+  }
+
+  const row=Array.isArray(data)?data[0]:data;
+  if(!row){
+    return {ok:false,error:"No pudimos validar tus datos. Consultanos por chat."};
+  }
+
+  const estadoInicial=String(row.estado||"").toUpperCase();
+  const validacionId=row.validacion_id || null;
+
+  if(estadoInicial==="EXISTE"){
+    return {ok:true,validacion_id:validacionId};
+  }
+
+  if(!validacionId){
+    return {ok:false,error:"No pudimos obtener la validación. Consultanos por chat."};
+  }
+
+  const max=40;
+  for(let i=1;i<=max;i++){
+    await new Promise(r=>setTimeout(r,2500));
+
+    const pct=Math.min(94, 20 + Math.round((i/max)*74));
+    msg("datosMsg", renderValidacionUsuarioBox(pct, i<8 ? "Confirmando usuario y datos..." : "La validación sigue en curso. No cierres esta ventana."), "info");
+
+    const {data:estadoData,error:estadoError}=await supabaseClient.rpc("landing_estado_validacion_usuario",{
+      p_validacion_id:Number(validacionId)
+    });
+
+    if(estadoError){
+      console.warn("Error consultando validación final:", estadoError);
+      continue;
+    }
+
+    const estadoRow=Array.isArray(estadoData)?estadoData[0]:estadoData;
+    const estado=String(estadoRow?.estado||"").toUpperCase();
+
+    if(estado==="EXISTE"){
+      return {ok:true,validacion_id:validacionId};
+    }
+
+    if(estado==="NO_EXISTE"){
+      return {ok:false,error:"No encontramos ese usuario en Agentes. Revisá el usuario o consultanos por chat."};
+    }
+
+    if(estado==="ERROR"){
+      return {ok:false,error:"No pudimos validar automáticamente. Intentá nuevamente o consultanos por chat."};
+    }
+  }
+
+  return {ok:false,error:"La validación demoró más de lo esperado. Intentá nuevamente o consultanos por chat."};
 }
 
 function mostrarCarga(){
@@ -402,7 +506,7 @@ async function asegurarChatLite(){
   const row=Array.isArray(data)?data[0]:data; if(!row?.chat_id||!row?.chat_token)throw new Error("No se pudo iniciar el chat seguro.");
   chatSessionId=String(row.chat_id);chatSessionToken=String(row.chat_token);localStorage.setItem(LS_CHAT,chatSessionId);localStorage.setItem(LS_CHAT_TOKEN,chatSessionToken);iniciarRealtimeChatLanding();return chatSessionId
 }
-async function abrirChatLite(){if(!userLogin?.usuario){msg("loginMsg","Primero ingresá tu usuario para iniciar el chat.","err");setVista("loginCard");return}$("chatLite").classList.remove("hidden");try{await asegurarChatLite();await cargarChatLite();iniciarTimerChatLite()}catch(e){$("chatLiteStatus").innerText="No se pudo conectar";alert("No se pudo enviar el mensaje.")}}
+async function abrirChatLite(){if(!userLogin?.usuario){msg("loginMsg","Primero ingresá tu usuario para iniciar el chat.","err");setVista("loginCard");return}$("chatLite").classList.remove("hidden");try{await asegurarChatLite();await cargarChatLite();iniciarTimerChatLite()}catch(e){$("chatLiteStatus").innerText="No se pudo conectar";alert("No se pudo conectar el chat. Intentá nuevamente o escribinos por WhatsApp.")}}
 function cerrarChatLite(){$("chatLite").classList.add("hidden")}function iniciarTimerChatLite(){if(chatLiteTimer)clearInterval(chatLiteTimer);chatLiteTimer=setInterval(cargarChatLite,2500)}
 async function cargarChatLite(){if(!chatSessionId||!chatSessionToken)return;const {data,error}=await supabaseClient.rpc("landing_leer_chat_v2",{p_chat_id:Number(chatSessionId),p_chat_token:chatSessionToken});if(error){console.error(error);return}renderChatLite((data||[]).map(m=>({TIPO_EMISOR:m.tipo_emisor,MENSAJE:m.mensaje,IMAGEN_URL:m.imagen_url,FECHA:m.created_at,LEIDO:m.leido?"SI":"NO"})))}
 async function enviarChatLite(){const input=$("chatLiteInput");const mensaje=(input.value||"").trim();if(!mensaje&&!chatLiteImagenBase64)return;try{await asegurarChatLite()}catch(e){alert("No se pudo enviar el mensaje.");return}const {error}=await supabaseClient.rpc("landing_enviar_mensaje_v2",{p_chat_id:Number(chatSessionId),p_chat_token:chatSessionToken,p_emisor:userLogin?.usuario||"Usuario",p_mensaje:mensaje||"",p_imagen_url:chatLiteImagenBase64||""});if(error){console.error(error);alert("No se pudo enviar el mensaje.");return}input.value="";chatLiteImagenBase64="";quitarImagenChatLite();await cargarChatLite()}
