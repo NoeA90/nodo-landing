@@ -3,555 +3,76 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BET300 - Landing Final</title>
-
+<title>BET300 · Landing blindada</title>
 <style>
 *{box-sizing:border-box;font-family:Arial,sans-serif}
-
-body{
-  margin:0;
-  min-height:100vh;
-  background:radial-gradient(circle at top,#12352f 0%,#07131f 45%,#080a10 100%);
-  color:#f4f7fb;
-}
-
+body{margin:0;min-height:100vh;background:radial-gradient(circle at top,#12352f 0%,#07131f 45%,#080a10 100%);color:#f4f7fb}
 .hidden{display:none!important}
-
-.wrap{
-  width:100%;
-  max-width:680px;
-  margin:auto;
-  padding:22px 16px 34px;
-}
-
-.logo-img{
-  width:270px;
-  max-width:84%;
-  height:auto;
-  display:block;
-  margin:0 auto 18px;
-  filter:drop-shadow(0 0 18px rgba(212,175,55,.25));
-}
-
-.card{
-  background:rgba(18,24,35,.88);
-  border:1px solid rgba(255,255,255,.12);
-  border-radius:24px;
-  padding:20px;
-  margin-bottom:18px;
-  box-shadow:0 18px 55px rgba(0,0,0,.28);
-}
-
-h1{
-  font-size:38px;
-  line-height:1.05;
-  margin:8px 0 12px;
-}
-
-.sub,.muted{
-  color:#cbd5e1;
-  font-size:18px;
-  line-height:1.45;
-  margin-bottom:22px;
-}
-
-label{
-  color:#cbd5e1;
-  font-weight:700;
-  margin-bottom:6px;
-  display:block;
-}
-
-input,button{
-  width:100%;
-  border:none;
-  border-radius:16px;
-  padding:17px;
-  font-size:18px;
-  margin-top:8px;
-  margin-bottom:18px;
-}
-
-input{
-  background:#090c13;
-  color:#fff;
-  border:1px solid rgba(255,255,255,.14);
-  outline:none;
-}
-
-input::placeholder{color:#6f7684}
-
-button{
-  font-weight:900;
-  cursor:pointer;
-  color:#08110f;
-  background:linear-gradient(135deg,#d4af37,#f7d774);
-  box-shadow:0 10px 30px rgba(212,175,55,.18);
-}
-
-button:disabled{
-  opacity:.45;
-  cursor:not-allowed;
-}
-
-.transfer-card{
-  border-color:rgba(212,175,55,.35);
-  background:linear-gradient(145deg,rgba(45,35,12,.92),rgba(13,30,46,.88));
-}
-
-.gold-title{
-  color:#d4af37;
-  font-size:24px;
-  font-weight:900;
-  margin-bottom:22px;
-}
-
-.data-row{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-}
-
-.big-data{
-  font-size:24px;
-  font-weight:900;
-  letter-spacing:1px;
-  word-break:break-all;
-  margin-bottom:12px;
-}
-
-.copy-btn{
-  background:rgba(255,255,255,.12);
-  color:#fff;
-  box-shadow:none;
-  margin:0;
-  padding:13px;
-  font-size:15px;
-  width:auto;
-  min-width:100px;
-}
-
-.line{
-  font-size:18px;
-  margin:8px 0;
-  color:#dbe5ef;
-}
-
-.warn{
-  margin-top:16px;
-  color:#f9d36b;
-  font-size:17px;
-  font-weight:800;
-}
-
-.actions{
-  display:grid;
-  grid-template-columns:1fr;
-  gap:10px;
-  margin-top:10px;
-}
-
-.wa{
-  text-decoration:none;
-  display:block;
-  text-align:center;
-  border-radius:16px;
-  padding:16px;
-  font-size:17px;
-  font-weight:900;
-  color:white;
-  background:linear-gradient(135deg,#ff7a66,#ff9b55);
-  box-shadow:0 10px 35px rgba(255,122,102,.25);
-}
-
-.wa.secondary{
-  background:rgba(255,255,255,.12);
-  box-shadow:none;
-}
-
-.result{
-  display:none;
-  padding:16px;
-  border-radius:16px;
-  margin-top:12px;
-  line-height:1.45;
-}
-
-.ok{
-  display:block;
-  background:rgba(22,163,74,.18);
-  border:1px solid rgba(22,163,74,.45);
-}
-
-.err{
-  display:block;
-  background:rgba(239,68,68,.18);
-  border:1px solid rgba(239,68,68,.45);
-}
-
-.mini{
-  font-size:13px;
-  color:#94a3b8;
-  text-align:center;
-  margin-top:16px;
-}
-
-.step-box{
-  margin-top:18px;
-  background:rgba(0,0,0,.22);
-  border:1px solid rgba(255,255,255,.1);
-  border-radius:18px;
-  padding:16px;
-}
-
-.step{
-  display:flex;
-  gap:12px;
-  align-items:flex-start;
-  margin-bottom:14px;
-  opacity:.55;
-}
-
-.step:last-child{margin-bottom:0}
-
-.step.active{
-  opacity:1;
-}
-
-.step.done{
-  opacity:1;
-}
-
-.step-dot{
-  width:30px;
-  height:30px;
-  min-width:30px;
-  border-radius:999px;
-  background:#2d3748;
-  display:grid;
-  place-items:center;
-  font-weight:900;
-}
-
-.step.done .step-dot{
-  background:#12b76a;
-}
-
-.step.active .step-dot{
-  background:#d4af37;
-  color:#07131f;
-  animation:pulse 1.2s infinite;
-}
-
-.step-title{
-  font-weight:900;
-  font-size:16px;
-}
-
-.step-text{
-  color:#cbd5e1;
-  font-size:14px;
-  margin-top:3px;
-}
-
-.loader{
-  width:18px;
-  height:18px;
-  border:3px solid rgba(255,255,255,.25);
-  border-top-color:#d4af37;
-  border-radius:50%;
-  display:inline-block;
-  animation:spin .8s linear infinite;
-  vertical-align:middle;
-  margin-right:8px;
-}
-
-.success-modal.hidden{display:none!important}
-
-.success-modal{
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,.82);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  z-index:9999;
-  padding:20px;
-}
-
-.success-box{
-  width:100%;
-  max-width:420px;
-  background:linear-gradient(145deg,#0c2d24,#111827);
-  border:1px solid rgba(38,255,169,.3);
-  border-radius:28px;
-  padding:34px 24px;
-  text-align:center;
-  animation:popIn .25s ease;
-  position:relative;
-}
-
-.close-modal{
-  width:auto;
-  position:absolute;
-  right:16px;
-  top:12px;
-  background:transparent;
-  color:white;
-  box-shadow:none;
-  font-size:28px;
-  padding:0;
-  margin:0;
-}
-
-.success-icon{
-  font-size:62px;
-  margin-bottom:12px;
-}
-
-.success-box h2{
-  margin:0 0 10px;
-  font-size:34px;
-}
-
-.success-box p{
-  color:#d0d7e2;
-  margin-bottom:24px;
-  font-size:18px;
-}
-
-.change-data{
-  background:transparent;
-  color:#d4af37;
-  box-shadow:none;
-  padding:8px;
-  margin-top:2px;
-  font-size:15px;
-}
-
-@keyframes pulse{
-  0%{box-shadow:0 0 0 0 rgba(212,175,55,.55)}
-  70%{box-shadow:0 0 0 12px rgba(212,175,55,0)}
-  100%{box-shadow:0 0 0 0 rgba(212,175,55,0)}
-}
-
-@keyframes spin{
-  to{transform:rotate(360deg)}
-}
-
-@keyframes popIn{
-  from{transform:scale(.85);opacity:0}
-  to{transform:scale(1);opacity:1}
-}
-
-@media(max-width:520px){
-  .wrap{padding:18px 14px 30px}
-  .logo-img{width:245px;margin-bottom:14px}
-  h1{font-size:34px}
-  .sub,.muted{font-size:17px}
-  .card{padding:18px;border-radius:22px}
-  .big-data{font-size:22px}
-}
-
-/* === CHAT LITE PRO === */
+.wrap{width:100%;max-width:690px;margin:auto;padding:22px 16px 120px}
+.logo-img{width:270px;max-width:84%;height:auto;display:block;margin:0 auto 18px;filter:drop-shadow(0 0 18px rgba(212,175,55,.25))}
+.card{background:rgba(18,24,35,.9);border:1px solid rgba(255,255,255,.12);border-radius:24px;padding:20px;margin-bottom:18px;box-shadow:0 18px 55px rgba(0,0,0,.28)}
+h1{font-size:38px;line-height:1.05;margin:8px 0 12px}
+h2{font-size:25px;margin:0 0 12px}
+.sub,.muted{color:#cbd5e1;font-size:18px;line-height:1.45;margin-bottom:22px}
+label{color:#cbd5e1;font-weight:800;margin-bottom:6px;display:block}
+input,button,textarea{width:100%;border:none;border-radius:16px;padding:17px;font-size:18px;margin-top:8px;margin-bottom:18px}
+input,textarea{background:#090c13;color:#fff;border:1px solid rgba(255,255,255,.14);outline:none}
+input::placeholder,textarea::placeholder{color:#6f7684}
+button{font-weight:900;cursor:pointer;color:#08110f;background:linear-gradient(135deg,#d4af37,#f7d774);box-shadow:0 10px 30px rgba(212,175,55,.18)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.btn-dark{background:rgba(255,255,255,.12);color:#fff;box-shadow:none}
+.btn-danger{background:linear-gradient(135deg,#ff7a66,#ff9b55);color:white}
+.result{display:none;padding:16px;border-radius:16px;margin-top:12px;line-height:1.45}
+.ok{display:block;background:rgba(22,163,74,.18);border:1px solid rgba(22,163,74,.45)}
+.err{display:block;background:rgba(239,68,68,.18);border:1px solid rgba(239,68,68,.45)}
+.info{display:block;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.35)}
+.mini{font-size:13px;color:#94a3b8;text-align:center;margin-top:16px}
+.transfer-card{border-color:rgba(212,175,55,.35);background:linear-gradient(145deg,rgba(45,35,12,.92),rgba(13,30,46,.88))}
+.gold-title{color:#d4af37;font-size:24px;font-weight:900;margin-bottom:22px}
+.data-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.big-data{font-size:24px;font-weight:900;letter-spacing:1px;word-break:break-all;margin-bottom:12px}
+.copy-btn{background:rgba(255,255,255,.12);color:#fff;box-shadow:none;margin:0;padding:13px;font-size:15px;width:auto;min-width:100px}
+.line{font-size:18px;margin:8px 0;color:#dbe5ef}.warn{margin-top:16px;color:#f9d36b;font-size:17px;font-weight:800}
+.tipo-solicitud-box{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0 18px}
+.tipo-option{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.08);color:#fff;border-radius:16px;padding:14px;font-weight:900;cursor:pointer;text-align:center}
+.tipo-option.active{background:linear-gradient(135deg,#d4af37,#f7d774);color:#07131f}
+.validation-card{display:block;background:rgba(15,23,42,.92);border:1px solid rgba(212,175,55,.35);border-radius:18px;padding:16px;margin-top:12px;text-align:left;box-shadow:0 12px 32px rgba(0,0,0,.20)}
+.validation-head{display:flex;align-items:center;gap:12px;margin-bottom:12px}.validation-icon{width:38px;height:38px;min-width:38px;border-radius:50%;display:grid;place-items:center;background:rgba(212,175,55,.16);color:#f7d774;font-weight:900}.validation-title{font-weight:900;font-size:16px;color:#fff}.validation-sub{color:#cbd5e1;font-size:13px;margin-top:3px;line-height:1.35}.validation-bar{width:100%;height:9px;border-radius:999px;overflow:hidden;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.08)}.validation-fill{height:100%;width:30%;border-radius:999px;background:linear-gradient(90deg,#d4af37,#f7d774);transition:width .35s ease}.validation-footer{color:#94a3b8;font-size:12px;margin-top:10px;line-height:1.35}.loader{width:18px;height:18px;border:3px solid rgba(255,255,255,.25);border-top-color:#d4af37;border-radius:50%;display:inline-block;animation:spin .8s linear infinite;vertical-align:middle;margin-right:8px}@keyframes spin{to{transform:rotate(360deg)}}@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(212,175,55,.55)}70%{box-shadow:0 0 0 12px rgba(212,175,55,0)}100%{box-shadow:0 0 0 0 rgba(212,175,55,0)}}
+.actions{display:grid;grid-template-columns:1fr;gap:10px;margin-top:10px}.wa{text-decoration:none;display:block;text-align:center;border-radius:16px;padding:16px;font-size:17px;font-weight:900;color:white;background:linear-gradient(135deg,#ff7a66,#ff9b55);box-shadow:0 10px 35px rgba(255,122,102,.25)}.wa.secondary{background:rgba(255,255,255,.12);box-shadow:none}
+.retiro-data-box{margin-top:12px;padding:13px;border:1px solid rgba(245,158,11,.35);background:rgba(245,158,11,.08);border-radius:14px}.retiro-data-box .hint{color:#f9d36b;font-size:12px;line-height:1.35;margin-bottom:10px}
+.step-box{margin-top:18px;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:16px}.step{display:flex;gap:12px;align-items:flex-start;margin-bottom:14px;opacity:.55}.step.done,.step.active{opacity:1}.step-dot{width:30px;height:30px;min-width:30px;border-radius:999px;background:#2d3748;display:grid;place-items:center;font-weight:900}.step.done .step-dot{background:#12b76a}.step.active .step-dot{background:#d4af37;color:#07131f;animation:pulse 1.2s infinite}.step-title{font-weight:900;font-size:16px}.step-text{color:#cbd5e1;font-size:14px;margin-top:3px}
 .chat-lite-btn{position:fixed;right:18px;bottom:18px;width:auto;min-width:190px;z-index:9998;border-radius:999px;padding:15px 18px;margin:0;color:#07131f;background:linear-gradient(135deg,#d4af37,#f7d774);box-shadow:0 14px 40px rgba(212,175,55,.28)}
-.chat-lite.hidden{display:none!important}.chat-lite{position:fixed;right:18px;bottom:86px;width:min(390px,calc(100vw - 28px));height:min(590px,calc(100vh - 118px));z-index:9999;border-radius:24px;overflow:hidden;background:#101722;border:1px solid rgba(255,255,255,.14);box-shadow:0 22px 70px rgba(0,0,0,.45);display:flex;flex-direction:column}.chat-lite-head{padding:15px 16px;background:linear-gradient(135deg,#153b31,#111827);border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;gap:12px}.chat-agent{display:flex;align-items:center;gap:10px}.chat-avatar{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:#d4af37;color:#07131f;font-weight:900;box-shadow:0 0 0 4px rgba(212,175,55,.12)}.chat-title{font-weight:900;font-size:16px}.chat-status{color:#9ee6bd;font-size:12px;margin-top:2px}.chat-close{background:rgba(255,255,255,.1);color:#fff;box-shadow:none;width:38px;height:38px;padding:0;margin:0;border-radius:12px;font-size:20px}.chat-lite-body{flex:1;overflow-y:auto;padding:14px;background:radial-gradient(circle at top right,rgba(212,175,55,.08),transparent 30%),#0b111a}.chat-day{width:max-content;max-width:88%;margin:0 auto 12px;padding:7px 10px;border-radius:999px;background:rgba(255,255,255,.08);color:#cbd5e1;font-size:12px}.chat-msg{max-width:84%;margin-bottom:10px;display:flex;flex-direction:column}.chat-msg.user{margin-left:auto;align-items:flex-end}.chat-msg.operator{margin-right:auto;align-items:flex-start}.chat-bubble{padding:10px 12px;border-radius:16px;line-height:1.35;font-size:15px;word-break:break-word}.chat-msg.user .chat-bubble{background:linear-gradient(135deg,#d4af37,#f7d774);color:#07131f;border-bottom-right-radius:4px}.chat-msg.operator .chat-bubble{background:#1d2939;color:#f4f7fb;border-bottom-left-radius:4px}.chat-bubble img{width:100%;max-width:240px;border-radius:12px;display:block;margin-top:6px}.chat-meta{color:#94a3b8;font-size:11px;margin-top:4px;padding:0 4px}.chat-msg.user .chat-meta{color:#cbd5e1}.chat-lite-compose{padding:12px;background:#101722;border-top:1px solid rgba(255,255,255,.1)}.chat-preview{display:none;align-items:center;justify-content:space-between;gap:10px;padding:8px;border-radius:14px;background:rgba(255,255,255,.08);margin-bottom:10px}.chat-preview.show{display:flex}.chat-preview img{width:58px;height:58px;object-fit:cover;border-radius:12px}.chat-preview button{width:auto;min-width:34px;height:34px;padding:0;margin:0;background:rgba(239,68,68,.18);color:#fff;box-shadow:none}.chat-input-row{display:grid;grid-template-columns:42px 1fr 46px;gap:8px;align-items:end}.chat-file-btn,.chat-send-btn{width:42px;height:42px;min-width:42px;padding:0;margin:0;border-radius:14px;color:#fff;box-shadow:none}.chat-file-btn{background:rgba(255,255,255,.12)}.chat-send-btn{background:linear-gradient(135deg,#d4af37,#f7d774);color:#07131f}#chatLiteInput{min-height:42px;max-height:110px;margin:0;padding:11px 12px;resize:none;border-radius:14px;font-size:15px;background:#090c13;color:#fff;border:1px solid rgba(255,255,255,.14)}.chat-hint{color:#94a3b8;font-size:11px;margin-top:8px;text-align:center}@media(max-width:520px){.chat-lite-btn{right:14px;bottom:14px;min-width:0;width:calc(100vw - 28px)}.chat-lite{right:0;bottom:0;width:100vw;height:100vh;max-height:none;border-radius:0;border:none}.chat-lite-head{padding-top:18px}}
-
-
-.tipo-solicitud-box{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-  margin:12px 0 18px;
-}
-.tipo-option{
-  border:1px solid rgba(255,255,255,.14);
-  background:rgba(255,255,255,.08);
-  color:#fff;
-  border-radius:16px;
-  padding:14px;
-  font-weight:900;
-  cursor:pointer;
-  text-align:center;
-}
-.tipo-option.active{
-  background:linear-gradient(135deg,#d4af37,#f7d774);
-  color:#07131f;
-}
-
-
-
-/* === TARJETA DE TRANSFERENCIA EN CHAT === */
-.transfer-chat-card{
-  background:linear-gradient(145deg,rgba(45,35,12,.96),rgba(13,30,46,.94));
-  border:1px solid rgba(212,175,55,.38);
-  border-radius:16px;
-  padding:12px;
-  min-width:230px;
-}
-.transfer-chat-title{
-  color:#f7d774;
-  font-weight:900;
-  font-size:15px;
-  margin-bottom:10px;
-}
-.transfer-chat-row{
-  background:rgba(255,255,255,.07);
-  border:1px solid rgba(255,255,255,.1);
-  border-radius:12px;
-  padding:9px;
-  margin-top:8px;
-}
-.transfer-chat-label{
-  color:#cbd5e1;
-  font-size:11px;
-  font-weight:900;
-  text-transform:uppercase;
-  letter-spacing:.3px;
-  margin-bottom:4px;
-}
-.transfer-chat-value{
-  color:#fff;
-  font-weight:900;
-  word-break:break-all;
-}
-.transfer-copy-btn{
-  width:100%;
-  margin:8px 0 0;
-  padding:9px 10px;
-  font-size:13px;
-  border-radius:10px;
-  background:rgba(255,255,255,.12);
-  color:#fff;
-  box-shadow:none;
-}
-.transfer-chat-note{
-  color:#f9d36b;
-  font-size:12px;
-  margin-top:10px;
-  line-height:1.35;
-}
-
-.retiro-data-box{
-  margin-top:12px;
-  padding:13px;
-  border:1px solid rgba(245,158,11,.35);
-  background:rgba(245,158,11,.08);
-  border-radius:14px;
-}
-.retiro-data-box .hint{
-  color:#f9d36b;
-  font-size:12px;
-  line-height:1.35;
-  margin-bottom:10px;
-}
-
-
-/* === VALIDACIÓN USUARIO · UI V3 === */
-.validation-card{
-  display:block;
-  background:rgba(15,23,42,.92);
-  border:1px solid rgba(212,175,55,.35);
-  border-radius:18px;
-  padding:16px;
-  margin-top:12px;
-  text-align:left;
-  box-shadow:0 12px 32px rgba(0,0,0,.20);
-}
-.validation-head{
-  display:flex;
-  align-items:center;
-  gap:12px;
-  margin-bottom:12px;
-}
-.validation-icon{
-  width:38px;
-  height:38px;
-  min-width:38px;
-  border-radius:50%;
-  display:grid;
-  place-items:center;
-  background:rgba(212,175,55,.16);
-  color:#f7d774;
-  font-weight:900;
-}
-.validation-title{
-  font-weight:900;
-  font-size:16px;
-  color:#fff;
-}
-.validation-sub{
-  color:#cbd5e1;
-  font-size:13px;
-  margin-top:3px;
-  line-height:1.35;
-}
-.validation-bar{
-  width:100%;
-  height:9px;
-  border-radius:999px;
-  overflow:hidden;
-  background:rgba(255,255,255,.10);
-  border:1px solid rgba(255,255,255,.08);
-}
-.validation-fill{
-  height:100%;
-  width:30%;
-  border-radius:999px;
-  background:linear-gradient(90deg,#d4af37,#f7d774);
-  transition:width .35s ease;
-}
-.validation-footer{
-  color:#94a3b8;
-  font-size:12px;
-  margin-top:10px;
-  line-height:1.35;
-}
-.validation-dots span{
-  display:inline-block;
-  width:6px;
-  height:6px;
-  margin-right:4px;
-  border-radius:50%;
-  background:#d4af37;
-  animation:dotPulse 1.1s infinite ease-in-out;
-}
-.validation-dots span:nth-child(2){animation-delay:.18s}
-.validation-dots span:nth-child(3){animation-delay:.36s}
-@keyframes dotPulse{
-  0%,80%,100%{opacity:.25;transform:scale(.85)}
-  40%{opacity:1;transform:scale(1.15)}
-}
-
+.chat-lite.hidden{display:none!important}.chat-lite{position:fixed;right:18px;bottom:86px;width:min(390px,calc(100vw - 28px));height:min(590px,calc(100vh - 118px));z-index:9999;border-radius:24px;overflow:hidden;background:#101722;border:1px solid rgba(255,255,255,.14);box-shadow:0 22px 70px rgba(0,0,0,.45);display:flex;flex-direction:column}.chat-lite-head{padding:15px 16px;background:linear-gradient(135deg,#153b31,#111827);border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;gap:12px}.chat-agent{display:flex;align-items:center;gap:10px}.chat-avatar{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:#d4af37;color:#07131f;font-weight:900}.chat-title{font-weight:900;font-size:16px}.chat-status{color:#9ee6bd;font-size:12px;margin-top:2px}.chat-close{background:rgba(255,255,255,.1);color:#fff;box-shadow:none;width:38px;height:38px;padding:0;margin:0;border-radius:12px;font-size:20px}.chat-lite-body{flex:1;overflow-y:auto;padding:14px;background:#0b111a}.chat-day{width:max-content;max-width:88%;margin:0 auto 12px;padding:7px 10px;border-radius:999px;background:rgba(255,255,255,.08);color:#cbd5e1;font-size:12px}.chat-msg{max-width:84%;margin-bottom:10px;display:flex;flex-direction:column}.chat-msg.user{margin-left:auto;align-items:flex-end}.chat-msg.operator{margin-right:auto;align-items:flex-start}.chat-bubble{padding:10px 12px;border-radius:16px;line-height:1.35;font-size:15px;word-break:break-word}.chat-msg.user .chat-bubble{background:linear-gradient(135deg,#d4af37,#f7d774);color:#07131f;border-bottom-right-radius:4px}.chat-msg.operator .chat-bubble{background:#1d2939;color:#f4f7fb;border-bottom-left-radius:4px}.chat-bubble img{width:100%;max-width:240px;border-radius:12px;display:block;margin-top:6px}.chat-meta{color:#94a3b8;font-size:11px;margin-top:4px;padding:0 4px}.chat-lite-compose{padding:12px;background:#101722;border-top:1px solid rgba(255,255,255,.1)}.chat-input-row{display:grid;grid-template-columns:42px 1fr 46px;gap:8px;align-items:end}.chat-file-btn,.chat-send-btn{width:42px;height:42px;min-width:42px;padding:0;margin:0;border-radius:14px;color:#fff;box-shadow:none}.chat-file-btn{background:rgba(255,255,255,.12)}.chat-send-btn{background:linear-gradient(135deg,#d4af37,#f7d774);color:#07131f}#chatLiteInput{min-height:42px;max-height:110px;margin:0;padding:11px 12px;resize:none;border-radius:14px;font-size:15px;background:#090c13;color:#fff;border:1px solid rgba(255,255,255,.14)}.chat-hint{color:#94a3b8;font-size:11px;margin-top:8px;text-align:center}.chat-preview{display:none;align-items:center;justify-content:space-between;gap:10px;padding:8px;border-radius:14px;background:rgba(255,255,255,.08);margin-bottom:10px}.chat-preview.show{display:flex}.chat-preview img{width:58px;height:58px;object-fit:cover;border-radius:12px}.chat-preview button{width:auto;min-width:34px;height:34px;padding:0;margin:0;background:rgba(239,68,68,.18);color:#fff;box-shadow:none}
+.success-modal.hidden{display:none!important}.success-modal{position:fixed;inset:0;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px}.success-box{width:100%;max-width:420px;background:linear-gradient(145deg,#0c2d24,#111827);border:1px solid rgba(38,255,169,.3);border-radius:28px;padding:34px 24px;text-align:center;position:relative}.close-modal{width:auto;position:absolute;right:16px;top:12px;background:transparent;color:white;box-shadow:none;font-size:28px;padding:0;margin:0}.success-icon{font-size:62px;margin-bottom:12px}
+@media(max-width:520px){.wrap{padding:18px 14px 120px}.logo-img{width:245px;margin-bottom:14px}h1{font-size:34px}.sub,.muted{font-size:17px}.card{padding:18px;border-radius:22px}.big-data{font-size:22px}.chat-lite-btn{right:14px;bottom:14px;min-width:0;width:calc(100vw - 28px)}.chat-lite{right:0;bottom:0;width:100vw;height:100vh;max-height:none;border-radius:0;border:none}}
 </style>
 </head>
-
 <body>
-
 <div class="wrap">
+  <img src="logo-bet300.png" class="logo-img" alt="BET300">
 
-  <img src= "logo-bet300.png" class="logo-img" alt="BET300">
-
-  <div class="card" id="registroCard">
-    <h1>Identificá tu cuenta</h1>
-    <p class="muted">Completá tus datos. Validamos tu usuario antes de continuar.</p>
-
+  <div class="card" id="loginCard">
+    <h1>Ingresá tu usuario</h1>
+    <p class="muted">Primero verificamos tu usuario en la plataforma. No pedimos datos hasta confirmar que exista.</p>
     <label>Usuario *</label>
-    <input id="regUsuario" placeholder="ej: maurito564">
+    <input id="loginUsuario" placeholder="ej: maurito564" autocomplete="username">
+    <button id="btnVerificarUsuario" onclick="verificarUsuarioInicial()">Verificar usuario</button>
+    <div id="loginMsg" class="result"></div>
+  </div>
 
+  <div class="card hidden" id="datosCard">
+    <h1>Completá tus datos</h1>
+    <p class="muted">Usuario validado. Ahora completá los datos necesarios para cargas, retiros y validación de pagos.</p>
+    <div id="usuarioValidadoBox" class="result ok"></div>
     <label>Nombre completo *</label>
     <input id="regNombre" placeholder="ej: Mauro Pérez">
-
     <label>WhatsApp *</label>
-    <input id="regTelefono" placeholder="ej: 1133344455">
-
+    <input id="regTelefono" inputmode="tel" placeholder="ej: 1133344455">
     <label>DNI *</label>
     <input id="regDni" inputmode="numeric" placeholder="ej: 30111222">
-
-    <button id="btnContinuar" onclick="continuarRegistro()">Continuar</button>
-
-    <div id="registroMsg" class="result"></div>
+    <button id="btnGuardarDatos" onclick="guardarDatosCuenta()">Continuar</button>
+    <button class="btn-dark" onclick="volverAUsuario()">Cambiar usuario</button>
+    <div id="datosMsg" class="result"></div>
   </div>
 
   <div class="card hidden" id="cargaCard">
@@ -560,31 +81,19 @@ button:disabled{
 
     <div class="card transfer-card">
       <div class="gold-title">💳 Datos para transferir</div>
-
       <span class="label">Alias</span>
-      <div class="data-row">
-        <div id="aliasBox" class="big-data">Cargando...</div>
-        <button class="copy-btn" onclick="copiarAlias()">Copiar</button>
-      </div>
+      <div class="data-row"><div id="aliasBox" class="big-data">Cargando...</div><button class="copy-btn" onclick="copiarAlias()">Copiar</button></div>
       <span class="label">CBU / CVU</span>
-      <div class="data-row">
-        <div id="cbuBox" class="big-data">Cargando...</div>
-        <button class="copy-btn" onclick="copiarCbu()">Copiar</button>
-      </div>
-      
-      
+      <div class="data-row"><div id="cbuBox" class="big-data">Cargando...</div><button class="copy-btn" onclick="copiarCbu()">Copiar</button></div>
       <div class="line"><b>Titular:</b> <span id="titularBox">Cargando...</span></div>
       <div class="line"><b>Banco:</b> <span id="bancoBox">Mercado Pago</span></div>
       <div class="warn" id="montoMinimoTxt">⚠️ Carga mínima: $2.000</div>
     </div>
 
-    <div id="datosUsuarioBox" class="ok">
-      Usuario identificado.
-    </div>
-
+    <div id="datosUsuarioBox" class="ok"></div>
     <div id="referenciaPagoBox" class="result ok hidden"></div>
 
-    <button class="change-data" onclick="cambiarDatos()">Cambiar mis datos</button>
+    <button class="btn-dark" onclick="volverADatos()">Editar mis datos</button>
 
     <label>Tipo de solicitud *</label>
     <div class="tipo-solicitud-box">
@@ -596,66 +105,41 @@ button:disabled{
     <input id="monto" type="number" placeholder="ej: 5000">
 
     <div id="retiroDatosBox" class="retiro-data-box hidden">
-      <div class="hint">Para retiros, indicá la cuenta donde querés recibir el dinero. Estos datos los revisa el operador antes de aprobar.</div>
-
+      <div class="hint">Para retiros, se usará la cuenta registrada/verificada. Si es la primera vez, completala y un operador la revisa antes de aprobar.</div>
       <div id="retiroCuentaRegistradaBox" class="result ok hidden"></div>
-
       <label id="retiroAliasLabel">CBU / CVU / Alias de destino *</label>
       <input id="retiroAliasCbu" placeholder="ej: alias.mp o CVU/CBU completo">
-
       <label id="retiroTitularLabel">Titular de la cuenta *</label>
       <input id="retiroTitular" placeholder="Nombre y apellido del titular">
     </div>
 
     <button id="btnEnviar" onclick="crearSolicitud()">Enviar solicitud</button>
-
     <div id="resultado" class="result"></div>
 
     <div id="estadoEspera" class="step-box hidden">
-      <div id="step1" class="step done">
-        <div class="step-dot">✓</div>
-        <div>
-          <div class="step-title">Solicitud enviada</div>
-          <div class="step-text" id="step1Text">Recibimos tu solicitud.</div>
-        </div>
-      </div>
-
-      <div id="step2" class="step active">
-        <div class="step-dot">2</div>
-        <div>
-          <div class="step-title"><span class="loader"></span>Esperando verificación</div>
-          <div class="step-text" id="step2Text">Un operador está revisando tu solicitud.</div>
-        </div>
-      </div>
-
-      <div id="step3" class="step">
-        <div class="step-dot">3</div>
-        <div>
-          <div class="step-title" id="step3Title">Fichas acreditadas</div>
-          <div class="step-text" id="step3Text">Cuando se apruebe, te avisamos automáticamente.</div>
-        </div>
-      </div>
-
-      <div class="mini">
-        No cierres esta ventana. Si demora más de lo habitual, podés contactarnos por chat.
-      </div>
+      <div id="step1" class="step done"><div class="step-dot">✓</div><div><div class="step-title">Solicitud enviada</div><div class="step-text" id="step1Text">Recibimos tu solicitud.</div></div></div>
+      <div id="step2" class="step active"><div class="step-dot">2</div><div><div class="step-title"><span class="loader"></span>Esperando verificación</div><div class="step-text" id="step2Text">Un operador está revisando tu solicitud.</div></div></div>
+      <div id="step3" class="step"><div class="step-dot">3</div><div><div class="step-title" id="step3Title">Fichas acreditadas</div><div class="step-text" id="step3Text">Cuando se apruebe, te avisamos automáticamente.</div></div></div>
+      <div class="mini">No cierres esta ventana. Si demora más de lo habitual, podés contactarnos por chat.</div>
     </div>
 
     <div class="actions">
-      <a id="btnCrearUsuario" class="wa" target="_blank">👤 Crear usuario</a>
+      <a id="btnPlataformaFijo" class="wa" target="_blank">🎮 Ingresar a la plataforma</a>
+      <a id="btnWhatsappFijo" class="wa secondary" target="_blank">🟢 WhatsApp</a>
       <button id="btnContactar" class="wa secondary" type="button" onclick="abrirChatLite()">💬 Chateá con nosotros</button>
+      <button class="btn-danger" type="button" onclick="limpiarTodo()">Cambiar de cuenta</button>
     </div>
   </div>
 
-  <div class="mini">
-    Guardá el comprobante de transferencia hasta que se confirme la carga.
-  </div>
-
+  <div class="mini">Guardá el comprobante de transferencia hasta que se confirme la carga.</div>
 </div>
 
-
 <button id="chatLiteOpenBtn" class="chat-lite-btn" type="button" onclick="abrirChatLite()">💬 Chateá con nosotros</button>
-<div id="chatLite" class="chat-lite hidden"><div class="chat-lite-head"><div class="chat-agent"><div class="chat-avatar">B</div><div><div class="chat-title">Soporte BET300</div><div id="chatLiteStatus" class="chat-status">Disponible para ayudarte</div></div></div><button class="chat-close" type="button" onclick="cerrarChatLite()">×</button></div><div id="chatLiteBody" class="chat-lite-body"><div class="chat-day">Chat de soporte</div><div class="chat-msg operator"><div class="chat-bubble">Hola 👋 Escribinos tu consulta o adjuntá el comprobante si necesitás ayuda con la carga.</div><div class="chat-meta">Soporte</div></div></div><div class="chat-lite-compose"><div id="chatLitePreview" class="chat-preview"><div style="display:flex;align-items:center;gap:10px"><img id="chatLitePreviewImg" src="" alt="Comprobante"><div><b>Imagen adjunta</b><div class="chat-meta">Lista para enviar</div></div></div><button type="button" onclick="quitarImagenChatLite()">×</button></div><div class="chat-input-row"><button class="chat-file-btn" type="button" onclick="document.getElementById('chatLiteFile').click()">📎</button><textarea id="chatLiteInput" rows="1" placeholder="Escribí tu mensaje..."></textarea><button class="chat-send-btn" type="button" onclick="enviarChatLite()">➤</button></div><input id="chatLiteFile" type="file" accept="image/*" style="display:none" onchange="tomarImagenChatLiteFile()"><div class="chat-hint">Podés adjuntar comprobante desde tu celular o pegar captura con Ctrl + V.</div></div></div>
+<div id="chatLite" class="chat-lite hidden">
+  <div class="chat-lite-head"><div class="chat-agent"><div class="chat-avatar">B</div><div><div class="chat-title">Soporte BET300</div><div id="chatLiteStatus" class="chat-status">Disponible para ayudarte</div></div></div><button class="chat-close" type="button" onclick="cerrarChatLite()">×</button></div>
+  <div id="chatLiteBody" class="chat-lite-body"><div class="chat-day">Chat de soporte</div><div class="chat-msg operator"><div class="chat-bubble">Hola 👋 Escribinos tu consulta o adjuntá el comprobante si necesitás ayuda.</div><div class="chat-meta">Soporte</div></div></div>
+  <div class="chat-lite-compose"><div id="chatLitePreview" class="chat-preview"><div style="display:flex;align-items:center;gap:10px"><img id="chatLitePreviewImg" src="" alt="Comprobante"><div><b>Imagen adjunta</b><div class="chat-meta">Lista para enviar</div></div></div><button type="button" onclick="quitarImagenChatLite()">×</button></div><div class="chat-input-row"><button class="chat-file-btn" type="button" onclick="document.getElementById('chatLiteFile').click()">📎</button><textarea id="chatLiteInput" rows="1" placeholder="Escribí tu mensaje..."></textarea><button class="chat-send-btn" type="button" onclick="enviarChatLite()">➤</button></div><input id="chatLiteFile" type="file" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="tomarImagenChatLiteFile()"><div class="chat-hint">Podés adjuntar comprobante o pegar captura con Ctrl + V.</div></div>
+</div>
 
 <div id="successModal" class="success-modal hidden">
   <div class="success-box">
@@ -667,1350 +151,271 @@ button:disabled{
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
-/* =========================================================
-   FASE 19A FRONTEND · CHAT TOKEN
-   Validación final de seguridad para chat público.
-========================================================= */
-function limpiarChatSeguroSiFaltaToken(){
-  if(chatSessionId && !chatSessionToken){
-    console.warn("Chat local sin token detectado. Se limpia para evitar acceso inseguro.");
-    localStorage.removeItem(LS_CHAT);
-    localStorage.removeItem(LS_CHAT_TOKEN);
-    chatSessionId = "";
-    chatSessionToken = "";
-  }
-}
-
-limpiarChatSeguroSiFaltaToken();
-
-</script>
-
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-// Landing 100% Supabase: no usa Apps Script.
-
 const SUPABASE_URL = "https://pjvvyvfcwjoocjqvdror.supabase.co";
 const SUPABASE_KEY = "sb_publishable_NYqRoKptTgcL90VAVF2kqA_Gl06mEUF";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-console.log("Landing blindada RPC v3 chat token + DNI + validación Agentes + MP preparada conectada ✅ · sin Apps Script · sin .from() directo en tablas públicas");
+console.log("Landing blindada v1 · usuario primero · chat token · sin acceso directo a tablas ✅");
 
-const WHATSAPP_POR_PC = {
-  P1: "5492235181171",
-  P2: "5491157718506",
-  P3: "5491127140155",
-  P4: "5492233391195",
-  P5: "5491166587968"
-};
-
-const LINKS_PLATAFORMA = {
-  P1: "https://www.bet-300.pw/",
-  P2: "https://www.bet-300.pw/",
-  P3: "https://www.bet-300.pw/",
-  P4: "https://www.bet-300.pw/",
-  P5: "https://www.bet-300.pw/"
-};
-
+const WHATSAPP_POR_PC = {P1:"5492235181171",P2:"5491157718506",P3:"5491127140155",P4:"5492233391195",P5:"5491166587968"};
+const LINKS_PLATAFORMA = {P1:"https://www.bet-300.pw/",P2:"https://www.bet-300.pw/",P3:"https://www.bet-300.pw/",P4:"https://www.bet-300.pw/",P5:"https://www.bet-300.pw/"};
 const params = new URLSearchParams(window.location.search);
-
-const PC_ALIASES = {
-  CHINO: "P1",
-  ALV: "P2",
-  SAN: "P3",
-  EYF: "P4",
-  X: "P5"
-};
-
-function normalizarPC(valor) {
-  const raw = String(valor || "P1").trim().toUpperCase();
-  return PC_ALIASES[raw] || raw;
-}
-
+const PC_ALIASES = {CHINO:"P1",ALV:"P2",SAN:"P3",EYF:"P4",X:"P5"};
+function normalizarPC(valor){const raw=String(valor||"P1").trim().toUpperCase();return PC_ALIASES[raw]||raw}
 const PC = normalizarPC(params.get("pc") || "P1");
+function pcCandidatos(pc){const raw=String(pc||"P1").trim().toUpperCase();const out=[raw];if(/^P\d+$/.test(raw))out.push("PC"+raw.replace("P",""));if(/^PC\d+$/.test(raw))out.push("P"+raw.replace("PC",""));return [...new Set(out)]}
 
-function pcCandidatos(pc){
-  const raw = String(pc || "P1").trim().toUpperCase();
-  const out = [raw];
-
-  // Compatibilidad: si la landing usa P1 pero en Supabase cargaste PC1, prueba ambas.
-  if(/^P\d+$/.test(raw)) out.push("PC" + raw.replace("P", ""));
-  if(/^PC\d+$/.test(raw)) out.push("P" + raw.replace("PC", ""));
-
-  return [...new Set(out)];
-}
-
+const LS_LOGIN = "bet300_login_validado_" + PC;
 const LS_USER = "bet300_user_" + PC;
 const LS_SOLICITUD = "solicitud_actual_" + PC;
+const LS_CHAT = "bet300_chat_" + PC;
+const LS_CHAT_TOKEN = "bet300_chat_token_" + PC;
 
-let billeteraActiva = null;
-let solicitudActual = null;
-let solicitudChatId = "";
-let intervaloEstado = null;
-let userData = null;
-let tipoSolicitudActual = "CARGA";
-let validacionUsuarioActual = null;
-let cuentaRetiroVerificada = null;
-let referenciaPagoActual = "";
+let billeteraActiva=null, solicitudActual=null, solicitudChatId="", intervaloEstado=null;
+let userLogin=null, userData=null, tipoSolicitudActual="CARGA", validacionUsuarioActual=null, cuentaRetiroVerificada=null, referenciaPagoActual="";
+let chatSessionId=localStorage.getItem(LS_CHAT)||"", chatSessionToken=localStorage.getItem(LS_CHAT_TOKEN)||"", chatLiteImagenBase64="", chatLiteTimer=null;
 
 window.onload = async () => {
-  prepararWhatsapp();
-  cargarUsuarioGuardado();
+  prepararLinks();
+  limpiarChatSeguroSiFaltaToken();
+  cargarEstadoGuardado();
   recuperarSolicitudPendiente();
   await cargarBilletera();
 };
 
-// ======================================================
-// Helpers Supabase
-// ======================================================
+function $(id){return document.getElementById(id)}
+function escapeHtml(t){return String(t??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
+function escapeAttr(t){return escapeHtml(t)}
+function show(id){$(id)?.classList.remove("hidden")} function hide(id){$(id)?.classList.add("hidden")}
+function msg(id, texto, tipo){const b=$(id); if(!b)return; b.innerHTML=texto; b.className="result "+(tipo||"info")}
+function getWhatsappNumero(){return WHATSAPP_POR_PC[PC]||WHATSAPP_POR_PC.P1}
+function prepararLinks(){const numero=getWhatsappNumero();$("btnWhatsappFijo").href=`https://wa.me/${numero}?text=${encodeURIComponent("Hola, necesito ayuda.")}`;$("btnPlataformaFijo").href=LINKS_PLATAFORMA[PC]||LINKS_PLATAFORMA.P1}
+function setVista(v){["loginCard","datosCard","cargaCard"].forEach(hide); show(v)}
+function normalizarTelefono(v){return String(v||"").replace(/\D/g,"")}
+function normalizarDni(v){return String(v||"").replace(/\D/g,"")}
 
-async function supabaseInsertSeguro(tabla, payloads){
-  // Blindaje RPC: la landing pública ya no inserta directo en tablas.
-  console.warn("supabaseInsertSeguro deshabilitado para tabla:", tabla);
-  return { ok:false, error:"Inserción directa deshabilitada en landing blindada." };
+function cargarEstadoGuardado(){
+  try{userLogin=JSON.parse(localStorage.getItem(LS_LOGIN)||"null")}catch(e){}
+  try{userData=JSON.parse(localStorage.getItem(LS_USER)||"null")}catch(e){}
+  if(userData?.usuario && userData?.nombre && userData?.telefono && userData?.dni && userData?.usuario_validado && userData?.validacion_id){mostrarCarga();return}
+  if(userLogin?.usuario && userLogin?.validacion_id){mostrarDatos();return}
+  setVista("loginCard");
 }
 
-async function registrarContactoSupabase(usuario, nombre, telefono){
-  // Blindaje RPC:
-  // No guardamos usuarios directo desde la landing.
-  // El contacto se registra automáticamente al crear solicitud mediante landing_crear_solicitud().
-  return { ok:true };
-}
+async function verificarUsuarioInicial(){
+  const usuario=$("loginUsuario").value.trim();
+  if(!usuario){msg("loginMsg","Ingresá tu usuario.", "err");return}
+  $("btnVerificarUsuario").disabled=true;$("btnVerificarUsuario").innerText="Verificando...";
+  msg("loginMsg",renderValidacionUsuarioBox(15,"Aguarde, estamos verificando su usuario. No cierre esta ventana."),"info");
 
-function comprimirImagenChat(file, cb){
-  const img = new Image();
-  const reader = new FileReader();
-
-  reader.onload = () => {
-    img.onload = () => {
-      const max = 560;
-      let w = img.width;
-      let h = img.height;
-
-      if(w > h && w > max){
-        h = Math.round(h * max / w);
-        w = max;
-      }else if(h >= w && h > max){
-        w = Math.round(w * max / h);
-        h = max;
-      }
-
-      const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
-
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0, w, h);
-
-      cb(canvas.toDataURL("image/jpeg", .52));
-    };
-
-    img.src = reader.result;
-  };
-
-  reader.readAsDataURL(file);
-}
-
-function getWhatsappNumero() {
-  return WHATSAPP_POR_PC[PC] || WHATSAPP_POR_PC.P1;
-}
-
-function prepararWhatsapp() {
-  const numero = getWhatsappNumero();
-
-  const crearTxt = encodeURIComponent("Hola, quiero crear usuario.");
-  const ayudaTxt = encodeURIComponent("Hola, necesito ayuda para cargar.");
-
-  document.getElementById("btnCrearUsuario").href =
-    `https://wa.me/${numero}?text=${crearTxt}`;
-
-
-}
-
-function cargarUsuarioGuardado() {
-  const raw = localStorage.getItem(LS_USER);
-
-  if (!raw) return;
-
-  try {
-    userData = JSON.parse(raw);
-
-    if (userData.usuario && userData.nombre && userData.telefono && userData.dni && userData.usuario_validado) {
-      mostrarCarga();
-    }
-  } catch (e) {}
-}
-
-function mostrarCarga() {
-  document.getElementById("registroCard").classList.add("hidden");
-  document.getElementById("cargaCard").classList.remove("hidden");
-
-  document.getElementById("datosUsuarioBox").innerHTML = `
-    <b>Usuario:</b> ${userData.usuario}<br>
-    <b>Nombre:</b> ${userData.nombre}<br>
-    <b>WhatsApp:</b> ${userData.telefono}<br>
-    <b>DNI:</b> ${userData.dni}<br>
-    <b>Validación:</b> Usuario encontrado en Agentes ✅
-  `;
-}
-
-function cambiarDatos() {
-  localStorage.removeItem(LS_USER);
-  localStorage.removeItem(LS_CHAT);
-  localStorage.removeItem(LS_CHAT_TOKEN);
-  chatSessionId = "";
-  chatSessionToken = "";
-  userData = null;
-
-  document.getElementById("registroCard").classList.remove("hidden");
-  document.getElementById("cargaCard").classList.add("hidden");
-
-  document.getElementById("regUsuario").value = "";
-  document.getElementById("regNombre").value = "";
-  document.getElementById("regTelefono").value = "";
-  document.getElementById("regDni").value = "";
-  validacionUsuarioActual = null;
-}
-
-async function continuarRegistro() {
-  const usuario = document.getElementById("regUsuario").value.trim();
-  const nombre = document.getElementById("regNombre").value.trim();
-  const telefono = document.getElementById("regTelefono").value.trim();
-  const dni = (document.getElementById("regDni")?.value || "").replace(/\D/g, "");
-
-  if (!usuario || !nombre || !telefono || !dni) {
-    mostrarRegistroMsg("Completá usuario, nombre, WhatsApp y DNI.", false);
-    return;
-  }
-
-  if (telefono.replace(/\D/g, "").length < 8) {
-    mostrarRegistroMsg("Revisá el número de WhatsApp.", false);
-    return;
-  }
-
-  if (dni.length < 7) {
-    mostrarRegistroMsg("Revisá el DNI. Ingresá solo números.", false);
-    return;
-  }
-
-  document.getElementById("btnContinuar").disabled = true;
-  document.getElementById("btnContinuar").innerText = "Validando usuario...";
-
-  userData = { usuario, nombre, telefono, dni, usuario_validado:false };
-  mostrarRegistroMsg(renderValidacionUsuarioBox(18, "Conectando con el worker de tu PC..."), true);
-
-  const { data, error } = await supabaseClient.rpc("landing_solicitar_validacion_usuario", {
-    p_usuario: usuario,
-    p_nombre_completo: nombre,
-    p_telefono: telefono,
-    p_dni: dni,
-    p_pc_codigo: PC
+  // Usamos placeholders solo para iniciar worker. La solicitud real no avanza hasta que se completen los datos finales.
+  const {data,error}=await supabaseClient.rpc("landing_solicitar_validacion_usuario",{
+    p_usuario:usuario,
+    p_nombre_completo:"",
+    p_telefono:"",
+    p_dni:"",
+    p_pc_codigo:PC
   });
 
-  if(error){
-    console.error("Error solicitando validación:", error);
-    document.getElementById("btnContinuar").disabled = false;
-    document.getElementById("btnContinuar").innerText = "Continuar";
-    mostrarRegistroMsg("No pudimos iniciar la validación. Intentá nuevamente o consultanos por chat.", false);
+  if(error){console.error(error);$("btnVerificarUsuario").disabled=false;$("btnVerificarUsuario").innerText="Verificar usuario";msg("loginMsg","No pudimos iniciar la validación. Intentá nuevamente o consultanos por chat.","err");return}
+
+  const row=Array.isArray(data)?data[0]:data;
+  if(!row){$("btnVerificarUsuario").disabled=false;$("btnVerificarUsuario").innerText="Verificar usuario";msg("loginMsg","No pudimos validar el usuario. Consultanos por chat.","err");return}
+
+  if(String(row.estado||"").toUpperCase()==="EXISTE"){
+    finalizarLoginValidado(usuario,row.validacion_id||null);
     return;
   }
 
-  const row = Array.isArray(data) ? data[0] : data;
-
-  if(!row){
-    document.getElementById("btnContinuar").disabled = false;
-    document.getElementById("btnContinuar").innerText = "Continuar";
-    mostrarRegistroMsg("No pudimos validar el usuario. Consultanos por chat.", false);
-    return;
-  }
-
-  if(row.estado === "EXISTE"){
-    validacionUsuarioActual = row.validacion_id || null;
-    finalizarRegistroValidado(usuario, nombre, telefono, dni, validacionUsuarioActual);
-    return;
-  }
-
-  validacionUsuarioActual = row.validacion_id;
-  await esperarValidacionUsuario(usuario, nombre, telefono, dni, validacionUsuarioActual);
+  await esperarValidacionInicial(usuario,row.validacion_id);
 }
 
-async function esperarValidacionUsuario(usuario, nombre, telefono, dni, validacionId){
-  const maxIntentos = 40;
-  let intentos = 0;
-
-  while(intentos < maxIntentos){
-    intentos++;
-    await new Promise(resolve => setTimeout(resolve, 2500));
-
-    const { data, error } = await supabaseClient.rpc("landing_estado_validacion_usuario", {
-      p_validacion_id: Number(validacionId)
-    });
-
-    if(error){
-      console.error("Error consultando validación:", error);
-      continue;
+async function esperarValidacionInicial(usuario,validacionId){
+  const max=40; let i=0;
+  while(i<max){
+    i++; await new Promise(r=>setTimeout(r,2500));
+    const {data,error}=await supabaseClient.rpc("landing_estado_validacion_usuario",{p_validacion_id:Number(validacionId)});
+    if(error){console.warn(error);continue}
+    const row=Array.isArray(data)?data[0]:data;
+    const estado=String(row?.estado||"").toUpperCase();
+    if(estado==="EXISTE"){finalizarLoginValidado(usuario,validacionId);return}
+    if(estado==="NO_EXISTE"){
+      $("btnVerificarUsuario").disabled=false;$("btnVerificarUsuario").innerText="Verificar usuario";
+      msg("loginMsg",renderValidacionNoExisteBox(),"err");return
     }
-
-    const row = Array.isArray(data) ? data[0] : data;
-    const estado = String(row?.estado || "").toUpperCase();
-
-    if(estado === "EXISTE"){
-      finalizarRegistroValidado(usuario, nombre, telefono, dni, validacionId);
-      return;
+    if(estado==="ERROR"){
+      $("btnVerificarUsuario").disabled=false;$("btnVerificarUsuario").innerText="Verificar usuario";
+      msg("loginMsg",renderValidacionErrorBox(),"err");return
     }
-
-    if(estado === "NO_EXISTE"){
-      document.getElementById("btnContinuar").disabled = false;
-      document.getElementById("btnContinuar").innerText = "Continuar";
-
-      userData = { usuario, nombre, telefono, dni, usuario_validado:false };
-      mostrarRegistroMsg(renderValidacionNoExisteBox(), false);
-      return;
-    }
-
-    if(estado === "ERROR"){
-      document.getElementById("btnContinuar").disabled = false;
-      document.getElementById("btnContinuar").innerText = "Continuar";
-
-      userData = { usuario, nombre, telefono, dni, usuario_validado:false };
-      mostrarRegistroMsg(renderValidacionErrorBox(), false);
-      return;
-    }
-
-    const pct = Math.min(92, 18 + Math.round((intentos / maxIntentos) * 74));
-    const subtitulo = intentos < 8
-      ? "Buscando tu usuario en Agentes..."
-      : "La validación sigue en curso. El panel puede estar ocupado.";
-    mostrarRegistroMsg(renderValidacionUsuarioBox(pct, subtitulo), true);
+    const pct=Math.min(92,15+Math.round((i/max)*77));
+    msg("loginMsg",renderValidacionUsuarioBox(pct,i<8?"Buscando tu usuario en Agentes...":"La validación sigue en curso. No cierres esta ventana."),"info");
   }
-
-  document.getElementById("btnContinuar").disabled = false;
-  document.getElementById("btnContinuar").innerText = "Continuar";
-  mostrarRegistroMsg("La validación está demorando más de lo habitual. Intentá nuevamente o consultanos por chat.", false);
+  $("btnVerificarUsuario").disabled=false;$("btnVerificarUsuario").innerText="Verificar usuario";
+  msg("loginMsg","La validación está demorando más de lo habitual. Intentá nuevamente o consultanos por chat.","err");
 }
 
-function finalizarRegistroValidado(usuario, nombre, telefono, dni, validacionId){
-  userData = {
-    usuario,
-    nombre,
-    telefono,
-    dni,
-    usuario_validado:true,
-    validacion_id: validacionId || null,
-    validado_at: new Date().toISOString()
-  };
+function finalizarLoginValidado(usuario,validacionId){
+  userLogin={usuario,validacion_id:validacionId,validado_at:new Date().toISOString()};
+  localStorage.setItem(LS_LOGIN,JSON.stringify(userLogin));
+  $("btnVerificarUsuario").disabled=false;$("btnVerificarUsuario").innerText="Verificar usuario";
+  msg("loginMsg","Usuario validado correctamente ✅","ok");
+  mostrarDatos();
+}
 
-  localStorage.setItem(LS_USER, JSON.stringify(userData));
-  document.getElementById("btnContinuar").disabled = false;
-  document.getElementById("btnContinuar").innerText = "Continuar";
-  mostrarRegistroMsg("Usuario validado correctamente ✅", true);
+function mostrarDatos(){
+  setVista("datosCard");
+  $("usuarioValidadoBox").innerHTML=`<b>Usuario validado:</b> ${escapeHtml(userLogin?.usuario||"")} ✅`;
+  if(userData){$("regNombre").value=userData.nombre||"";$("regTelefono").value=userData.telefono||"";$("regDni").value=userData.dni||""}
+}
+
+function guardarDatosCuenta(){
+  const nombre=$("regNombre").value.trim();
+  const telefono=normalizarTelefono($("regTelefono").value);
+  const dni=normalizarDni($("regDni").value);
+  if(!userLogin?.usuario||!userLogin?.validacion_id){msg("datosMsg","Primero verificá tu usuario.","err");setVista("loginCard");return}
+  if(!nombre||telefono.length<8||dni.length<7){msg("datosMsg","Completá nombre, WhatsApp válido y DNI válido.","err");return}
+  userData={usuario:userLogin.usuario,nombre,telefono,dni,usuario_validado:true,validacion_id:userLogin.validacion_id,validado_at:userLogin.validado_at};
+  localStorage.setItem(LS_USER,JSON.stringify(userData));
+  msg("datosMsg","Datos guardados correctamente ✅","ok");
   mostrarCarga();
 }
 
-
-function renderValidacionUsuarioBox(pct=20, subtitulo="Buscando tu usuario en Agentes..."){
-  const porcentaje = Math.max(8, Math.min(100, Number(pct || 20)));
-  return `
-    <div class="validation-card">
-      <div class="validation-head">
-        <div class="validation-icon">
-          <span class="validation-dots"><span></span><span></span><span></span></span>
-        </div>
-        <div>
-          <div class="validation-title">Validando tu usuario</div>
-          <div class="validation-sub">${escapeHtml(subtitulo)}</div>
-        </div>
-      </div>
-      <div class="validation-bar">
-        <div class="validation-fill" style="width:${porcentaje}%"></div>
-      </div>
-      <div class="validation-footer">
-        Esto puede tardar unos segundos si el panel está ocupado. No cierres esta ventana.
-      </div>
-    </div>
-  `;
+function mostrarCarga(){
+  setVista("cargaCard");
+  $("datosUsuarioBox").innerHTML=`<b>Usuario:</b> ${escapeHtml(userData.usuario)}<br><b>Nombre:</b> ${escapeHtml(userData.nombre)}<br><b>WhatsApp:</b> ${escapeHtml(userData.telefono)}<br><b>DNI:</b> ${escapeHtml(userData.dni)}<br><b>Validación:</b> Usuario encontrado en Agentes ✅`;
 }
 
-function renderValidacionNoExisteBox(){
-  return `
-    <div class="validation-card" style="border-color:rgba(239,68,68,.45)">
-      <div class="validation-head">
-        <div class="validation-icon" style="background:rgba(239,68,68,.15);color:#fca5a5">!</div>
-        <div>
-          <div class="validation-title">No encontramos ese usuario</div>
-          <div class="validation-sub">Revisá que esté escrito igual que en la plataforma o consultanos por chat.</div>
-        </div>
-      </div>
-      <button type="button" onclick="abrirChatLite()">💬 Consultar por chat</button>
-    </div>
-  `;
-}
+function volverAUsuario(){localStorage.removeItem(LS_LOGIN);localStorage.removeItem(LS_USER);userLogin=null;userData=null;setVista("loginCard")}
+function volverADatos(){mostrarDatos()}
+function limpiarTodo(){localStorage.removeItem(LS_LOGIN);localStorage.removeItem(LS_USER);localStorage.removeItem(LS_CHAT);localStorage.removeItem(LS_CHAT_TOKEN);localStorage.removeItem(LS_SOLICITUD);location.reload()}
 
-function renderValidacionErrorBox(){
-  return `
-    <div class="validation-card" style="border-color:rgba(245,158,11,.45)">
-      <div class="validation-head">
-        <div class="validation-icon" style="background:rgba(245,158,11,.15);color:#fcd34d">?</div>
-        <div>
-          <div class="validation-title">No pudimos validar automáticamente</div>
-          <div class="validation-sub">Podés intentar nuevamente o consultarnos por chat para revisar tu usuario.</div>
-        </div>
-      </div>
-      <button type="button" onclick="abrirChatLite()">💬 Consultar por chat</button>
-    </div>
-  `;
-}
+function renderValidacionUsuarioBox(pct=20,sub="Buscando tu usuario en Agentes..."){return `<div class="validation-card"><div class="validation-head"><div class="validation-icon"><span class="loader"></span></div><div><div class="validation-title">Validando tu usuario</div><div class="validation-sub">${escapeHtml(sub)}</div></div></div><div class="validation-bar"><div class="validation-fill" style="width:${Math.max(8,Math.min(100,Number(pct||20)))}%"></div></div><div class="validation-footer">Aguarde que se está verificando su usuario. No cierre esta ventana.</div></div>`}
+function renderValidacionNoExisteBox(){return `<div class="validation-card" style="border-color:rgba(239,68,68,.45)"><div class="validation-head"><div class="validation-icon" style="background:rgba(239,68,68,.15);color:#fca5a5">!</div><div><div class="validation-title">No encontramos ese usuario</div><div class="validation-sub">Revisá que esté escrito igual que en la plataforma.</div></div></div><button type="button" onclick="document.getElementById('loginUsuario').focus()">Intentar nuevamente</button><button class="btn-dark" type="button" onclick="abrirChatLite()">💬 Consultar por chat</button></div>`}
+function renderValidacionErrorBox(){return `<div class="validation-card" style="border-color:rgba(245,158,11,.45)"><div class="validation-head"><div class="validation-icon" style="background:rgba(245,158,11,.15);color:#fcd34d">?</div><div><div class="validation-title">No pudimos validar automáticamente</div><div class="validation-sub">Intentá nuevamente o consultanos por chat.</div></div></div><button type="button" onclick="abrirChatLite()">💬 Consultar por chat</button></div>`}
 
-
-function mostrarRegistroMsg(texto, ok) {
-  const box = document.getElementById("registroMsg");
-  box.innerHTML = texto;
-  box.className = "result " + (ok ? "ok" : "err");
-}
-
-async function cargarBilletera() {
-  const pcsCompatibles = pcCandidatos(PC);
-
-  let encontrada = null;
-  let ultimoError = null;
-
-  for (const pcTry of pcsCompatibles) {
-    const { data, error } = await supabaseClient.rpc("landing_obtener_billetera", {
-      p_pc_codigo: pcTry
-    });
-
-    if (error) {
-      ultimoError = error;
-      console.warn("Error RPC landing_obtener_billetera:", error.message);
-      continue;
-    }
-
-    if (data && data.length) {
-      encontrada = data[0];
-      break;
-    }
+async function cargarBilletera(){
+  let encontrada=null, ultimoError=null;
+  for(const pcTry of pcCandidatos(PC)){
+    const {data,error}=await supabaseClient.rpc("landing_obtener_billetera",{p_pc_codigo:pcTry});
+    if(error){ultimoError=error;console.warn(error.message);continue}
+    if(data&&data.length){encontrada=data[0];break}
   }
-
-  if (!encontrada) {
-    if (ultimoError) console.error("Error cargando billetera:", ultimoError);
-    mostrarBilleteraNoDisponible();
-    return;
-  }
-
-  billeteraActiva = encontrada;
-
-  document.getElementById("aliasBox").innerText =
-    billeteraActiva.alias || "Consultar";
-
-  document.getElementById("cbuBox").innerText =
-    billeteraActiva.cbu || "Consultar";
-
-  document.getElementById("titularBox").innerText =
-    billeteraActiva.titular || billeteraActiva.nombre_visible || "Consultar";
-
-  document.getElementById("bancoBox").innerText =
-    billeteraActiva.banco || "Billetera";
+  if(!encontrada){if(ultimoError)console.error(ultimoError);mostrarBilleteraNoDisponible();return}
+  billeteraActiva=encontrada;
+  $("aliasBox").innerText=billeteraActiva.alias||"Consultar";
+  $("cbuBox").innerText=billeteraActiva.cbu||"Consultar";
+  $("titularBox").innerText=billeteraActiva.titular||billeteraActiva.nombre_visible||"Consultar";
+  $("bancoBox").innerText=billeteraActiva.banco||"Billetera";
 }
-
-function mostrarBilleteraNoDisponible() {
-  billeteraActiva = null;
-
-  document.getElementById("aliasBox").innerText = "No disponible";
-  document.getElementById("cbuBox").innerText = "No disponible";
-  document.getElementById("titularBox").innerText = "Consultar por chat";
-  document.getElementById("bancoBox").innerText = "Consultar";
-}
-
-function copiarTextoDato(id, nombreDato) {
-  const texto = document.getElementById(id)?.innerText || "";
-
-  if (!texto || texto === "Consultar" || texto === "No disponible") {
-    mostrarResultado(`${nombreDato} no disponible. Contactanos por chat.`, false);
-    return;
-  }
-
-  navigator.clipboard.writeText(texto);
-  mostrarResultado(`${nombreDato} copiado correctamente.`, true);
-}
-
-function copiarAlias() {
-  copiarTextoDato("aliasBox", "Alias");
-}
-
-function copiarCbu() {
-  copiarTextoDato("cbuBox", "CBU / CVU");
-}
-
-/* Compatibilidad por si quedó algún botón viejo llamando copiarCvu */
-function copiarCvu() {
-  copiarAlias();
-}
-
+function mostrarBilleteraNoDisponible(){billeteraActiva=null;$("aliasBox").innerText="No disponible";$("cbuBox").innerText="No disponible";$("titularBox").innerText="Consultar por chat";$("bancoBox").innerText="Consultar"}
+function copiarTextoDato(id,n){const t=$(id)?.innerText||"";if(!t||["Consultar","No disponible"].includes(t)){mostrarResultado(`${n} no disponible. Contactanos por chat.`,false);return}navigator.clipboard.writeText(t);mostrarResultado(`${n} copiado correctamente.`,true)}
+function copiarAlias(){copiarTextoDato("aliasBox","Alias")} function copiarCbu(){copiarTextoDato("cbuBox","CBU / CVU")}
 
 function seleccionarTipoSolicitud(tipo){
-  tipoSolicitudActual = String(tipo || "CARGA").toUpperCase();
-  const esRetiro = tipoSolicitudActual === "RETIRO";
-
-  document.getElementById("tipoCargaBtn").classList.toggle("active", !esRetiro);
-  document.getElementById("tipoRetiroBtn").classList.toggle("active", esRetiro);
-
-  document.getElementById("montoLabel").innerText = esRetiro ? "Monto a retirar *" : "Monto a cargar *";
-  document.getElementById("monto").placeholder = esRetiro ? "mínimo: 5000" : "ej: 5000";
-  document.getElementById("btnEnviar").innerText = esRetiro ? "Enviar solicitud de retiro" : "Enviar solicitud";
-
-  const retiroBox = document.getElementById("retiroDatosBox");
-  if(retiroBox){
-    retiroBox.classList.toggle("hidden", !esRetiro);
-  }
-
-  if(esRetiro){
-    cargarCuentaRetiroVerificada();
-  }else{
-    cuentaRetiroVerificada = null;
-    actualizarVistaCuentaRetiro();
-  }
-
-  const minTxt = document.getElementById("montoMinimoTxt");
-  if(minTxt){
-    minTxt.innerText = esRetiro ? "⚠️ Retiro mínimo: $5.000" : "⚠️ Carga mínima: $2.000";
-  }
+  tipoSolicitudActual=String(tipo||"CARGA").toUpperCase(); const esRetiro=tipoSolicitudActual==="RETIRO";
+  $("tipoCargaBtn").classList.toggle("active",!esRetiro);$("tipoRetiroBtn").classList.toggle("active",esRetiro);
+  $("montoLabel").innerText=esRetiro?"Monto a retirar *":"Monto a cargar *";$("monto").placeholder=esRetiro?"mínimo: 5000":"ej: 5000";$("btnEnviar").innerText=esRetiro?"Enviar solicitud de retiro":"Enviar solicitud";
+  $("retiroDatosBox").classList.toggle("hidden",!esRetiro);$("montoMinimoTxt").innerText=esRetiro?"⚠️ Retiro mínimo: $5.000":"⚠️ Carga mínima: $2.000";
+  if(esRetiro)cargarCuentaRetiroVerificada();else{cuentaRetiroVerificada=null;actualizarVistaCuentaRetiro()}
 }
-
-
-
 
 async function cargarCuentaRetiroVerificada(){
-  cuentaRetiroVerificada = null;
-
-  if(!userData || !userData.usuario || !userData.dni){
-    actualizarVistaCuentaRetiro();
-    return;
-  }
-
-  const { data, error } = await supabaseClient.rpc("landing_obtener_cuenta_retiro", {
-    p_usuario: userData.usuario,
-    p_dni: userData.dni,
-    p_pc_codigo: PC
-  });
-
-  if(error){
-    console.warn("No pude consultar cuenta de retiro verificada:", error.message);
-    actualizarVistaCuentaRetiro();
-    return;
-  }
-
-  const row = Array.isArray(data) ? data[0] : data;
-
-  if(row && row.cuenta_id){
-    cuentaRetiroVerificada = row;
-  }
-
-  actualizarVistaCuentaRetiro();
+  cuentaRetiroVerificada=null;
+  if(!userData?.usuario||!userData?.dni){actualizarVistaCuentaRetiro();return}
+  const {data,error}=await supabaseClient.rpc("landing_obtener_cuenta_retiro",{p_usuario:userData.usuario,p_dni:userData.dni,p_pc_codigo:PC});
+  if(error){console.warn(error.message);actualizarVistaCuentaRetiro();return}
+  const row=Array.isArray(data)?data[0]:data; if(row&&row.cuenta_id)cuentaRetiroVerificada=row; actualizarVistaCuentaRetiro();
 }
-
 function actualizarVistaCuentaRetiro(){
-  const box = document.getElementById("retiroCuentaRegistradaBox");
-  const aliasInput = document.getElementById("retiroAliasCbu");
-  const titularInput = document.getElementById("retiroTitular");
-  const aliasLabel = document.getElementById("retiroAliasLabel");
-  const titularLabel = document.getElementById("retiroTitularLabel");
-
-  if(!box || !aliasInput || !titularInput) return;
-
-  if(cuentaRetiroVerificada && cuentaRetiroVerificada.cuenta_id){
-    box.classList.remove("hidden");
-    box.innerHTML = `
-      <b>Cuenta de retiro verificada</b><br>
-      <b>Titular:</b> ${escapeHtml(cuentaRetiroVerificada.titular || "")}<br>
-      <b>Alias/CBU:</b> ${escapeHtml(cuentaRetiroVerificada.alias_cbu || "")}<br>
-      <span class="mini">Por seguridad, los retiros se envían a la cuenta registrada. Para cambiarla, consultá por chat.</span>
-    `;
-
-    aliasInput.value = cuentaRetiroVerificada.alias_cbu || "";
-    titularInput.value = cuentaRetiroVerificada.titular || "";
-    aliasInput.disabled = true;
-    titularInput.disabled = true;
-
-    if(aliasLabel) aliasLabel.innerText = "Alias / CBU verificado";
-    if(titularLabel) titularLabel.innerText = "Titular verificado";
-  }else{
-    box.classList.add("hidden");
-    box.innerHTML = "";
-
-    aliasInput.disabled = false;
-    titularInput.disabled = false;
-
-    if(aliasLabel) aliasLabel.innerText = "CBU / CVU / Alias de destino *";
-    if(titularLabel) titularLabel.innerText = "Titular de la cuenta *";
-  }
+  const box=$("retiroCuentaRegistradaBox"), a=$("retiroAliasCbu"), t=$("retiroTitular");
+  if(!box||!a||!t)return;
+  if(cuentaRetiroVerificada?.cuenta_id){
+    box.classList.remove("hidden");box.innerHTML=`<b>Cuenta de retiro verificada</b><br><b>Titular:</b> ${escapeHtml(cuentaRetiroVerificada.titular||"")}<br><b>Alias/CBU:</b> ${escapeHtml(cuentaRetiroVerificada.alias_cbu||"")}<br><span class="mini">Por seguridad, los retiros se envían a la cuenta registrada. Para cambiarla, consultá por chat.</span>`;
+    a.value=cuentaRetiroVerificada.alias_cbu||"";t.value=cuentaRetiroVerificada.titular||"";a.disabled=true;t.disabled=true;
+  }else{box.classList.add("hidden");box.innerHTML="";a.disabled=false;t.disabled=false}
 }
-
-
+function fechaBA(f){try{return new Date(f).toLocaleString("es-AR",{timeZone:"America/Argentina/Buenos_Aires",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).replace(","," a las")}catch(e){return String(f||"")}}
 async function puedeSolicitarRetiro(){
-  if(!userData || !userData.usuario || !userData.dni){
-    return { ok:false, error:"Primero completá tus datos y DNI." };
-  }
-
-  const { data, error } = await supabaseClient.rpc("landing_puede_solicitar_retiro", {
-    p_usuario: userData.usuario,
-    p_dni: userData.dni,
-    p_pc_codigo: PC
-  });
-
-  if(error){
-    console.error("Error validando retiro 24h:", error);
-    return { ok:false, error:"No pudimos validar si podés retirar ahora. Consultanos por chat." };
-  }
-
-  const row = Array.isArray(data) ? data[0] : data;
-
-  if(!row){
-    return { ok:false, error:"No pudimos validar el retiro. Consultanos por chat." };
-  }
-
-  if(row.ok === false){
-    return {
-      ok:false,
-      error: row.mensaje || "Ya tenés un retiro registrado en las últimas 24 hs."
-    };
-  }
-
-  return { ok:true };
+  const {data,error}=await supabaseClient.rpc("landing_puede_solicitar_retiro",{p_usuario:userData.usuario,p_dni:userData.dni,p_pc_codigo:PC});
+  if(error){console.error(error);return{ok:false,error:"No pudimos validar si podés retirar ahora. Consultanos por chat."}}
+  const row=Array.isArray(data)?data[0]:data; if(!row)return{ok:false,error:"No pudimos validar el retiro. Consultanos por chat."}
+  if(row.ok===false){let msg=row.mensaje||"Ya tenés un retiro registrado en las últimas 24 hs."; const desde=row.puede_desde||row.disponible_desde||row.proximo_retiro_at||row.next_available_at; if(desde)msg+=`<br>Podés volver a solicitarlo a partir del ${fechaBA(desde)} hs.`; return{ok:false,error:msg}}
+  return{ok:true}
 }
 
-async function crearSolicitud() {
-  const monto = Number(document.getElementById("monto").value || 0);
-  const tipo = String(tipoSolicitudActual || "CARGA").toUpperCase();
-  const esRetiro = tipo === "RETIRO";
-
-  if (!userData || !userData.usuario || !userData.nombre || !userData.telefono || !userData.dni) {
-    mostrarResultado("Primero completá tus datos y DNI.", false);
-    return;
-  }
-
-  if (!userData.usuario_validado) {
-    mostrarResultado("Primero necesitamos validar tu usuario en Agentes.", false);
-    cambiarDatos();
-    return;
-  }
-
-  if (!monto) {
-    mostrarResultado(esRetiro ? "Completá el monto a retirar." : "Completá el monto a cargar.", false);
-    return;
-  }
-
-  if (!esRetiro && monto < 2000) {
-    mostrarResultado("El monto mínimo de carga es $2.000.", false);
-    return;
-  }
-
-  if (esRetiro && monto < 5000) {
-    mostrarResultado("El monto mínimo de retiro es $5.000.", false);
-    return;
-  }
-
-  if (esRetiro) {
-    const destino = (document.getElementById("retiroAliasCbu")?.value || "").trim();
-    const titular = (document.getElementById("retiroTitular")?.value || "").trim();
-
-    if(!destino){
-      mostrarResultado("Completá el CBU/CVU o alias donde querés recibir el retiro.", false);
-      return;
-    }
-
-    if(!titular){
-      mostrarResultado("Completá el titular de la cuenta de destino.", false);
-      return;
-    }
-  }
-
-  if (esRetiro) {
-    const validacionRetiro = await puedeSolicitarRetiro();
-    if(!validacionRetiro.ok){
-      mostrarResultado(validacionRetiro.error || "No se puede solicitar otro retiro todavía. Contactanos por chat.", false);
-      return;
-    }
-  }
-
-  if (!esRetiro && !billeteraActiva) {
-    mostrarResultado("No hay billetera disponible. Contactanos por chat.", false);
-    return;
-  }
-
-  document.getElementById("btnEnviar").disabled = true;
-  document.getElementById("btnEnviar").innerText = "Enviando...";
-
-  const r = await crearSolicitudSupabase(monto, tipo);
-
-  document.getElementById("btnEnviar").disabled = false;
-  document.getElementById("btnEnviar").innerText = esRetiro ? "Enviar solicitud de retiro" : "Enviar solicitud";
-
-  if (!r.ok) {
-    mostrarResultado(r.error || "No se pudo crear la solicitud.", false);
-    return;
-  }
-
-  guardarSolicitudLocal(r.solicitud.id, r.solicitud.chat_id, r.solicitud.chat_token, tipo);
-
-  if(r.solicitud.chat_id && r.solicitud.chat_token){
-    chatSessionId = String(r.solicitud.chat_id);
-    chatSessionToken = String(r.solicitud.chat_token);
-    localStorage.setItem(LS_CHAT, chatSessionId);
-    localStorage.setItem(LS_CHAT_TOKEN, chatSessionToken);
-    iniciarRealtimeChatLanding();
-  }
-
-  referenciaPagoActual = r.solicitud.referencia_pago || "";
-
-  mostrarReferenciaPago(r.solicitud);
-
-  mostrarResultado(
-    `✅ Solicitud enviada correctamente.<br><br>
-    <b>ID:</b> ${r.solicitud.id}<br>
-    <b>Tipo:</b> ${tipo}<br>
-    ${(!esRetiro && referenciaPagoActual) ? `<b>Referencia:</b> ${referenciaPagoActual}<br>` : ""}
-    <b>Estado:</b> ${r.solicitud.estado}<br><br>
-    ${esRetiro ? "Estamos revisando tu retiro." : "Estamos verificando tu transferencia."}`,
-    true
-  );
-
-  mostrarEstadoEspera(r.solicitud.estado || "PENDIENTE");
-  iniciarEscuchaEstado();
-
-  document.getElementById("monto").value = "";
+async function crearSolicitud(){
+  const monto=Number($("monto").value||0), tipo=String(tipoSolicitudActual||"CARGA").toUpperCase(), esRetiro=tipo==="RETIRO";
+  if(!userData?.usuario||!userData?.validacion_id){mostrarResultado("Primero verificá tu usuario en Agentes.",false);setVista("loginCard");return}
+  if(!monto){mostrarResultado(esRetiro?"Completá el monto a retirar.":"Completá el monto a cargar.",false);return}
+  if(!esRetiro&&monto<2000){mostrarResultado("El monto mínimo de carga es $2.000.",false);return}
+  if(esRetiro&&monto<5000){mostrarResultado("El monto mínimo de retiro es $5.000.",false);return}
   if(esRetiro){
-    const destinoInput = document.getElementById("retiroAliasCbu");
-    const titularInput = document.getElementById("retiroTitular");
-    if(destinoInput) destinoInput.value = "";
-    if(titularInput) titularInput.value = "";
+    const destino=($("retiroAliasCbu")?.value||"").trim(), titular=($("retiroTitular")?.value||"").trim();
+    if(!destino||!titular){mostrarResultado("Completá la cuenta de destino y titular para el retiro.",false);return}
+    const v=await puedeSolicitarRetiro(); if(!v.ok){mostrarResultado(v.error,false);return}
   }
+  if(!esRetiro&&!billeteraActiva){mostrarResultado("No hay billetera disponible. Contactanos por chat.",false);return}
+  $("btnEnviar").disabled=true;$("btnEnviar").innerText="Enviando...";
+  const r=await crearSolicitudSupabase(monto,tipo);
+  $("btnEnviar").disabled=false;$("btnEnviar").innerText=esRetiro?"Enviar solicitud de retiro":"Enviar solicitud";
+  if(!r.ok){mostrarResultado(r.error||"No se pudo crear la solicitud.",false);return}
+  guardarSolicitudLocal(r.solicitud.id,r.solicitud.chat_id,r.solicitud.chat_token,tipo);
+  if(r.solicitud.chat_id&&r.solicitud.chat_token){chatSessionId=String(r.solicitud.chat_id);chatSessionToken=String(r.solicitud.chat_token);localStorage.setItem(LS_CHAT,chatSessionId);localStorage.setItem(LS_CHAT_TOKEN,chatSessionToken);iniciarRealtimeChatLanding()}
+  referenciaPagoActual=r.solicitud.referencia_pago||"";mostrarReferenciaPago(r.solicitud);
+  mostrarResultado(`✅ Solicitud enviada correctamente.<br><br><b>ID:</b> ${r.solicitud.id}<br><b>Tipo:</b> ${tipo}<br>${(!esRetiro&&referenciaPagoActual)?`<b>Referencia:</b> ${referenciaPagoActual}<br>`:""}<b>Estado:</b> ${r.solicitud.estado}<br><br>${esRetiro?"Estamos revisando tu retiro.":"Estamos verificando tu transferencia."}`,true);
+  mostrarEstadoEspera(r.solicitud.estado||"PENDIENTE");iniciarEscuchaEstado();$("monto").value="";
 }
-
-
-function mostrarReferenciaPago(solicitud){
-  const box = document.getElementById("referenciaPagoBox");
-  if(!box) return;
-
-  const tipo = String(solicitud?.tipo || tipoSolicitudActual || "CARGA").toUpperCase();
-  const ref = solicitud?.referencia_pago || solicitud?.referencia_pago_visible || "";
-
-  if(tipo !== "CARGA" || !ref){
-    box.classList.add("hidden");
-    box.innerHTML = "";
-    return;
-  }
-
-  box.classList.remove("hidden");
-  box.innerHTML = `
-    <b>Referencia de carga:</b> ${escapeHtml(ref)}<br>
-    <span class="mini">Si tu billetera permite agregar nota o motivo, escribí esta referencia. Esto ayuda a validar tu pago más rápido.</span>
-    <button class="copy-btn" type="button" onclick="copiarReferenciaPago('${escapeAttr(ref)}')">Copiar referencia</button>
-  `;
-}
-
-function copiarReferenciaPago(ref){
-  navigator.clipboard.writeText(String(ref || ""));
-  mostrarResultado("Referencia copiada correctamente.", true);
-}
-
-
-function mostrarEstadoEspera(estado="PENDIENTE") {
-  document.getElementById("estadoEspera").classList.remove("hidden");
-  renderProgresoSolicitud(estado);
-}
-
-function completarEstado() {
-  renderProgresoSolicitud("ACREDITADA");
-}
-
-
-function renderProgresoSolicitud(estado){
-  const e = String(estado || "PENDIENTE").toUpperCase();
-  const tipo = String(tipoSolicitudActual || "CARGA").toUpperCase();
-  const esRetiro = tipo === "RETIRO";
-
-  const esFinalOk = ["ACREDITADA","PAGADA"].includes(e);
-  const esRechazada = ["RECHAZADA","ERROR"].includes(e);
-
-  document.getElementById("estadoEspera").classList.remove("hidden");
-
-  const step1Text = document.getElementById("step1Text");
-  const step2Text = document.getElementById("step2Text");
-  const step3Title = document.getElementById("step3Title");
-  const step3Text = document.getElementById("step3Text");
-
-  if(step1Text) step1Text.innerText = esRetiro ? "Recibimos tu solicitud de retiro." : "Recibimos tu pedido de carga.";
-  if(step2Text) step2Text.innerText = esRetiro ? "Un operador está revisando tu retiro." : "Un operador está revisando la transferencia.";
-  if(step3Title) step3Title.innerText = esRetiro ? "Retiro aprobado/pagado" : "Fichas acreditadas";
-  if(step3Text) step3Text.innerText = esRetiro ? "Cuando se apruebe, te avisamos automáticamente." : "Cuando se apruebe, te avisamos automáticamente.";
-
-  document.getElementById("step1").className = "step done";
-
-  if(esFinalOk){
-    document.getElementById("step2").className = "step done";
-    document.getElementById("step3").className = "step done";
-  }else if(esRechazada){
-    document.getElementById("step2").className = "step";
-    document.getElementById("step3").className = "step";
-  }else{
-    document.getElementById("step2").className = "step active";
-    document.getElementById("step3").className = "step";
-  }
-}
-
-
-function guardarSolicitudLocal(id, chatId, chatToken, tipo){
-  solicitudActual = id ? String(id) : null;
-  solicitudChatId = chatId ? String(chatId) : "";
-
-  if(chatToken){
-    chatSessionToken = String(chatToken);
-    localStorage.setItem(LS_CHAT_TOKEN, chatSessionToken);
-  }
-
-  localStorage.setItem(LS_SOLICITUD, JSON.stringify({
-    id: solicitudActual,
-    chat_id: solicitudChatId,
-    chat_token: chatToken ? String(chatToken) : "",
-    tipo: tipo || tipoSolicitudActual || "CARGA"
-  }));
-}
-
-function recuperarSolicitudPendiente() {
-  const guardada = localStorage.getItem(LS_SOLICITUD);
-
-  if (!guardada) return;
-
-  try {
-    const obj = JSON.parse(guardada);
-    solicitudActual = obj.id ? String(obj.id) : null;
-    solicitudChatId = obj.chat_id ? String(obj.chat_id) : "";
-    if(obj.chat_token){
-      chatSessionToken = String(obj.chat_token);
-      localStorage.setItem(LS_CHAT_TOKEN, chatSessionToken);
-    }
-    if(obj.tipo) tipoSolicitudActual = String(obj.tipo).toUpperCase();
-  } catch(e) {
-    // Compatibilidad con versión vieja que guardaba solo el ID.
-    solicitudActual = String(guardada || "");
-    solicitudChatId = localStorage.getItem(LS_CHAT) || "";
-    chatSessionToken = localStorage.getItem(LS_CHAT_TOKEN) || "";
-  }
-
-  if (solicitudActual) {
-    mostrarEstadoEspera("PENDIENTE");
-    iniciarEscuchaEstado();
-  }
-}
-
-function iniciarEscuchaEstado() {
-  if (intervaloEstado) clearInterval(intervaloEstado);
-
-  intervaloEstado = setInterval(async () => {
-    if (!solicitudActual || !solicitudChatId) return;
-
-    const { data, error } = await supabaseClient.rpc("landing_estado_solicitud", {
-      p_solicitud_id: Number(solicitudActual),
-      p_chat_id: solicitudChatId
-    });
-
-    if(error || !data || !data.length) return;
-
-    const s = data[0];
-    const estado = String(s.estado || "");
-    const tipo = String(s.tipo || tipoSolicitudActual || "CARGA").toUpperCase();
-    const esRetiro = tipo === "RETIRO";
-
-    tipoSolicitudActual = tipo;
-    renderProgresoSolicitud(estado);
-
-    if (
-      estado === "ACREDITADA" ||
-      estado === "PAGADA"
-    ) {
-      clearInterval(intervaloEstado);
-      completarEstado();
-
-      if(esRetiro){
-        mostrarResultado("✅ Tu retiro fue marcado como pagado/aprobado.", true);
-        setTimeout(() => {
-          resetLandingEstado();
-          location.reload();
-        }, 2600);
-      }else{
-        document.getElementById("successModal").classList.remove("hidden");
-        setTimeout(() => {
-          resetLandingEstado();
-          location.reload();
-        }, 4500);
-      }
-
-      if (navigator.vibrate) navigator.vibrate([160, 80, 160]);
-      return;
-    }
-
-    if (estado === "RECHAZADA" || estado === "ERROR") {
-      clearInterval(intervaloEstado);
-      mostrarResultado("La solicitud no pudo ser aprobada. Contactanos por chat.", false);
-      setTimeout(() => {
-        resetLandingEstado();
-        location.reload();
-      }, 3200);
-    }
-  }, 3500);
-}
-
-function irPlataforma() {
-  const url = LINKS_PLATAFORMA[PC] || LINKS_PLATAFORMA.P1;
-  resetLandingEstado();
-
-  if (url) {
-    window.location.href = url;
-  }
-}
-
-function cerrarModalExito() {
-  document.getElementById("successModal").classList.add("hidden");
-  resetLandingEstado();
-  setTimeout(() => location.reload(), 300);
-}
-
-function mostrarResultado(texto, ok) {
-  const box = document.getElementById("resultado");
-  box.innerHTML = texto;
-  box.className = "result " + (ok ? "ok" : "err");
-}
-async function crearSolicitudSupabase(monto, tipo="CARGA"){
-
-  const esRetiro = String(tipo || "CARGA").toUpperCase() === "RETIRO";
-
-  const destinoRetiro = esRetiro
-    ? (cuentaRetiroVerificada?.alias_cbu || document.getElementById("retiroAliasCbu")?.value || "").trim()
-    : null;
-
-  const titularRetiro = esRetiro
-    ? (cuentaRetiroVerificada?.titular || document.getElementById("retiroTitular")?.value || "").trim()
-    : null;
-
-  const params = {
-    p_usuario: userData.usuario,
-    p_nombre_completo: userData.nombre,
-    p_telefono: userData.telefono,
-    p_dni: userData.dni,
-    p_validacion_usuario_id: userData.validacion_id ? Number(userData.validacion_id) : null,
-    p_pc_codigo: PC,
-    p_tipo: esRetiro ? "RETIRO" : "CARGA",
-    p_monto: Number(monto),
-    p_comprobante_url: null,
-    p_billetera_id: (!esRetiro && billeteraActiva?.id) ? Number(billeteraActiva.id) : null,
-    p_billetera_nombre: (!esRetiro && billeteraActiva) ? String(billeteraActiva.nombre_visible || "") : null,
-    p_link_plataforma: LINKS_PLATAFORMA[PC] || LINKS_PLATAFORMA.P1 || null,
-    p_retiro_alias_cbu: destinoRetiro,
-    p_retiro_titular: titularRetiro,
-    p_cuenta_retiro_id: esRetiro && cuentaRetiroVerificada?.cuenta_id ? Number(cuentaRetiroVerificada.cuenta_id) : null
+async function crearSolicitudSupabase(monto,tipo="CARGA"){
+  const esRetiro=String(tipo||"CARGA").toUpperCase()==="RETIRO";
+  const params={
+    p_usuario:userData.usuario,p_nombre_completo:userData.nombre,p_telefono:userData.telefono,p_dni:userData.dni,p_validacion_usuario_id:Number(userData.validacion_id),p_pc_codigo:PC,p_tipo:esRetiro?"RETIRO":"CARGA",p_monto:Number(monto),p_comprobante_url:null,
+    p_billetera_id:null,p_billetera_nombre:(!esRetiro&&billeteraActiva)?String(billeteraActiva.nombre_visible||""):null,p_link_plataforma:LINKS_PLATAFORMA[PC]||LINKS_PLATAFORMA.P1||null,
+    p_retiro_alias_cbu:esRetiro?(cuentaRetiroVerificada?.alias_cbu||$("retiroAliasCbu")?.value||"").trim():null,p_retiro_titular:esRetiro?(cuentaRetiroVerificada?.titular||$("retiroTitular")?.value||"").trim():null,p_cuenta_retiro_id:esRetiro&&cuentaRetiroVerificada?.cuenta_id?Number(cuentaRetiroVerificada.cuenta_id):null
   };
-
-  const { data, error } = await supabaseClient.rpc("landing_crear_solicitud_v3", params);
-
-  if(error){
-    console.error("Error creando solicitud RPC v2:", error);
-    return {
-      ok:false,
-      error:error.message || "No se pudo crear la solicitud."
-    };
-  }
-
-  const row = Array.isArray(data) ? data[0] : data;
-
-  if(!row || !row.solicitud_id){
-    return {
-      ok:false,
-      error:"La solicitud no devolvió ID."
-    };
-  }
-
-  solicitudActual = row.solicitud_id;
-  solicitudChatId = row.chat_id || "";
-
-  return {
-    ok:true,
-    solicitud:{
-      id: row.solicitud_id,
-      chat_id: row.chat_id,
-      chat_token: row.chat_token || "",
-      estado: row.estado || "PENDIENTE",
-      created_at: row.created_at,
-      tipo: esRetiro ? "RETIRO" : "CARGA",
-      referencia_pago: row.referencia_pago || "",
-      referencia_pago_visible: row.referencia_pago_visible || row.referencia_pago || "",
-      retiro_requiere_revision: row.retiro_requiere_revision || false
-    }
-  };
+  const {data,error}=await supabaseClient.rpc("landing_crear_solicitud_v3",params);
+  if(error){console.error(error);return{ok:false,error:error.message||"No se pudo crear la solicitud."}}
+  const row=Array.isArray(data)?data[0]:data; if(!row?.solicitud_id)return{ok:false,error:"La solicitud no devolvió ID."}
+  solicitudActual=row.solicitud_id; solicitudChatId=row.chat_id||"";
+  return{ok:true,solicitud:{id:row.solicitud_id,chat_id:row.chat_id,chat_token:row.chat_token||"",estado:row.estado||"PENDIENTE",created_at:row.created_at,tipo:esRetiro?"RETIRO":"CARGA",referencia_pago:row.referencia_pago||"",referencia_pago_visible:row.referencia_pago_visible||row.referencia_pago||"",retiro_requiere_revision:row.retiro_requiere_revision||false}}
 }
 
- function resetLandingEstado(){
-  solicitudActual = null;
+function guardarSolicitudLocal(id,chatId,chatToken,tipo){solicitudActual=id?String(id):null;solicitudChatId=chatId?String(chatId):"";if(chatToken){chatSessionToken=String(chatToken);localStorage.setItem(LS_CHAT_TOKEN,chatSessionToken)}localStorage.setItem(LS_SOLICITUD,JSON.stringify({id:solicitudActual,chat_id:solicitudChatId,chat_token:chatToken?String(chatToken):"",tipo:tipo||tipoSolicitudActual||"CARGA"}))}
+function recuperarSolicitudPendiente(){const g=localStorage.getItem(LS_SOLICITUD);if(!g)return;try{const o=JSON.parse(g);solicitudActual=o.id?String(o.id):null;solicitudChatId=o.chat_id?String(o.chat_id):"";if(o.chat_token){chatSessionToken=String(o.chat_token);localStorage.setItem(LS_CHAT_TOKEN,chatSessionToken)}if(o.tipo)tipoSolicitudActual=String(o.tipo).toUpperCase()}catch(e){solicitudActual=String(g||"");solicitudChatId=localStorage.getItem(LS_CHAT)||"";chatSessionToken=localStorage.getItem(LS_CHAT_TOKEN)||""}if(solicitudActual){mostrarEstadoEspera("PENDIENTE");iniciarEscuchaEstado()}}
+function mostrarReferenciaPago(s){const box=$("referenciaPagoBox");if(!box)return;const tipo=String(s?.tipo||tipoSolicitudActual||"CARGA").toUpperCase(), ref=s?.referencia_pago||s?.referencia_pago_visible||"";if(tipo!=="CARGA"||!ref){box.classList.add("hidden");box.innerHTML="";return}box.classList.remove("hidden");box.innerHTML=`<b>Referencia de carga:</b> ${escapeHtml(ref)}<br><span class="mini">Si tu billetera permite agregar nota o motivo, escribí esta referencia. Esto ayuda a validar tu pago más rápido.</span><button class="copy-btn" type="button" onclick="navigator.clipboard.writeText('${escapeAttr(ref)}')">Copiar referencia</button>`}
+function mostrarResultado(texto,ok){const box=$("resultado");box.innerHTML=texto;box.className="result "+(ok?"ok":"err")}
+function mostrarEstadoEspera(e="PENDIENTE"){$("estadoEspera").classList.remove("hidden");renderProgresoSolicitud(e)}
+function renderProgresoSolicitud(estado){const e=String(estado||"PENDIENTE").toUpperCase(), esRetiro=String(tipoSolicitudActual||"CARGA").toUpperCase()==="RETIRO", ok=["ACREDITADA","PAGADA"].includes(e), bad=["RECHAZADA","ERROR"].includes(e);$("step1Text").innerText=esRetiro?"Recibimos tu solicitud de retiro.":"Recibimos tu pedido de carga.";$("step2Text").innerText=esRetiro?"Un operador está revisando tu retiro.":"Un operador está revisando la transferencia.";$("step3Title").innerText=esRetiro?"Retiro aprobado/pagado":"Fichas acreditadas";$("step1").className="step done";$("step2").className=ok?"step done":(bad?"step":"step active");$("step3").className=ok?"step done":"step"}
+function iniciarEscuchaEstado(){if(intervaloEstado)clearInterval(intervaloEstado);intervaloEstado=setInterval(async()=>{if(!solicitudActual||!solicitudChatId)return;const {data,error}=await supabaseClient.rpc("landing_estado_solicitud",{p_solicitud_id:Number(solicitudActual),p_chat_id:solicitudChatId});if(error||!data||!data.length)return;const s=data[0], estado=String(s.estado||""), tipo=String(s.tipo||tipoSolicitudActual||"CARGA").toUpperCase();tipoSolicitudActual=tipo;renderProgresoSolicitud(estado);if(["ACREDITADA","PAGADA"].includes(estado)){clearInterval(intervaloEstado);if(tipo==="RETIRO"){mostrarResultado("✅ Tu retiro fue marcado como pagado/aprobado.",true);setTimeout(()=>{resetLandingEstado();location.reload()},2600)}else{$("successModal").classList.remove("hidden");setTimeout(()=>{resetLandingEstado();location.reload()},4500)}if(navigator.vibrate)navigator.vibrate([160,80,160])}if(["RECHAZADA","ERROR"].includes(estado)){clearInterval(intervaloEstado);mostrarResultado("La solicitud no pudo ser aprobada. Contactanos por chat.",false);setTimeout(()=>{resetLandingEstado();location.reload()},3200)}},3500)}
+function resetLandingEstado(){solicitudActual=null;if(intervaloEstado){clearInterval(intervaloEstado);intervaloEstado=null}localStorage.removeItem(LS_SOLICITUD);$("estadoEspera").classList.add("hidden");$("successModal").classList.add("hidden");$("resultado").innerHTML="";$("resultado").className="result";$("monto").value="";seleccionarTipoSolicitud("CARGA")}
+function irPlataforma(){resetLandingEstado();window.location.href=LINKS_PLATAFORMA[PC]||LINKS_PLATAFORMA.P1}
+function cerrarModalExito(){$("successModal").classList.add("hidden");resetLandingEstado();setTimeout(()=>location.reload(),300)}
 
-  if(intervaloEstado){
-    clearInterval(intervaloEstado);
-    intervaloEstado = null;
-  }
-
-  localStorage.removeItem(LS_SOLICITUD);
-
-  const progreso = document.getElementById("estadoEspera");
-  if(progreso) progreso.classList.add("hidden");
-
-  const modal = document.getElementById("successModal");
-  if(modal) modal.classList.add("hidden");
-
-  referenciaPagoActual = "";
-  const refBox = document.getElementById("referenciaPagoBox");
-  if(refBox){
-    refBox.innerHTML = "";
-    refBox.classList.add("hidden");
-  }
-
-  const resultado = document.getElementById("resultado");
-  if(resultado){
-    resultado.innerHTML = "";
-    resultado.className = "result";
-  }
-
-  const monto = document.getElementById("monto");
-  if(monto) monto.value = "";
-
-  seleccionarTipoSolicitud("CARGA");
-} 
-/* === CHAT LITE PRO === */
-const LS_CHAT="bet300_chat_"+PC;const LS_CHAT_TOKEN="bet300_chat_token_"+PC;let chatSessionId=localStorage.getItem(LS_CHAT)||"";let chatSessionToken=localStorage.getItem(LS_CHAT_TOKEN)||"";let chatLiteImagenBase64="";let chatLiteImagenNombre="";let chatLiteTimer=null;let chatLiteMensajesCount=0;
+// CHAT SEGURO
+function limpiarChatSeguroSiFaltaToken(){if(chatSessionId&&!chatSessionToken){localStorage.removeItem(LS_CHAT);localStorage.removeItem(LS_CHAT_TOKEN);chatSessionId="";chatSessionToken=""}}
 async function asegurarChatLite(){
-
-  // Seguridad Fase 19A:
-  // El chat público ahora requiere chat_id + chat_public_token.
-  // Si hay chat viejo sin token, se descarta y se crea uno nuevo por RPC v2.
-  if(chatSessionId && chatSessionToken){
-    iniciarRealtimeChatLanding();
-    return chatSessionId;
-  }
-
-  if(chatSessionId && !chatSessionToken){
-    console.warn("Chat anterior sin token. Se limpia para recrearlo con seguridad v2.");
-    localStorage.removeItem(LS_CHAT);
-    localStorage.removeItem(LS_CHAT_TOKEN);
-    chatSessionId = "";
-    chatSessionToken = "";
-  }
-
-  const { data, error } = await supabaseClient.rpc("landing_crear_chat_v2", {
-    p_usuario: userData?.usuario || "",
-    p_telefono: userData?.telefono || "",
-    p_pc_codigo: PC,
-    p_solicitud_id: solicitudActual ? Number(solicitudActual) : null
-  });
-
-  if(error){
-    console.error("Error creando chat RPC v2:", error);
-    throw new Error("No se pudo iniciar el chat.");
-  }
-
-  const row = Array.isArray(data) ? data[0] : data;
-
-  if(!row || !row.chat_id || !row.chat_token){
-    throw new Error("No se pudo iniciar el chat seguro.");
-  }
-
-  chatSessionId = String(row.chat_id);
-  chatSessionToken = String(row.chat_token);
-
-  localStorage.setItem(LS_CHAT, chatSessionId);
-  localStorage.setItem(LS_CHAT_TOKEN, chatSessionToken);
-
-  iniciarRealtimeChatLanding();
-
-  return chatSessionId;
+  if(chatSessionId&&chatSessionToken){iniciarRealtimeChatLanding();return chatSessionId}
+  if(!userLogin?.usuario){throw new Error("Primero verificá tu usuario.")}
+  const {data,error}=await supabaseClient.rpc("landing_crear_chat_v2",{p_usuario:userLogin.usuario,p_telefono:userData?.telefono||"",p_pc_codigo:PC,p_solicitud_id:solicitudActual?Number(solicitudActual):null});
+  if(error){console.error(error);throw new Error("No se pudo iniciar el chat.")}
+  const row=Array.isArray(data)?data[0]:data; if(!row?.chat_id||!row?.chat_token)throw new Error("No se pudo iniciar el chat seguro.");
+  chatSessionId=String(row.chat_id);chatSessionToken=String(row.chat_token);localStorage.setItem(LS_CHAT,chatSessionId);localStorage.setItem(LS_CHAT_TOKEN,chatSessionToken);iniciarRealtimeChatLanding();return chatSessionId
 }
-async function abrirChatLite(){if(!userData||!userData.usuario||!userData.nombre||!userData.telefono){mostrarRegistroMsg("Primero completá tus datos para iniciar el chat.",false);document.getElementById("registroCard").scrollIntoView({behavior:"smooth"});return}document.getElementById("chatLite").classList.remove("hidden");try{await asegurarChatLite();await cargarChatLite();iniciarTimerChatLite()}catch(e){document.getElementById("chatLiteStatus").innerText="No se pudo conectar"}}
-function cerrarChatLite(){document.getElementById("chatLite").classList.add("hidden")}
-function iniciarTimerChatLite(){if(chatLiteTimer)clearInterval(chatLiteTimer);chatLiteTimer=setInterval(cargarChatLite,2500)}
-async function cargarChatLite(){
-
-  if(!chatSessionId) return;
-
-  if(!chatSessionToken){
-    console.warn("Chat sin token. Se recreará al abrir/enviar.");
-    return;
-  }
-
-  const { data, error } = await supabaseClient.rpc("landing_leer_chat_v2", {
-    p_chat_id: Number(chatSessionId),
-    p_chat_token: chatSessionToken
-  });
-
-  if(error){
-    console.error("Error cargando chat RPC:", error);
-    return;
-  }
-
-  const mensajes = (data || []).map(m=>({
-    TIPO_EMISOR:m.tipo_emisor,
-    MENSAJE:m.mensaje,
-    IMAGEN_URL:m.imagen_url,
-    FECHA:m.created_at,
-    LEIDO:m.leido ? "SI" : "NO"
-  }));
-
-  chatLiteMensajesCount = mensajes.length;
-
-  renderChatLite(mensajes);
-}
-
-
-
-
-
-function normalizarImagenUrl(url){
-  const u = String(url || "");
-  if(u.startsWith("data:image")) return u;
-  const m1 = u.match(/\/d\/([^/]+)/);
-  const m2 = u.match(/[?&]id=([^&]+)/);
-  const id = m1 ? m1[1] : (m2 ? m2[1] : "");
-  return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w1000` : u;
-}
-
-
-const TRANSFER_CARD_PREFIX = "::TRANSFER_CARD::";
-
-function parseTransferCardMessage(text){
-  const raw = String(text || "").trim();
-  if(!raw.startsWith(TRANSFER_CARD_PREFIX)) return null;
-  try{
-    return JSON.parse(raw.slice(TRANSFER_CARD_PREFIX.length));
-  }catch(e){
-    console.warn("Tarjeta de transferencia inválida", e);
-    return null;
-  }
-}
-
-function copiarDatoChat(valor, nombreDato){
-  const texto = String(valor || "").trim();
-  if(!texto || texto === "Consultar" || texto === "No disponible"){
-    alert((nombreDato || "Dato") + " no disponible.");
-    return;
-  }
-  navigator.clipboard.writeText(texto);
-  const old = document.getElementById("resultado");
-  if(old) mostrarResultado((nombreDato || "Dato") + " copiado correctamente.", true);
-}
-
-function renderTransferCardChat(card){
-  const alias = card.alias || "Consultar";
-  const cbu = card.cbu || "Consultar";
-  const titular = card.titular || card.nombre_visible || "Consultar";
-  const banco = card.banco || "Billetera";
-  const nombre = card.nombre_visible || "Datos para transferir";
-
-  return `
-    <div class="transfer-chat-card">
-      <div class="transfer-chat-title">💳 ${escapeHtml(nombre)}</div>
-      <div class="transfer-chat-row">
-        <div class="transfer-chat-label">Alias</div>
-        <div class="transfer-chat-value">${escapeHtml(alias)}</div>
-        <button class="transfer-copy-btn" type="button" onclick="copiarDatoChat('${escapeAttr(alias)}','Alias')">Copiar alias</button>
-      </div>
-      <div class="transfer-chat-row">
-        <div class="transfer-chat-label">CBU / CVU</div>
-        <div class="transfer-chat-value">${escapeHtml(cbu)}</div>
-        <button class="transfer-copy-btn" type="button" onclick="copiarDatoChat('${escapeAttr(cbu)}','CBU / CVU')">Copiar CBU/CVU</button>
-      </div>
-      <div class="transfer-chat-row">
-        <div class="transfer-chat-label">Titular</div>
-        <div class="transfer-chat-value">${escapeHtml(titular)}</div>
-      </div>
-      <div class="line" style="font-size:13px;margin-top:10px"><b>Banco:</b> ${escapeHtml(banco)}</div>
-      <div class="transfer-chat-note">Transferí y luego enviá la solicitud o el comprobante por este chat.</div>
-    </div>`;
-}
-
-function escapeAttr(text){
-  return String(text || "").replaceAll("&","&amp;").replaceAll("'","&#039;").replaceAll('"',"&quot;").replaceAll("<","&lt;").replaceAll(">","&gt;");
-}
-
-function renderChatLite(mensajes){
-  const box=document.getElementById("chatLiteBody");
-  let html=`<div class="chat-day">Chat de soporte</div>`;
-
-  if(!mensajes.length){
-    html+=`<div class="chat-msg operator"><div class="chat-bubble">Hola 👋 Escribinos tu consulta o adjuntá el comprobante si necesitás ayuda con la carga.</div><div class="chat-meta">Soporte</div></div>`;
-  }
-
-  mensajes.forEach(m=>{
-    const tipo=String(m.TIPO_EMISOR||"").toUpperCase();
-    const esUsuario=tipo==="USUARIO";
-    const cls=esUsuario?"user":"operator";
-    const hora=formatearHoraChat(m.FECHA);
-    const leido=String(m.LEIDO||"").toUpperCase()==="SI";
-    const mensaje = m.MENSAJE || "";
-    const card = parseTransferCardMessage(mensaje);
-
-    html+=`<div class="chat-msg ${cls}"><div class="chat-bubble">${card ? renderTransferCardChat(card) : escapeHtml(mensaje)}${m.IMAGEN_URL?`<img src="${normalizarImagenUrl(m.IMAGEN_URL)}" alt="Imagen adjunta">`:""}</div><div class="chat-meta">${esUsuario?estadoMensajeChat(leido):"Soporte"} · ${hora}</div></div>`;
-  });
-
-  box.innerHTML=html;
-  box.scrollTop=box.scrollHeight;
-}
-
-function estadoMensajeChat(leido){return leido?"✓✓ recibido":"✓ enviado"}
-function formatFecha(fechaRaw){
-
-  if(!fechaRaw) return "";
-
-  try{
-
-    const fecha = new Date(fechaRaw);
-
-    if(isNaN(fecha)){
-      return String(fechaRaw || "");
-    }
-
-    return fecha.toLocaleString("es-AR",{
-      timeZone:"America/Argentina/Buenos_Aires",
-      day:"2-digit",
-      month:"2-digit",
-      hour:"2-digit",
-      minute:"2-digit",
-      second:"2-digit",
-      hour12:false
-    }).replace(",", " ·");
-
-  }catch(e){
-
-    return String(fechaRaw || "");
-
-  }
-}
-
-function formatearHoraChat(fechaRaw){
-
-  if(!fechaRaw) return "";
-
-  try{
-
-    const fecha = new Date(fechaRaw);
-
-    if(isNaN(fecha)){
-      return "";
-    }
-
-    return fecha.toLocaleTimeString("es-AR",{
-      timeZone:"America/Argentina/Buenos_Aires",
-      hour:"2-digit",
-      minute:"2-digit",
-      second:"2-digit",
-      hour12:false
-    });
-
-  }catch(e){
-
-    return "";
-
-  }
-}
-
-function escapeHtml(text){return String(text||"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
-async function enviarChatLite(){
-
-  const input = document.getElementById("chatLiteInput");
-  const mensaje = input.value.trim();
-
-  if(!mensaje && !chatLiteImagenBase64){
-    return;
-  }
-
-  try{
-    await asegurarChatLite();
-  }catch(e){
-    alert(e.message || "No se pudo iniciar el chat.");
-    return;
-  }
-
-  const box = document.getElementById("chatLiteBody");
-
-  box.insertAdjacentHTML("beforeend", `
-    <div class="chat-msg user">
-      <div class="chat-bubble">
-        ${escapeHtml(mensaje)}
-        ${chatLiteImagenBase64 ? `<img src="${chatLiteImagenBase64}" alt="Imagen adjunta">` : ""}
-      </div>
-      <div class="chat-meta">✓ enviando...</div>
-    </div>
-  `);
-
-  box.scrollTop = box.scrollHeight;
-  input.value = "";
-
-  const { error } = await supabaseClient.rpc("landing_enviar_mensaje_v2", {
-    p_chat_id: Number(chatSessionId),
-    p_chat_token: chatSessionToken,
-    p_emisor: userData?.usuario || "Usuario",
-    p_mensaje: mensaje || "",
-    p_imagen_url: chatLiteImagenBase64 || ""
-  });
-
-  if(error){
-    console.error("Error enviando chat RPC:", error);
-    alert("No se pudo enviar el mensaje.");
-    return;
-  }
-
-  marcarUltimoMensajeChatLiteEnviado();
-  quitarImagenChatLite();
-
-  setTimeout(cargarChatLite, 400);
-  setTimeout(cargarChatLite, 1200);
-}
-
-let realtimeChatChannel = null;
-
-function iniciarRealtimeChatLanding(){
-  // Blindaje RPC:
-  // Evitamos suscripción directa a la tabla pública chat_mensajes.
-  // El chat se actualiza por polling con landing_leer_chat().
-  return;
-}
-
-function marcarUltimoMensajeChatLiteEnviado(){
-  const metas = document.querySelectorAll("#chatLiteBody .chat-msg.user .chat-meta");
-  const last = metas[metas.length - 1];
-  if(last) last.innerText = "✓ enviado · ahora";
-}
-function tomarImagenChatLiteFile(){const file=document.getElementById("chatLiteFile").files[0];if(file)leerImagenChatLite(file)}
-function leerImagenChatLite(file){if(!file.type.startsWith("image/")){alert("Adjuntá una imagen válida.");return}comprimirImagenChat(file,base64=>{chatLiteImagenBase64=base64;chatLiteImagenNombre=(file.name||"comprobante.jpg").replace(/\.[^.]+$/,".jpg");document.getElementById("chatLitePreviewImg").src=chatLiteImagenBase64;document.getElementById("chatLitePreview").classList.add("show")})}
-function quitarImagenChatLite(){chatLiteImagenBase64="";chatLiteImagenNombre="";document.getElementById("chatLiteFile").value="";document.getElementById("chatLitePreviewImg").src="";document.getElementById("chatLitePreview").classList.remove("show")}
-document.addEventListener("paste",e=>{const chatVisible=!document.getElementById("chatLite").classList.contains("hidden");if(!chatVisible)return;const items=e.clipboardData?.items||[];for(const item of items){if(item.type&&item.type.startsWith("image/")){const file=item.getAsFile();if(file){leerImagenChatLite(file);e.preventDefault();return}}}});
-setTimeout(()=>{document.getElementById("chatLiteInput")?.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();enviarChatLite()}})},0);
-async function vincularChatLiteASolicitud(idSolicitud){
-  // Blindaje RPC:
-  // La solicitud creada por landing_crear_solicitud ya devuelve y vincula su chat_id.
-  return;
-}
-
-
-/* =========================================================
-   FASE 19A FRONTEND · CHAT TOKEN
-   Validación final de seguridad para chat público.
-========================================================= */
-function limpiarChatSeguroSiFaltaToken(){
-  if(chatSessionId && !chatSessionToken){
-    console.warn("Chat local sin token detectado. Se limpia para evitar acceso inseguro.");
-    localStorage.removeItem(LS_CHAT);
-    localStorage.removeItem(LS_CHAT_TOKEN);
-    chatSessionId = "";
-    chatSessionToken = "";
-  }
-}
-
-limpiarChatSeguroSiFaltaToken();
-
+async function abrirChatLite(){if(!userLogin?.usuario){msg("loginMsg","Primero ingresá tu usuario para iniciar el chat.","err");setVista("loginCard");return}$("chatLite").classList.remove("hidden");try{await asegurarChatLite();await cargarChatLite();iniciarTimerChatLite()}catch(e){$("chatLiteStatus").innerText="No se pudo conectar";alert("No se pudo enviar el mensaje.")}}
+function cerrarChatLite(){$("chatLite").classList.add("hidden")}function iniciarTimerChatLite(){if(chatLiteTimer)clearInterval(chatLiteTimer);chatLiteTimer=setInterval(cargarChatLite,2500)}
+async function cargarChatLite(){if(!chatSessionId||!chatSessionToken)return;const {data,error}=await supabaseClient.rpc("landing_leer_chat_v2",{p_chat_id:Number(chatSessionId),p_chat_token:chatSessionToken});if(error){console.error(error);return}renderChatLite((data||[]).map(m=>({TIPO_EMISOR:m.tipo_emisor,MENSAJE:m.mensaje,IMAGEN_URL:m.imagen_url,FECHA:m.created_at,LEIDO:m.leido?"SI":"NO"})))}
+async function enviarChatLite(){const input=$("chatLiteInput");const mensaje=(input.value||"").trim();if(!mensaje&&!chatLiteImagenBase64)return;try{await asegurarChatLite()}catch(e){alert("No se pudo enviar el mensaje.");return}const {error}=await supabaseClient.rpc("landing_enviar_mensaje_v2",{p_chat_id:Number(chatSessionId),p_chat_token:chatSessionToken,p_emisor:userLogin?.usuario||"Usuario",p_mensaje:mensaje||"",p_imagen_url:chatLiteImagenBase64||""});if(error){console.error(error);alert("No se pudo enviar el mensaje.");return}input.value="";chatLiteImagenBase64="";quitarImagenChatLite();await cargarChatLite()}
+function renderChatLite(mensajes){const box=$("chatLiteBody");let html=`<div class="chat-day">Chat de soporte</div>`;if(!mensajes.length)html+=`<div class="chat-msg operator"><div class="chat-bubble">Hola 👋 Escribinos tu consulta o adjuntá el comprobante si necesitás ayuda.</div><div class="chat-meta">Soporte</div></div>`;mensajes.forEach(m=>{const es=String(m.TIPO_EMISOR||"").toUpperCase()==="USUARIO", cls=es?"user":"operator", h=formatearHoraChat(m.FECHA), leido=String(m.LEIDO||"").toUpperCase()==="SI";html+=`<div class="chat-msg ${cls}"><div class="chat-bubble">${escapeHtml(m.MENSAJE||"")}${m.IMAGEN_URL?`<img src="${normalizarImagenUrl(m.IMAGEN_URL)}" alt="Imagen adjunta">`:""}</div><div class="chat-meta">${es?(leido?"✓✓ recibido":"✓ enviado"):"Soporte"} · ${h}</div></div>`});box.innerHTML=html;box.scrollTop=box.scrollHeight}
+function normalizarImagenUrl(u){u=String(u||"");return u.startsWith("data:image")?u:u}
+function formatearHoraChat(f){try{return new Date(f).toLocaleTimeString("es-AR",{timeZone:"America/Argentina/Buenos_Aires",hour:"2-digit",minute:"2-digit",hour12:false})}catch(e){return""}}
+function comprimirImagenChat(file,cb){const img=new Image(),reader=new FileReader();reader.onload=()=>{img.onload=()=>{const max=560;let w=img.width,h=img.height;if(w>h&&w>max){h=Math.round(h*max/w);w=max}else if(h>=w&&h>max){w=Math.round(w*max/h);h=max}const canvas=document.createElement("canvas");canvas.width=w;canvas.height=h;const ctx=canvas.getContext("2d");ctx.drawImage(img,0,0,w,h);cb(canvas.toDataURL("image/jpeg",.52))};img.src=reader.result};reader.readAsDataURL(file)}
+function tomarImagenChatLiteFile(){const f=$("chatLiteFile").files?.[0];if(f)leerImagenChatLite(f)}
+function leerImagenChatLite(file){if(!["image/jpeg","image/png","image/webp"].includes(file.type)){alert("Formato de imagen no permitido.");return}comprimirImagenChat(file,b64=>{chatLiteImagenBase64=b64;$("chatLitePreviewImg").src=b64;$("chatLitePreview").classList.add("show")})}
+function quitarImagenChatLite(){chatLiteImagenBase64="";$("chatLiteFile").value="";$("chatLitePreview").classList.remove("show")}
+document.addEventListener("paste",e=>{const items=e.clipboardData?.items||[];for(const item of items){if(item.type&&item.type.startsWith("image/")){const f=item.getAsFile();if(f){leerImagenChatLite(f);e.preventDefault();return}}}});
+setTimeout(()=>{$("chatLiteInput")?.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();enviarChatLite()}})},0)
+function iniciarRealtimeChatLanding(){return}
 </script>
 </body>
 </html>
