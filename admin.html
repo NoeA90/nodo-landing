@@ -187,6 +187,149 @@ function editOperador(id){
   scrollTo(0,0);
 }
 
+
+/* =========================================================
+   ADMIN V16A FIX2 · TOKEN HELPER
+   Corrige: requireAdminToken is not defined.
+========================================================= */
+
+if(typeof window.LS_ADMIN_TOKEN === "undefined"){
+  window.LS_ADMIN_TOKEN = "nodo_admin_session_token";
+}
+
+window.requireAdminToken = function(){
+  // Caso normal: variable global creada por el login nuevo.
+  if(typeof adminSessionToken !== "undefined" && adminSessionToken){
+    return adminSessionToken;
+  }
+
+  // Fallback: token guardado en localStorage.
+  const token = localStorage.getItem(window.LS_ADMIN_TOKEN || "nodo_admin_session_token");
+
+  if(token){
+    try{
+      if(typeof adminSessionToken !== "undefined"){
+        adminSessionToken = token;
+      }
+    }catch(e){}
+    return token;
+  }
+
+  throw new Error("Sesión admin no iniciada. Cerrá sesión y volvé a ingresar.");
+};
+
+// Reforzamos saveOperador para que use window.requireAdminToken explícitamente.
+async function saveOperador(e){
+  if(e && e.preventDefault)e.preventDefault();
+  window.__lastOperadorSubmitAt = Date.now();
+
+  try{
+    const id = val("op_id");
+    const usuario = val("op_usuario").trim();
+    const nombre = val("op_nombre").trim();
+
+    if(!usuario || !nombre){
+      toast("Completá usuario y nombre.", "err");
+      return false;
+    }
+
+    const payload = {
+      p_session_token: window.requireAdminToken(),
+      p_operador_id: id ? Number(id) : null,
+      p_usuario: usuario,
+      p_nombre: nombre,
+      p_clave: val("op_clave"),
+      p_password: val("op_password"),
+      p_rol: val("op_rol") || "OPERADOR",
+      p_tipo: val("op_tipo") || "FIJO",
+      p_pc_codigo: val("op_pc_codigo"),
+      p_turno: val("op_turno"),
+      p_telefono: val("op_telefono"),
+      p_email: val("op_email"),
+      p_activo: bool("op_activo"),
+      p_observaciones: val("op_observaciones")
+    };
+
+    const {data,error}=await supabaseClient.rpc("admin_guardar_operador", payload);
+
+    if(error){
+      console.error("admin_guardar_operador", error);
+      toast("Error operador: " + (error.message || "error desconocido"), "err");
+      alert("Error operador: " + (error.message || "error desconocido"));
+      return false;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+
+    resetOperadorForm();
+    await loadOperadores(true);
+    renderOperadores();
+    toast(row?.mensaje || "Operador guardado por RPC", "okb");
+    alert(row?.mensaje || "Operador guardado");
+    return false;
+
+  }catch(err){
+    console.error("saveOperador exception", err);
+    toast("Error operador: " + (err.message || err), "err");
+    alert("Error operador: " + (err.message || err));
+    return false;
+  }
+}
+
+async function adminToggleOperador(id, activo){
+  try{
+    const accion = activo ? "activar" : "desactivar";
+    if(!confirm(`¿Querés ${accion} este operador?`))return;
+
+    const {data,error}=await supabaseClient.rpc("admin_cambiar_estado_operador", {
+      p_session_token: window.requireAdminToken(),
+      p_operador_id: Number(id),
+      p_activo: !!activo
+    });
+
+    if(error){
+      console.error("admin_cambiar_estado_operador", error);
+      toast("Error: " + (error.message || "error desconocido"), "err");
+      alert("Error: " + (error.message || "error desconocido"));
+      return;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+    await loadOperadores(true);
+    renderOperadores();
+    toast(row?.mensaje || "Operador actualizado", "okb");
+  }catch(err){
+    console.error(err);
+    alert("Error cambiando estado: "+(err.message||err));
+  }
+}
+
+async function adminDeleteOperador(id){
+  try{
+    if(!confirm("¿Seguro que querés eliminar este operador? Esta acción no se puede deshacer."))return;
+
+    const {data,error}=await supabaseClient.rpc("admin_eliminar_operador", {
+      p_session_token: window.requireAdminToken(),
+      p_operador_id: Number(id)
+    });
+
+    if(error){
+      console.error("admin_eliminar_operador", error);
+      toast("Error al eliminar: " + (error.message || "error desconocido"), "err");
+      alert("Error al eliminar: " + (error.message || "error desconocido"));
+      return;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+    await loadOperadores(true);
+    renderOperadores();
+    toast(row?.mensaje || "Operador eliminado", "okb");
+  }catch(err){
+    console.error(err);
+    alert("Error eliminando: "+(err.message||err));
+  }
+}
+
 </script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
@@ -1114,6 +1257,149 @@ function editOperador(id){
   $("opFormTitle").textContent="Editar operador";
   showSection("operadores");
   scrollTo(0,0);
+}
+
+
+/* =========================================================
+   ADMIN V16A FIX2 · TOKEN HELPER
+   Corrige: requireAdminToken is not defined.
+========================================================= */
+
+if(typeof window.LS_ADMIN_TOKEN === "undefined"){
+  window.LS_ADMIN_TOKEN = "nodo_admin_session_token";
+}
+
+window.requireAdminToken = function(){
+  // Caso normal: variable global creada por el login nuevo.
+  if(typeof adminSessionToken !== "undefined" && adminSessionToken){
+    return adminSessionToken;
+  }
+
+  // Fallback: token guardado en localStorage.
+  const token = localStorage.getItem(window.LS_ADMIN_TOKEN || "nodo_admin_session_token");
+
+  if(token){
+    try{
+      if(typeof adminSessionToken !== "undefined"){
+        adminSessionToken = token;
+      }
+    }catch(e){}
+    return token;
+  }
+
+  throw new Error("Sesión admin no iniciada. Cerrá sesión y volvé a ingresar.");
+};
+
+// Reforzamos saveOperador para que use window.requireAdminToken explícitamente.
+async function saveOperador(e){
+  if(e && e.preventDefault)e.preventDefault();
+  window.__lastOperadorSubmitAt = Date.now();
+
+  try{
+    const id = val("op_id");
+    const usuario = val("op_usuario").trim();
+    const nombre = val("op_nombre").trim();
+
+    if(!usuario || !nombre){
+      toast("Completá usuario y nombre.", "err");
+      return false;
+    }
+
+    const payload = {
+      p_session_token: window.requireAdminToken(),
+      p_operador_id: id ? Number(id) : null,
+      p_usuario: usuario,
+      p_nombre: nombre,
+      p_clave: val("op_clave"),
+      p_password: val("op_password"),
+      p_rol: val("op_rol") || "OPERADOR",
+      p_tipo: val("op_tipo") || "FIJO",
+      p_pc_codigo: val("op_pc_codigo"),
+      p_turno: val("op_turno"),
+      p_telefono: val("op_telefono"),
+      p_email: val("op_email"),
+      p_activo: bool("op_activo"),
+      p_observaciones: val("op_observaciones")
+    };
+
+    const {data,error}=await supabaseClient.rpc("admin_guardar_operador", payload);
+
+    if(error){
+      console.error("admin_guardar_operador", error);
+      toast("Error operador: " + (error.message || "error desconocido"), "err");
+      alert("Error operador: " + (error.message || "error desconocido"));
+      return false;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+
+    resetOperadorForm();
+    await loadOperadores(true);
+    renderOperadores();
+    toast(row?.mensaje || "Operador guardado por RPC", "okb");
+    alert(row?.mensaje || "Operador guardado");
+    return false;
+
+  }catch(err){
+    console.error("saveOperador exception", err);
+    toast("Error operador: " + (err.message || err), "err");
+    alert("Error operador: " + (err.message || err));
+    return false;
+  }
+}
+
+async function adminToggleOperador(id, activo){
+  try{
+    const accion = activo ? "activar" : "desactivar";
+    if(!confirm(`¿Querés ${accion} este operador?`))return;
+
+    const {data,error}=await supabaseClient.rpc("admin_cambiar_estado_operador", {
+      p_session_token: window.requireAdminToken(),
+      p_operador_id: Number(id),
+      p_activo: !!activo
+    });
+
+    if(error){
+      console.error("admin_cambiar_estado_operador", error);
+      toast("Error: " + (error.message || "error desconocido"), "err");
+      alert("Error: " + (error.message || "error desconocido"));
+      return;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+    await loadOperadores(true);
+    renderOperadores();
+    toast(row?.mensaje || "Operador actualizado", "okb");
+  }catch(err){
+    console.error(err);
+    alert("Error cambiando estado: "+(err.message||err));
+  }
+}
+
+async function adminDeleteOperador(id){
+  try{
+    if(!confirm("¿Seguro que querés eliminar este operador? Esta acción no se puede deshacer."))return;
+
+    const {data,error}=await supabaseClient.rpc("admin_eliminar_operador", {
+      p_session_token: window.requireAdminToken(),
+      p_operador_id: Number(id)
+    });
+
+    if(error){
+      console.error("admin_eliminar_operador", error);
+      toast("Error al eliminar: " + (error.message || "error desconocido"), "err");
+      alert("Error al eliminar: " + (error.message || "error desconocido"));
+      return;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+    await loadOperadores(true);
+    renderOperadores();
+    toast(row?.mensaje || "Operador eliminado", "okb");
+  }catch(err){
+    console.error(err);
+    alert("Error eliminando: "+(err.message||err));
+  }
 }
 
 </script>
