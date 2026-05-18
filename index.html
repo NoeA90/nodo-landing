@@ -701,7 +701,38 @@ function renderMensajeChatLite(texto){
     return escapeHtml(raw);
   }
 }
-  
+function copiarDesdeTarjeta(elementId, mensajeOk){
+  const el = document.getElementById(elementId);
+  const texto = (el?.innerText || "").trim();
+
+  if(!texto){
+    alert("No hay dato para copiar.");
+    return;
+  }
+
+  navigator.clipboard.writeText(texto)
+    .then(() => {
+      const aviso = document.createElement("div");
+      aviso.innerText = mensajeOk || "Copiado";
+      aviso.style.position = "fixed";
+      aviso.style.left = "50%";
+      aviso.style.bottom = "95px";
+      aviso.style.transform = "translateX(-50%)";
+      aviso.style.background = "rgba(22,163,74,.95)";
+      aviso.style.color = "white";
+      aviso.style.padding = "10px 14px";
+      aviso.style.borderRadius = "999px";
+      aviso.style.fontWeight = "900";
+      aviso.style.zIndex = "99999";
+      aviso.style.boxShadow = "0 10px 30px rgba(0,0,0,.35)";
+      document.body.appendChild(aviso);
+
+      setTimeout(() => aviso.remove(), 1400);
+    })
+    .catch(() => {
+      alert("No se pudo copiar. Mantené presionado el dato y copialo manualmente.");
+    });
+}  
   
 function renderChatLite(mensajes){const box=$("chatLiteBody");let html=`<div class="chat-day">Chat de soporte</div>`;if(!mensajes.length)html+=`<div class="chat-msg operator"><div class="chat-bubble">Hola 👋 Escribinos tu consulta o adjuntá el comprobante si necesitás ayuda.</div><div class="chat-meta">Soporte</div></div>`;mensajes.forEach(m=>{const es=String(m.TIPO_EMISOR||"").toUpperCase()==="USUARIO", cls=es?"user":"operator", h=formatearHoraChat(m.FECHA), leido=String(m.LEIDO||"").toUpperCase()==="SI";html+=`<div class="chat-msg ${cls}"><div class="chat-bubble">${renderMensajeChatLite(m.MENSAJE||"")}${m.IMAGEN_URL?`<img src="${normalizarImagenUrl(m.IMAGEN_URL)}" alt="Imagen adjunta">`:""}</div><div class="chat-meta">${es?(leido?"✓✓ recibido":"✓ enviado"):"Soporte"} · ${h}</div></div>`});box.innerHTML=html;box.scrollTop=box.scrollHeight}
 function normalizarImagenUrl(u){u=String(u||"");return u.startsWith("data:image")?u:u}
