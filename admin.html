@@ -3,240 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>NODO · ADMIN RPC V15.3</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
-/* =========================================================
-   FIX ADMIN V15.1
-   Corrige carga de datos: loadConfig/loadSolicitudes faltaban
-   y fuerza que todas las lecturas usen RPC con session_token.
-========================================================= */
-
-async function reloadAll(){
-  try{
-    await Promise.allSettled([
-      loadPcs(false),
-      loadOperadores(false),
-      loadBilleteras(false),
-      loadConfig(false),
-      loadSolicitudes(false),
-      loadChats(false),
-      loadWorkerJobs(false)
-    ]);
-    fillPcSelects();
-    renderAll();
-    toast("Datos actualizados","okb");
-  }catch(e){
-    console.error("reloadAll error:", e);
-    toast("Error actualizando: "+(e.message||e),"err");
-  }
-}
-
-async function loadPcs(render=true){
-  const {data,error}=await supabaseClient.rpc("admin_get_pcs",{
-    p_session_token:requireAdminToken()
-  });
-  if(error){console.error("admin_get_pcs",error);pcs=[];return toast("Error PCs: "+error.message,"err")}
-  pcs=data||[];
-  if(render)renderAll();
-}
-
-async function loadOperadores(render=true){
-  const {data,error}=await supabaseClient.rpc("admin_get_operadores",{
-    p_session_token:requireAdminToken()
-  });
-  if(error){console.error("admin_get_operadores",error);operadores=[];return toast("Error operadores: "+error.message,"err")}
-  operadores=data||[];
-  if(render)renderAll();
-}
-
-async function loadBilleteras(render=true){
-  const pc=val("globalPc")||null;
-  const {data,error}=await supabaseClient.rpc("admin_get_billeteras",{
-    p_session_token:requireAdminToken(),
-    p_pc_codigo:pc
-  });
-  if(error){console.error("admin_get_billeteras",error);billeteras=[];return toast("Error billeteras: "+error.message,"err")}
-  billeteras=data||[];
-  if(render)renderAll();
-}
-
-async function loadConfig(render=true){
-  const {data,error}=await supabaseClient.rpc("admin_get_configuracion",{
-    p_session_token:requireAdminToken()
-  });
-  if(error){console.error("admin_get_configuracion",error);configuracion=[];return toast("Error config: "+error.message,"err")}
-  configuracion=data||[];
-  if(render)renderAll();
-}
-
-async function loadSolicitudes(render=true){
-  const pc=val("globalPc")||null;
-  const {data,error}=await supabaseClient.rpc("admin_get_solicitudes",{
-    p_session_token:requireAdminToken(),
-    p_pc_codigo:pc,
-    p_limit:1000
-  });
-  if(error){console.error("admin_get_solicitudes",error);solicitudes=[];return toast("Error solicitudes: "+error.message,"err")}
-  solicitudes=data||[];
-  if(render)renderAll();
-}
-
-async function loadChats(render=true){
-  const pc=val("globalPc")||null;
-  const {data:ses,error:e1}=await supabaseClient.rpc("admin_get_chat_sesiones",{
-    p_session_token:requireAdminToken(),
-    p_pc_codigo:pc
-  });
-  if(e1){console.error("admin_get_chat_sesiones",e1);chatSesiones=[];chatMensajes=[];return toast("Error chats: "+e1.message,"err")}
-  chatSesiones=ses||[];
-
-  const {data:ms,error:e2}=await supabaseClient.rpc("admin_get_chat_mensajes",{
-    p_session_token:requireAdminToken(),
-    p_pc_codigo:pc
-  });
-  if(e2){console.error("admin_get_chat_mensajes",e2);chatMensajes=[];return toast("Error mensajes chat: "+e2.message,"err")}
-  chatMensajes=ms||[];
-
-  if(render)renderAll();
-}
-
-async function loadWorkerJobs(render=true){
-  const pc=val("globalPc")||null;
-  const {data,error}=await supabaseClient.rpc("admin_get_worker_jobs",{
-    p_session_token:requireAdminToken(),
-    p_pc_codigo:pc,
-    p_limit:1500
-  });
-  if(error){console.error("admin_get_worker_jobs",error);workerJobs=[];return toast("Error worker_jobs: "+error.message,"err")}
-  workerJobs=data||[];
-  if(render)renderAll();
-}
-
-async function loadWorkerLogs(jobId){
-  const {data,error}=await supabaseClient.rpc("admin_get_worker_logs",{
-    p_session_token:requireAdminToken(),
-    p_worker_job_id:jobId?Number(jobId):null
-  });
-  if(error){console.error("admin_get_worker_logs",error);toast("No pude leer worker_logs: "+error.message,"err");return[]}
-  return data||[];
-}
-
-
-/* =========================================================
-   FIX ADMIN V15.2
-   Filtros PC/Estado:
-   - El selector de PC se arma con fallback desde pcs, solicitudes,
-     billeteras, worker_jobs y operadores.
-   - Agrega filtro por estado de solicitud.
-========================================================= */
-
-function getAllPcCodes(){
-  const raw=[
-    ...pcs.map(p=>p.codigo||p.nombre),
-    ...solicitudes.map(s=>s.pc_codigo),
-    ...billeteras.map(b=>b.pc_codigo),
-    ...workerJobs.map(w=>w.pc_codigo),
-    ...operadores.map(o=>o.pc_codigo)
-  ].filter(Boolean).map(x=>String(x).trim().toUpperCase()).filter(x=>x && x!=="TODAS");
-
-  return [...new Set(raw)].sort((a,b)=>{
-    const na=Number(String(a).replace(/\D/g,""));
-    const nb=Number(String(b).replace(/\D/g,""));
-    if(!isNaN(na)&&!isNaN(nb)&&na!==nb)return na-nb;
-    return String(a).localeCompare(String(b));
-  });
-}
-
-function fillPcSelects(){
-  let cods=getAllPcCodes();
-
-  if(adminScope && !adminScope.puede_todas && adminScope.pc_codigo){
-    cods=[String(adminScope.pc_codigo).toUpperCase()];
-  }
-
-  const opts=['<option value="">Seleccionar</option>'].concat(cods.map(c=>`<option value="${attr(c)}">${safe(c)}</option>`)).join("");
-  const filt=['<option value="">Todas las PCs</option>'].concat(cods.map(c=>`<option value="${attr(c)}">${safe(c)}</option>`)).join("");
-
-  ["op_pc_codigo","bi_pc_codigo"].forEach(id=>{
-    const el=$(id);
-    if(el){
-      const v=el.value;
-      el.innerHTML=opts;
-      el.value=cods.includes(String(v).toUpperCase())?v:"";
-    }
-  });
-
-  ["op_filter_pc","bi_filter_pc","globalPc","wk_filter_pc"].forEach(id=>{
-    const el=$(id);
-    if(el){
-      const v=el.value;
-      el.innerHTML=filt;
-      if(cods.includes(String(v).toUpperCase()) || v==="")el.value=v;
-    }
-  });
-
-  if(adminScope && !adminScope.puede_todas){
-    ["globalPc","op_filter_pc","bi_filter_pc","wk_filter_pc"].forEach(id=>{
-      const el=$(id);
-      if(el){
-        el.value=String(adminScope.pc_codigo||"").toUpperCase();
-        if(id==="globalPc")el.disabled=true;
-      }
-    });
-  }
-}
-
-function renderDashboard(){
-  const sol=listaFiltradaPc(solicitudes).filter(s=>esHoy(s.created_at));
-  const chats=listaFiltradaPc(chatSesiones).filter(c=>esHoy(c.created_at));
-  setText({
-    stSolHoy:sol.length,
-    stPend:sol.filter(esPendiente).length,
-    stReal:sol.filter(esRealizada).length,
-    stRet:sol.filter(s=>esPendiente(s)&&norm(s.tipo)==="retiro").length,
-    stChats:chats.length
-  });
-  $("dashTurnos").innerHTML=resumenTurnosHTML(sol);
-  $("dashPcs").innerHTML=resumenPcsHTML(solicitudes.filter(s=>esHoy(s.created_at)).filter(s=>coincideEstadoSolicitud(s,estadoSeleccionado())));
-  $("ultimasSolicitudes").innerHTML=(listaFiltradaPc(solicitudes).slice(0,80).map(s=>`<tr><td>${fecha(s.created_at)}</td><td>${safe(s.pc_codigo)}</td><td>${turnoDe(s.created_at)}</td><td>${safe(s.tipo)}</td><td><strong>${safe(s.usuario)}</strong><br><span class="muted">${safe(s.nombre_completo)}</span></td><td>${money(s.monto)}</td><td>${estado(s.estado)}</td><td>${workerSolicitudBadge(s)}</td><td>${safe(s.operador_usuario)}</td></tr>`).join("")||`<tr><td colspan="9" class="empty">No hay solicitudes para ese filtro.</td></tr>`);
-}
-
-
-/* =========================================================
-   ADMIN V15 FIX3 · VISTAS
-   Mejora render de PCs detectadas y mensajes vacíos.
-========================================================= */
-
-function renderPcs(){
-  if(!pcs.length)return empty("pcsBody",6,"No hay PCs cargadas ni detectadas desde solicitudes/billeteras/operadores.");
-  $("pcsBody").innerHTML=pcs.map(p=>{
-    const esReal=!!p.id;
-    return `<tr>
-      <td>${esReal?safe(p.id):'<span class="muted">detectada</span>'}</td>
-      <td><strong>${safe(p.codigo)}</strong></td>
-      <td>${safe(p.nombre || p.codigo)}</td>
-      <td>${safe(p.descripcion || (esReal?'':'Detectada automáticamente'))}</td>
-      <td>${p.activa?pill('Activa','ok'):pill('Inactiva','off')}</td>
-      <td><div class="rowActions">
-        ${esReal?`<button class="small blue" onclick="editPc('${p.id}')">Editar</button><button class="small danger" onclick="deleteRow('${TABLES.pcs}','${p.id}',loadPcs,'PC')">Eliminar</button>`:'<span class="muted">Sin ficha en tabla PCs</span>'}
-      </div></td>
-    </tr>`;
-  }).join("");
-}
-
-function renderBilleteras(){
-  const q=norm(val("bi_search")),banco=val("bi_filter_banco"),pc=val("bi_filter_pc"),act=val("bi_filter_activa");
-  let rows=billeteras.filter(b=>
-    (!q||norm([b.id,b.pc_codigo,b.nombre_visible,b.titular,b.alias,b.cbu,b.banco,b.estado].join(" ")).includes(q))&&
-    (!banco||b.banco===banco)&&
-    (!pc||b.pc_codigo===pc)&&
-    (act===""||String(!!b.activa)===act)
-  );
-  if(!rows.length)return empty("billeterasBody",11,"No hay billeteras para el filtro actual. Revisá PC/estado o actualizá.");
-  $("billeterasBody").innerHTML=rows.map(b=>`<tr><td>${safe(b.id)}</td><td>${safe(b.pc_codigo)}</td><td><strong>${safe(b.nombre_visible)}</strong></td><td>${safe(b.titular)}</td><td>${safe(b.banco)}</td><td>${safe(b.alias)}</td><td>${estadoBi(b)}</td><td>${mpBadge(b)}</td><td>${safe(b.prioridad||0)}</td><td>${b.seleccionada_manual?pill('Manual','warn'):'<span class="muted">No</span>'}</td><td><div class="rowActions"><button class="small blue" onclick="editBilletera('${b.id}')">Editar</button><button class="small ${b.activa?'warning':'primary'}" onclick="toggleBilletera('${b.id}',${!b.activa})">${b.activa?'Pausar':'Activar'}</button><button class="small violet" onclick="setManual('${b.id}')">Manual</button><button class="small danger" onclick="deleteRow('${TABLES.billeteras}','${b.id}',loadBilleteras,'billetera')">Eliminar</button></div></td></tr>`).join("");
-}
-
-</script>
+<title>NODO · ADMIN</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
 :root{--bg:#020617;--panel:#0f172a;--card:#111827;--card2:#1f2937;--line:#334155;--muted:#94a3b8;--txt:#f8fafc;--green:#22c55e;--red:#ef4444;--yellow:#f59e0b;--blue:#3b82f6;--violet:#8b5cf6}
@@ -265,32 +33,11 @@ button{border:0;border-radius:12px;padding:11px 14px;cursor:pointer;font-weight:
 .mp-status-card{background:rgba(2,6,23,.45);border:1px solid var(--line);border-radius:10px;padding:9px;font-size:12px;color:var(--muted)}
 .mp-status-card b{display:block;color:#fff;margin-top:3px}
 
-
-.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:22px}
-.login-card{width:min(430px,94vw);background:rgba(17,24,39,.98);border:1px solid var(--line);border-radius:20px;padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.4)}
-.login-card h2{font-size:24px;margin-bottom:6px}
-.admin-user-box{margin-top:14px;padding:10px;border:1px solid var(--line);border-radius:13px;background:rgba(2,6,23,.35);font-size:13px;color:#d1d5db}
-.logout-btn{background:var(--red)}
-
 </style>
 </head>
 <body>
-<div id="loginView" class="login-wrap">
-  <div class="login-card">
-    <h2>NODO ADMIN</h2>
-    <p class="muted" style="margin-bottom:16px">Ingreso seguro con sesión.</p>
-    <label>Usuario</label>
-    <input id="adminLoginUsuario" autocomplete="username">
-    <label>Clave</label>
-    <input id="adminLoginClave" type="password" autocomplete="current-password">
-    <button class="primary" style="width:100%;margin-top:8px" onclick="adminLogin()">Ingresar</button>
-    <div id="adminLoginMsg" style="margin-top:12px"></div>
-  </div>
-</div>
-
-<div id="appView" class="app hidden">
-<aside><div class="brand"><h1>NODO ADMIN</h1><p>Panel admin con sesión segura y permisos por rol.</p></div>
-  <div id="adminInfo" class="admin-user-box hidden"></div>
+<div class="app">
+<aside><div class="brand"><h1>NODO ADMIN</h1><p>Panel general. Administrás operadores, billeteras, PCs y estadísticas.</p></div>
   <div class="nav">
     <button class="navBtn active" data-section="dashboard" onclick="showSection('dashboard')">Dashboard <span class="badge" id="badgeDashboard">0</span></button>
     <button class="navBtn" data-section="metricas" onclick="showSection('metricas')">Métricas <span class="badge" id="badgeMetricas">0</span></button>
@@ -302,18 +49,7 @@ button{border:0;border-radius:12px;padding:11px 14px;cursor:pointer;font-weight:
   </div>
 </aside>
 <main>
-<div class="top"><div><h2 id="pageTitle">Dashboard</h2><p id="pageSub">Resumen general navegable por PC.</p></div><div class="top-actions"><select id="globalPc" onchange="reloadAll()"><option value="">Todas las PCs</option></select>
-<select id="globalEstado" onchange="renderAll()">
-  <option value="">Todos los estados</option>
-  <option value="PENDIENTE">Pendiente</option>
-  <option value="ACREDITADA">Acreditada</option>
-  <option value="PAGADA">Pagada</option>
-  <option value="RECHAZADA">Rechazada</option>
-  <option value="CANCELADO">Cancelado</option>
-  <option value="REQUIERE_MANUAL">Requiere manual</option>
-  <option value="APROBADA_MANUAL">Aprobada manual / enviada worker</option>
-</select>
-<button class="blue" onclick="reloadAll()">Actualizar todo</button><button class="logout-btn" onclick="adminLogout()">Cerrar sesión</button></div></div>
+<div class="top"><div><h2 id="pageTitle">Dashboard</h2><p id="pageSub">Resumen general navegable por PC.</p></div><div class="top-actions"><select id="globalPc" onchange="renderAll()"><option value="">Todas las PCs</option></select><button class="blue" onclick="reloadAll()">Actualizar todo</button></div></div>
 
 <section id="section-dashboard" class="section active">
   <div class="notice">Selector superior: elegí una PC para ver el dashboard filtrado o dejá “Todas las PCs” para la vista general.</div>
@@ -507,169 +243,54 @@ const SUPABASE_ANON_KEY = "sb_publishable_NYqRoKptTgcL90VAVF2kqA_Gl06mEUF";
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const TABLES={operadores:"operadores",billeteras:"billeteras",pcs:"pcs",config:"configuracion",solicitudes:"solicitudes",chatSesiones:"chat_sesiones",chatMensajes:"chat_mensajes",workerJobs:"worker_jobs",workerLogs:"worker_logs"};
 let operadores=[],billeteras=[],pcs=[],configuracion=[],solicitudes=[],chatSesiones=[],chatMensajes=[],workerJobs=[],workerLogs=[];
-let adminSessionToken="";
-let adminScope=null;
-const LS_ADMIN_TOKEN="nodo_admin_session_token";
 const $=id=>document.getElementById(id);
 
-
-document.addEventListener("DOMContentLoaded",()=>{
-  $("operadorForm").addEventListener("submit",saveOperador);
-  $("billeteraForm").addEventListener("submit",saveBilletera);
-  $("pcForm").addEventListener("submit",savePc);
-  $("cfgForm").addEventListener("submit",saveCfg);
-  initAdminSession();
-});
-
-async function initAdminSession(){
-  const token=localStorage.getItem(LS_ADMIN_TOKEN);
-  if(token){
-    const ok=await validarAdminToken(token);
-    if(ok)return;
-  }
-  localStorage.removeItem(LS_ADMIN_TOKEN);
-  $("loginView").classList.remove("hidden");
-  $("appView").classList.add("hidden");
-}
-
-async function adminLogin(){
-  const usuario=val("adminLoginUsuario").trim();
-  const clave=val("adminLoginClave").trim();
-
-  if(!usuario||!clave){
-    $("adminLoginMsg").innerHTML='<div class="notice">Completá usuario y clave.</div>';
-    return;
-  }
-
-  $("adminLoginMsg").innerHTML='<div class="notice">Validando acceso...</div>';
-
-  const {data,error}=await supabaseClient.rpc("panel_login",{
-    p_usuario:usuario,
-    p_clave:clave,
-    p_ip:null,
-    p_user_agent:navigator.userAgent||"admin"
-  });
-
-  if(error){
-    $("adminLoginMsg").innerHTML='<div class="notice" style="border-color:rgba(239,68,68,.7);color:#fecaca">Error: '+safe(error.message)+'</div>';
-    return;
-  }
-
-  const row=Array.isArray(data)?data[0]:data;
-  if(!row||row.ok!==true){
-    $("adminLoginMsg").innerHTML='<div class="notice" style="border-color:rgba(239,68,68,.7);color:#fecaca">'+safe(row?.mensaje||"Usuario o clave incorrectos")+'</div>';
-    return;
-  }
-
-  const ok=await validarAdminToken(row.session_token);
-  if(!ok){
-    await supabaseClient.rpc("panel_logout",{p_session_token:row.session_token});
-    return;
-  }
-
-  localStorage.setItem(LS_ADMIN_TOKEN,row.session_token);
-}
-
-async function validarAdminToken(token){
-  const {data,error}=await supabaseClient.rpc("panel_validar_admin_session",{
-    p_session_token:token
-  });
-
-  if(error){
-    $("adminLoginMsg").innerHTML='<div class="notice" style="border-color:rgba(239,68,68,.7);color:#fecaca">'+safe(error.message||"Sin permisos admin")+'</div>';
-    return false;
-  }
-
-  const row=Array.isArray(data)?data[0]:data;
-  if(!row||row.ok!==true){
-    $("adminLoginMsg").innerHTML='<div class="notice" style="border-color:rgba(239,68,68,.7);color:#fecaca">Sesión inválida.</div>';
-    return false;
-  }
-
-  adminSessionToken=token;
-  adminScope=row;
-
-  $("loginView").classList.add("hidden");
-  $("appView").classList.remove("hidden");
-
-  $("adminInfo").classList.remove("hidden");
-  $("adminInfo").innerHTML=`<b>${safe(row.nombre||row.usuario)}</b><br>
-    <span class="pill info">${safe(row.rol)}</span>
-    <span class="pill ${row.puede_todas?'ok':'warn'}">${row.puede_todas?'TODAS LAS PCs':'PC '+safe(row.pc_codigo)}</span>`;
-
-  aplicarScopeAdmin();
-  await reloadAll();
-  return true;
-}
-
-function requireAdminToken(){
-  if(!adminSessionToken)throw new Error("Sesión admin no iniciada");
-  return adminSessionToken;
-}
-
-async function adminLogout(){
-  try{
-    if(adminSessionToken){
-      await supabaseClient.rpc("panel_logout",{p_session_token:adminSessionToken});
-    }
-  }catch(e){}
-  localStorage.removeItem(LS_ADMIN_TOKEN);
-  location.reload();
-}
-
-function aplicarScopeAdmin(){
-  if(!adminScope)return;
-
-  // Encargados: no editan configuración global.
-  if(!adminScope.puede_todas){
-    const cfgBtn=document.querySelector('[data-section="config"]');
-    if(cfgBtn)cfgBtn.style.display="none";
-  }
-}
-
+document.addEventListener("DOMContentLoaded",()=>{$("operadorForm").addEventListener("submit",saveOperador);$("billeteraForm").addEventListener("submit",saveBilletera);$("pcForm").addEventListener("submit",savePc);$("cfgForm").addEventListener("submit",saveCfg);reloadAll();});
 
 function showSection(name){document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));document.querySelectorAll(".navBtn").forEach(b=>b.classList.remove("active"));$("section-"+name).classList.add("active");document.querySelector(`[data-section="${name}"]`)?.classList.add("active");const t={dashboard:["Dashboard","Resumen general navegable por PC."],metricas:["Métricas","Aprobación rápida, respuesta de chat y rendimiento por operador/PC."],worker:["Worker","Cola de automatización, logs, errores y reintentos."],operadores:["Operadores","Crear, editar, activar, desactivar o eliminar operadores."],billeteras:["Billeteras","Administrar cuentas, estados, prioridad, selección manual e integración Mercado Pago."],pcs:["PCs","Administrar catálogo de PCs."],config:["Configuración","Parámetros internos del sistema."]};$("pageTitle").textContent=t[name][0];$("pageSub").textContent=t[name][1];}
 
 async function reloadAll(){await Promise.allSettled([loadPcs(false),loadOperadores(false),loadBilleteras(false),loadConfig(false),loadSolicitudes(false),loadChats(false),loadWorkerJobs(false)]);fillPcSelects();renderAll();toast("Datos actualizados","okb")}
-async function loadOperadores(render=true){
-  const {data,error}=await supabaseClient.rpc("admin_get_operadores",{p_session_token:requireAdminToken()});
-  if(error)return toast("Error operadores: "+error.message,"err");
-  operadores=data||[];
-  if(render)renderAll();
+async function loadOperadores(render=true){const {data,error}=await supabaseClient.from(TABLES.operadores).select("*").order("nombre",{ascending:true});if(error)return toast("Error operadores: "+error.message,"err");operadores=data||[];if(render)renderAll()}
+async function loadBilleteras(render=true){
+  const {data,error}=await supabaseClient.from(TABLES.billeteras).select("*").order("prioridad",{ascending:false}).order("orden",{ascending:true}).order("id",{ascending:true});
+  if(error)return toast("Error billeteras: "+error.message,"err");
+
+  let base=data||[];
+
+  // Datos Mercado Pago admin sin exponer secretos.
+  const {data:mpData,error:mpError}=await supabaseClient.rpc("admin_mp_listar_billeteras");
+  if(mpError){
+    console.warn("No pude leer config MP admin:",mpError);
+    billeteras=base;
+  }else{
+    const mpMap=new Map((mpData||[]).map(x=>[String(x.billetera_id),x]));
+    billeteras=base.map(b=>({...b,...(mpMap.get(String(b.id))||{})}));
+  }
+
+  if(render)renderAll()
 }
-async function loadPcs(render=true){
-  const {data,error}=await supabaseClient.rpc("admin_get_pcs",{p_session_token:requireAdminToken()});
-  if(error)return toast("Error PCs: "+error.message,"err");
-  pcs=data||[];
-  if(render)renderAll();
+async function loadPcs(render=true){const {data,error}=await supabaseClient.from(TABLES.pcs).select("*").order("codigo",{ascending:true});if(error)return toast("Error PCs: "+error.message,"err");pcs=data||[];if(render)renderAll()}
+async function loadConfig(render=true){const {data,error}=await supabaseClient.from(TABLES.config).select("*").order("clave",{ascending:true});if(error)return toast("Error config: "+error.message,"err");configuracion=data||[];if(render)renderAll()}
+async function loadSolicitudes(render=true){const {data,error}=await supabaseClient.from(TABLES.solicitudes).select("*").order("created_at",{ascending:false}).limit(1000);if(error){console.warn(error);solicitudes=[];return toast("No pude leer solicitudes: "+error.message,"err")}solicitudes=data||[];if(render)renderAll()}
+async function loadChats(render=true){const {data:ses,error:e1}=await supabaseClient.from(TABLES.chatSesiones).select("*").order("created_at",{ascending:false}).limit(1000);if(e1){console.warn(e1);chatSesiones=[];chatMensajes=[];return}chatSesiones=ses||[];const ids=chatSesiones.map(c=>c.chat_id).filter(Boolean);if(ids.length){const {data:ms,error:e2}=await supabaseClient.from(TABLES.chatMensajes).select("*").in("chat_id",ids).order("created_at",{ascending:true});if(e2){console.warn(e2);chatMensajes=[]}else chatMensajes=ms||[]}else chatMensajes=[];if(render)renderAll()}
+
+async function loadWorkerJobs(render=true){
+  const {data,error}=await supabaseClient.from(TABLES.workerJobs).select("*").order("created_at",{ascending:false}).limit(1500);
+  if(error){console.warn(error);workerJobs=[];return toast("No pude leer worker_jobs: "+error.message,"err")}
+  workerJobs=data||[];
+  if(render)renderAll()
 }
 async function loadWorkerLogs(jobId){
-  const {data,error}=await supabaseClient.rpc("admin_get_worker_logs",{
-    p_session_token:requireAdminToken(),
-    p_worker_job_id:jobId?Number(jobId):null
-  });
+  let q=supabaseClient.from(TABLES.workerLogs).select("*").order("created_at",{ascending:true});
+  if(jobId) q=q.eq("job_id",Number(jobId));
+  else q=q.limit(2000);
+  const {data,error}=await q;
   if(error){console.warn(error);toast("No pude leer worker_logs: "+error.message,"err");return[]}
   return data||[];
 }
 function renderAll(){fillPcSelects();renderDashboard();renderMetricas();renderWorker();renderOperadores();renderBilleteras();renderPcs();renderCfg();badges()}
 
-function pcSeleccionada(){return val("globalPc")}
-function estadoSeleccionado(){return val("globalEstado")}
-function coincideEstadoSolicitud(s, filtro){
-  if(!filtro)return true;
-  const e=String(s.estado||s.ESTADO||"").toUpperCase();
-  if(filtro==="PENDIENTE")return ["PENDIENTE","NUEVA","NUEVO","EN_REVISION"].includes(e);
-  if(filtro==="APROBADA_MANUAL")return ["APROBADA_MANUAL","PREPARANDO_COLA","EN_COLA_WORKER"].includes(e) || e.includes("APROBADA");
-  if(filtro==="REQUIERE_MANUAL")return e.includes("REQUIERE_MANUAL") || e.includes("MANUAL");
-  return e===filtro || e.includes(filtro);
-}
-function listaFiltradaPc(arr,campo="pc_codigo"){
-  const pc=pcSeleccionada();
-  const estado=estadoSeleccionado();
-  let out=pc?arr.filter(x=>String(x[campo]||"")===pc):arr;
-  if(arr===solicitudes && estado)out=out.filter(s=>coincideEstadoSolicitud(s,estado));
-  return out;
-}
+function pcSeleccionada(){return val("globalPc")}function listaFiltradaPc(arr,campo="pc_codigo"){const pc=pcSeleccionada();return pc?arr.filter(x=>String(x[campo]||"")===pc):arr}
 function hoyBA(fecha){const d=fecha?new Date(fecha):new Date();return d.toLocaleDateString("en-CA",{timeZone:"America/Argentina/Buenos_Aires"})}
 function esHoy(fecha){return hoyBA(fecha)===hoyBA(new Date())}
 function turnoDe(fecha){const h=Number(new Date(fecha||Date.now()).toLocaleString("en-US",{timeZone:"America/Argentina/Buenos_Aires",hour:"2-digit",hour12:false}));if(h>=6&&h<14)return"TM";if(h>=14&&h<22)return"TT";return"TN"}
@@ -799,11 +420,135 @@ function workerNivelBadge(n){const x=String(n||"INFO");if(x==="SUCCESS")return "
 function abrirModal(titulo,html){$("modalTitle").textContent=titulo;$("modalBody").innerHTML=html;$("modalOverlay").classList.add("show")}
 function cerrarModal(){$("modalOverlay").classList.remove("show");$("modalBody").innerHTML=""}
 
-async function saveOperador(e){e.preventDefault();const id=val("op_id");const payload={usuario:val("op_usuario"),nombre:val("op_nombre"),clave:val("op_clave"),password:val("op_password"),rol:val("op_rol"),tipo:val("op_tipo"),pc_codigo:val("op_pc_codigo"),turno:val("op_turno"),telefono:val("op_telefono"),email:val("op_email"),activo:bool("op_activo"),observaciones:val("op_observaciones"),updated_at:new Date().toISOString()};if(!payload.password)delete payload.password;if(!payload.clave)delete payload.clave;const res=id?await supabaseClient.from(TABLES.operadores).update(payload).eq("id",id):await supabaseClient.from(TABLES.operadores).insert([payload]);if(res.error)return toast("Error operador: "+res.error.message,"err");resetOperadorForm();await loadOperadores();toast("Operador guardado","okb")}
-function renderOperadores(){const q=norm(val("op_search")),rol=val("op_filter_rol"),pc=val("op_filter_pc"),act=val("op_filter_activo");let rows=operadores.filter(o=>(!q||norm([o.id,o.usuario,o.nombre,o.rol,o.tipo,o.pc_codigo,o.turno,o.telefono,o.email].join(" ")).includes(q))&&(!rol||o.rol===rol)&&(!pc||o.pc_codigo===pc)&&(act===""||String(!!o.activo)===act));if(!rows.length)return empty("operadoresBody",9,"No hay operadores.");$("operadoresBody").innerHTML=rows.map(o=>`<tr><td>${safe(o.id)}</td><td>${safe(o.usuario)}</td><td><strong>${safe(o.nombre)}</strong></td><td>${pill(o.rol||'-','vio')}</td><td>${safe(o.tipo)}</td><td>${safe(o.pc_codigo)}</td><td>${safe(o.turno)}</td><td>${o.activo?pill('Activo','ok'):pill('Inactivo','off')}</td><td><div class="rowActions"><button class="small blue" onclick="editOperador('${o.id}')">Editar</button><button class="small ${o.activo?'warning':'primary'}" onclick="toggleRow('${TABLES.operadores}','${o.id}','activo',${!o.activo},loadOperadores)">${o.activo?'Desactivar':'Activar'}</button><button class="small danger" onclick="deleteRow('${TABLES.operadores}','${o.id}',loadOperadores,'operador')">Eliminar</button></div></td></tr>`).join("")}
-function editOperador(id){const o=operadores.find(x=>String(x.id)===String(id));if(!o)return;setVals({op_id:o.id,op_usuario:o.usuario,op_nombre:o.nombre,op_clave:o.clave,op_password:o.password,op_rol:o.rol||'OPERADOR',op_tipo:o.tipo||'fijo',op_pc_codigo:o.pc_codigo,op_turno:o.turno,op_telefono:o.telefono,op_email:o.email,op_activo:String(!!o.activo),op_observaciones:o.observaciones});$("opFormTitle").textContent="Editar operador";showSection("operadores");scrollTo(0,0)}
-function resetOperadorForm(){$("operadorForm").reset();setVals({op_id:"",op_rol:"OPERADOR",op_tipo:"fijo",op_activo:"true"});$("opFormTitle").textContent="Crear operador"}
+async function saveOperador(e){
+  e.preventDefault();
+
+  const id = val("op_id");
+  const payload = {
+    p_session_token: requireAdminToken(),
+    p_operador_id: id ? Number(id) : null,
+    p_usuario: val("op_usuario"),
+    p_nombre: val("op_nombre"),
+    p_clave: val("op_clave"),
+    p_password: val("op_password"),
+    p_rol: val("op_rol") || "OPERADOR",
+    p_tipo: val("op_tipo") || "FIJO",
+    p_pc_codigo: val("op_pc_codigo"),
+    p_turno: val("op_turno"),
+    p_telefono: val("op_telefono"),
+    p_email: val("op_email"),
+    p_activo: bool("op_activo"),
+    p_observaciones: val("op_observaciones")
+  };
+
+  const {data,error}=await supabaseClient.rpc("admin_guardar_operador", payload);
+
+  if(error){
+    console.error("admin_guardar_operador", error);
+    return toast("Error operador: " + error.message, "err");
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+
+  resetOperadorForm();
+  await loadOperadores();
+  toast(row?.mensaje || "Operador guardado por RPC", "okb");
+}
+
+function renderOperadores(){
+  const q=norm(val("op_search")),rol=val("op_filter_rol"),pc=val("op_filter_pc"),act=val("op_filter_activo");
+  let rows=operadores.filter(o=>
+    (!q||norm([o.id,o.usuario,o.nombre,o.rol,o.tipo,o.pc_codigo,o.turno,o.telefono,o.email].join(" ")).includes(q))&&
+    (!rol||o.rol===rol)&&
+    (!pc||o.pc_codigo===pc)&&
+    (act===""||String(!!o.activo)===act)
+  );
+
+  if(!rows.length)return empty("operadoresBody",9,"No hay operadores.");
+
+  $("operadoresBody").innerHTML=rows.map(o=>`<tr>
+    <td>${safe(o.id)}</td>
+    <td>${safe(o.usuario)}</td>
+    <td><strong>${safe(o.nombre)}</strong></td>
+    <td>${pill(o.rol||'-','vio')}</td>
+    <td>${safe(o.tipo)}</td>
+    <td>${safe(o.pc_codigo)}</td>
+    <td>${safe(o.turno)}</td>
+    <td>${o.activo?pill('Activo','ok'):pill('Inactivo','off')}</td>
+    <td><div class="rowActions">
+      <button class="small blue" onclick="editOperador('${o.id}')">Editar</button>
+      <button class="small ${o.activo?'warning':'primary'}" onclick="adminToggleOperador('${o.id}',${!o.activo})">${o.activo?'Desactivar':'Activar'}</button>
+      <button class="small danger" onclick="adminDeleteOperador('${o.id}')">Eliminar</button>
+    </div></td>
+  </tr>`).join("");
+}
+
+function editOperador(id){
+  const o=operadores.find(x=>String(x.id)===String(id));
+  if(!o)return;
+
+  setVals({
+    op_id:o.id,
+    op_usuario:o.usuario,
+    op_nombre:o.nombre,
+    op_clave:"",
+    op_password:"",
+    op_rol:o.rol||'OPERADOR',
+    op_tipo:o.tipo||'FIJO',
+    op_pc_codigo:o.pc_codigo,
+    op_turno:o.turno,
+    op_telefono:o.telefono,
+    op_email:o.email,
+    op_activo:String(!!o.activo),
+    op_observaciones:o.observaciones
+  });
+
+  $("opFormTitle").textContent="Editar operador";
+  showSection("operadores");
+  scrollTo(0,0);
+}
+
+function resetOperadorForm(){$("operadorForm").reset();setVals({op_id:"",op_rol:"OPERADOR",op_tipo:"FIJO",op_activo:"true"});$("opFormTitle").textContent="Crear operador"}
 function clearOpFilters(){setVals({op_search:"",op_filter_rol:"",op_filter_pc:"",op_filter_activo:""});renderOperadores()}
+
+
+async function adminToggleOperador(id, activo){
+  const accion = activo ? "activar" : "desactivar";
+  if(!confirm(`¿Querés ${accion} este operador?`))return;
+
+  const {data,error}=await supabaseClient.rpc("admin_cambiar_estado_operador", {
+    p_session_token: requireAdminToken(),
+    p_operador_id: Number(id),
+    p_activo: !!activo
+  });
+
+  if(error){
+    console.error("admin_cambiar_estado_operador", error);
+    return toast("Error: " + error.message, "err");
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  await loadOperadores();
+  toast(row?.mensaje || "Operador actualizado", "okb");
+}
+
+async function adminDeleteOperador(id){
+  if(!confirm("¿Seguro que querés eliminar este operador? Esta acción no se puede deshacer."))return;
+
+  const {data,error}=await supabaseClient.rpc("admin_eliminar_operador", {
+    p_session_token: requireAdminToken(),
+    p_operador_id: Number(id)
+  });
+
+  if(error){
+    console.error("admin_eliminar_operador", error);
+    return toast("Error al eliminar: " + error.message, "err");
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  await loadOperadores();
+  toast(row?.mensaje || "Operador eliminado", "okb");
+}
 
 async function saveBilletera(e){
   e.preventDefault();
@@ -1000,285 +745,11 @@ function renderCfg(){if(!configuracion.length)return empty("cfgBody",5,"No hay c
 function editCfg(id){const c=configuracion.find(x=>String(x.id)===String(id));if(!c)return;setVals({cfg_id:c.id,cfg_clave:c.clave,cfg_valor:c.valor,cfg_descripcion:c.descripcion});$("cfgFormTitle").textContent="Editar configuración";showSection("config")}function resetCfgForm(){$("cfgForm").reset();setVals({cfg_id:""});$("cfgFormTitle").textContent="Crear configuración"}
 
 async function toggleRow(table,id,col,value,reload){const {error}=await supabaseClient.from(table).update({[col]:value,updated_at:new Date().toISOString()}).eq("id",id);if(error)return toast(error.message,"err");await reload();toast("Actualizado","okb")}async function deleteRow(table,id,reload,label){if(!confirm(`¿Seguro que querés eliminar ${label}?`))return;const {error}=await supabaseClient.from(table).delete().eq("id",id);if(error)return toast("Error al eliminar: "+error.message,"err");await reload();toast("Eliminado","okb")}
-function fillPcSelects(){const cods=[...new Set(pcs.map(p=>p.codigo||p.nombre).filter(Boolean))];const opts=['<option value="">Seleccionar</option>'].concat(cods.map(c=>`<option value="${attr(c)}">${safe(c)}</option>`)).join("");const filt=['<option value="">Todas las PCs</option>'].concat(cods.map(c=>`<option value="${attr(c)}">${safe(c)}</option>`)).join("");["op_pc_codigo","bi_pc_codigo"].forEach(id=>{const el=$(id);if(el){const v=el.value;el.innerHTML=opts;el.value=v}});["op_filter_pc","bi_filter_pc","globalPc","wk_filter_pc"].forEach(id=>{const el=$(id);if(el){const v=el.value;el.innerHTML=filt;el.value=v}})
-  if(adminScope && !adminScope.puede_todas){
-    ["globalPc","op_filter_pc","bi_filter_pc","wk_filter_pc"].forEach(id=>{const el=$(id);if(el){el.value=adminScope.pc_codigo; if(id==="globalPc")el.disabled=true;}});
-  }}
+function fillPcSelects(){const cods=[...new Set(pcs.map(p=>p.codigo||p.nombre).filter(Boolean))];const opts=['<option value="">Seleccionar</option>'].concat(cods.map(c=>`<option value="${attr(c)}">${safe(c)}</option>`)).join("");const filt=['<option value="">Todas las PCs</option>'].concat(cods.map(c=>`<option value="${attr(c)}">${safe(c)}</option>`)).join("");["op_pc_codigo","bi_pc_codigo"].forEach(id=>{const el=$(id);if(el){const v=el.value;el.innerHTML=opts;el.value=v}});["op_filter_pc","bi_filter_pc","globalPc","wk_filter_pc"].forEach(id=>{const el=$(id);if(el){const v=el.value;el.innerHTML=filt;el.value=v}})}
 function badges(){setText({badgeDashboard:solicitudes.length,badgeMetricas:solicitudes.filter(esRealizada).length,badgeWorker:workerJobs.filter(j=>["PENDIENTE","REINTENTAR","TOMADO","PROCESANDO","ERROR","REQUIERE_MANUAL"].includes(j.estado)).length,badgeOperadores:operadores.length,badgeBilleteras:billeteras.length,badgePcs:pcs.length,badgeConfig:configuracion.length})}
 function toast(msg,cls="okb"){const e=$("toast");e.className=`toast show ${cls}`;e.textContent=msg;clearTimeout(window.__to);window.__to=setTimeout(()=>e.classList.remove("show"),3200)}
 function empty(id,col,msg){$(id).innerHTML=`<tr><td colspan="${col}" class="empty">${safe(msg)}</td></tr>`}function val(id){return ($(id)?.value||"").trim()}function bool(id){return val(id)==="true"}function num(id){return Number(val(id)||0)}function norm(v){return String(v||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim()}function avg(a){return a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null}function money(n){return Number(n||0).toLocaleString("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0})}function fecha(f){if(!f)return"";return new Date(f).toLocaleString("es-AR",{timeZone:"America/Argentina/Buenos_Aires",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).replace(","," ·")}function fechaCompleta(f){if(!f)return"";return new Date(f).toLocaleString("es-AR",{timeZone:"America/Argentina/Buenos_Aires",day:"2-digit",month:"2-digit",year:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false}).replace(","," ·")}function estado(e){if(esRealizada({estado:e}))return pill(e||"Realizada","ok");if(norm(e)==="rechazada")return pill(e,"off");return pill(e||"Pendiente","warn")}
 function setVals(obj){Object.entries(obj).forEach(([k,v])=>{if($(k))$(k).value=v??""})}function setText(obj){Object.entries(obj).forEach(([k,v])=>{if($(k))$(k).textContent=v??""})}function safe(v){return String(v??"").replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]))}function attr(v){return safe(v).replace(/`/g,"&#96;")}function pill(t,type){const m={ok:"ok",off:"off",warn:"warn",info:"info",vio:"vio"};return`<span class="pill ${m[type]||'info'}">${safe(t)}</span>`}
-
-/* =========================================================
-   FIX ADMIN V15.1
-   Corrige carga de datos: loadConfig/loadSolicitudes faltaban
-   y fuerza que todas las lecturas usen RPC con session_token.
-========================================================= */
-
-async function reloadAll(){
-  try{
-    await Promise.allSettled([
-      loadPcs(false),
-      loadOperadores(false),
-      loadBilleteras(false),
-      loadConfig(false),
-      loadSolicitudes(false),
-      loadChats(false),
-      loadWorkerJobs(false)
-    ]);
-    fillPcSelects();
-    renderAll();
-    toast("Datos actualizados","okb");
-  }catch(e){
-    console.error("reloadAll error:", e);
-    toast("Error actualizando: "+(e.message||e),"err");
-  }
-}
-
-async function loadPcs(render=true){
-  const {data,error}=await supabaseClient.rpc("admin_get_pcs",{
-    p_session_token:requireAdminToken()
-  });
-  if(error){console.error("admin_get_pcs",error);pcs=[];return toast("Error PCs: "+error.message,"err")}
-  pcs=data||[];
-  if(render)renderAll();
-}
-
-async function loadOperadores(render=true){
-  const {data,error}=await supabaseClient.rpc("admin_get_operadores",{
-    p_session_token:requireAdminToken()
-  });
-  if(error){console.error("admin_get_operadores",error);operadores=[];return toast("Error operadores: "+error.message,"err")}
-  operadores=data||[];
-  if(render)renderAll();
-}
-
-async function loadBilleteras(render=true){
-  const pc=val("globalPc")||null;
-  const {data,error}=await supabaseClient.rpc("admin_get_billeteras",{
-    p_session_token:requireAdminToken(),
-    p_pc_codigo:pc
-  });
-  if(error){console.error("admin_get_billeteras",error);billeteras=[];return toast("Error billeteras: "+error.message,"err")}
-  billeteras=data||[];
-  if(render)renderAll();
-}
-
-async function loadConfig(render=true){
-  const {data,error}=await supabaseClient.rpc("admin_get_configuracion",{
-    p_session_token:requireAdminToken()
-  });
-  if(error){console.error("admin_get_configuracion",error);configuracion=[];return toast("Error config: "+error.message,"err")}
-  configuracion=data||[];
-  if(render)renderAll();
-}
-
-async function loadSolicitudes(render=true){
-  const pc=val("globalPc")||null;
-  const {data,error}=await supabaseClient.rpc("admin_get_solicitudes",{
-    p_session_token:requireAdminToken(),
-    p_pc_codigo:pc,
-    p_limit:1000
-  });
-  if(error){console.error("admin_get_solicitudes",error);solicitudes=[];return toast("Error solicitudes: "+error.message,"err")}
-  solicitudes=data||[];
-  if(render)renderAll();
-}
-
-async function loadChats(render=true){
-  const pc=val("globalPc")||null;
-  const {data:ses,error:e1}=await supabaseClient.rpc("admin_get_chat_sesiones",{
-    p_session_token:requireAdminToken(),
-    p_pc_codigo:pc
-  });
-  if(e1){console.error("admin_get_chat_sesiones",e1);chatSesiones=[];chatMensajes=[];return toast("Error chats: "+e1.message,"err")}
-  chatSesiones=ses||[];
-
-  const {data:ms,error:e2}=await supabaseClient.rpc("admin_get_chat_mensajes",{
-    p_session_token:requireAdminToken(),
-    p_pc_codigo:pc
-  });
-  if(e2){console.error("admin_get_chat_mensajes",e2);chatMensajes=[];return toast("Error mensajes chat: "+e2.message,"err")}
-  chatMensajes=ms||[];
-
-  if(render)renderAll();
-}
-
-async function loadWorkerJobs(render=true){
-  const pc=val("globalPc")||null;
-  const {data,error}=await supabaseClient.rpc("admin_get_worker_jobs",{
-    p_session_token:requireAdminToken(),
-    p_pc_codigo:pc,
-    p_limit:1500
-  });
-  if(error){console.error("admin_get_worker_jobs",error);workerJobs=[];return toast("Error worker_jobs: "+error.message,"err")}
-  workerJobs=data||[];
-  if(render)renderAll();
-}
-
-async function loadWorkerLogs(jobId){
-  const {data,error}=await supabaseClient.rpc("admin_get_worker_logs",{
-    p_session_token:requireAdminToken(),
-    p_worker_job_id:jobId?Number(jobId):null
-  });
-  if(error){console.error("admin_get_worker_logs",error);toast("No pude leer worker_logs: "+error.message,"err");return[]}
-  return data||[];
-}
-
-
-/* =========================================================
-   FIX ADMIN V15.2
-   Filtros PC/Estado:
-   - El selector de PC se arma con fallback desde pcs, solicitudes,
-     billeteras, worker_jobs y operadores.
-   - Agrega filtro por estado de solicitud.
-========================================================= */
-
-function getAllPcCodes(){
-  const raw=[
-    ...pcs.map(p=>p.codigo||p.nombre),
-    ...solicitudes.map(s=>s.pc_codigo),
-    ...billeteras.map(b=>b.pc_codigo),
-    ...workerJobs.map(w=>w.pc_codigo),
-    ...operadores.map(o=>o.pc_codigo)
-  ].filter(Boolean).map(x=>String(x).trim().toUpperCase()).filter(x=>x && x!=="TODAS");
-
-  return [...new Set(raw)].sort((a,b)=>{
-    const na=Number(String(a).replace(/\D/g,""));
-    const nb=Number(String(b).replace(/\D/g,""));
-    if(!isNaN(na)&&!isNaN(nb)&&na!==nb)return na-nb;
-    return String(a).localeCompare(String(b));
-  });
-}
-
-function fillPcSelects(){
-  let cods=getAllPcCodes();
-
-  if(adminScope && !adminScope.puede_todas && adminScope.pc_codigo){
-    cods=[String(adminScope.pc_codigo).toUpperCase()];
-  }
-
-  const opts=['<option value="">Seleccionar</option>'].concat(cods.map(c=>`<option value="${attr(c)}">${safe(c)}</option>`)).join("");
-  const filt=['<option value="">Todas las PCs</option>'].concat(cods.map(c=>`<option value="${attr(c)}">${safe(c)}</option>`)).join("");
-
-  ["op_pc_codigo","bi_pc_codigo"].forEach(id=>{
-    const el=$(id);
-    if(el){
-      const v=el.value;
-      el.innerHTML=opts;
-      el.value=cods.includes(String(v).toUpperCase())?v:"";
-    }
-  });
-
-  ["op_filter_pc","bi_filter_pc","globalPc","wk_filter_pc"].forEach(id=>{
-    const el=$(id);
-    if(el){
-      const v=el.value;
-      el.innerHTML=filt;
-      if(cods.includes(String(v).toUpperCase()) || v==="")el.value=v;
-    }
-  });
-
-  if(adminScope && !adminScope.puede_todas){
-    ["globalPc","op_filter_pc","bi_filter_pc","wk_filter_pc"].forEach(id=>{
-      const el=$(id);
-      if(el){
-        el.value=String(adminScope.pc_codigo||"").toUpperCase();
-        if(id==="globalPc")el.disabled=true;
-      }
-    });
-  }
-}
-
-function renderDashboard(){
-  const sol=listaFiltradaPc(solicitudes).filter(s=>esHoy(s.created_at));
-  const chats=listaFiltradaPc(chatSesiones).filter(c=>esHoy(c.created_at));
-  setText({
-    stSolHoy:sol.length,
-    stPend:sol.filter(esPendiente).length,
-    stReal:sol.filter(esRealizada).length,
-    stRet:sol.filter(s=>esPendiente(s)&&norm(s.tipo)==="retiro").length,
-    stChats:chats.length
-  });
-  $("dashTurnos").innerHTML=resumenTurnosHTML(sol);
-  $("dashPcs").innerHTML=resumenPcsHTML(solicitudes.filter(s=>esHoy(s.created_at)).filter(s=>coincideEstadoSolicitud(s,estadoSeleccionado())));
-  $("ultimasSolicitudes").innerHTML=(listaFiltradaPc(solicitudes).slice(0,80).map(s=>`<tr><td>${fecha(s.created_at)}</td><td>${safe(s.pc_codigo)}</td><td>${turnoDe(s.created_at)}</td><td>${safe(s.tipo)}</td><td><strong>${safe(s.usuario)}</strong><br><span class="muted">${safe(s.nombre_completo)}</span></td><td>${money(s.monto)}</td><td>${estado(s.estado)}</td><td>${workerSolicitudBadge(s)}</td><td>${safe(s.operador_usuario)}</td></tr>`).join("")||`<tr><td colspan="9" class="empty">No hay solicitudes para ese filtro.</td></tr>`);
-}
-
-
-/* =========================================================
-   ADMIN V15 FIX3 · VISTAS
-   Mejora render de PCs detectadas y mensajes vacíos.
-========================================================= */
-
-function renderPcs(){
-  if(!pcs.length)return empty("pcsBody",6,"No hay PCs cargadas ni detectadas desde solicitudes/billeteras/operadores.");
-  $("pcsBody").innerHTML=pcs.map(p=>{
-    const esReal=!!p.id;
-    return `<tr>
-      <td>${esReal?safe(p.id):'<span class="muted">detectada</span>'}</td>
-      <td><strong>${safe(p.codigo)}</strong></td>
-      <td>${safe(p.nombre || p.codigo)}</td>
-      <td>${safe(p.descripcion || (esReal?'':'Detectada automáticamente'))}</td>
-      <td>${p.activa?pill('Activa','ok'):pill('Inactiva','off')}</td>
-      <td><div class="rowActions">
-        ${esReal?`<button class="small blue" onclick="editPc('${p.id}')">Editar</button><button class="small danger" onclick="deleteRow('${TABLES.pcs}','${p.id}',loadPcs,'PC')">Eliminar</button>`:'<span class="muted">Sin ficha en tabla PCs</span>'}
-      </div></td>
-    </tr>`;
-  }).join("");
-}
-
-function renderBilleteras(){
-  const q=norm(val("bi_search")),banco=val("bi_filter_banco"),pc=val("bi_filter_pc"),act=val("bi_filter_activa");
-  let rows=billeteras.filter(b=>
-    (!q||norm([b.id,b.pc_codigo,b.nombre_visible,b.titular,b.alias,b.cbu,b.banco,b.estado].join(" ")).includes(q))&&
-    (!banco||b.banco===banco)&&
-    (!pc||b.pc_codigo===pc)&&
-    (act===""||String(!!b.activa)===act)
-  );
-  if(!rows.length)return empty("billeterasBody",11,"No hay billeteras para el filtro actual. Revisá PC/estado o actualizá.");
-  $("billeterasBody").innerHTML=rows.map(b=>`<tr><td>${safe(b.id)}</td><td>${safe(b.pc_codigo)}</td><td><strong>${safe(b.nombre_visible)}</strong></td><td>${safe(b.titular)}</td><td>${safe(b.banco)}</td><td>${safe(b.alias)}</td><td>${estadoBi(b)}</td><td>${mpBadge(b)}</td><td>${safe(b.prioridad||0)}</td><td>${b.seleccionada_manual?pill('Manual','warn'):'<span class="muted">No</span>'}</td><td><div class="rowActions"><button class="small blue" onclick="editBilletera('${b.id}')">Editar</button><button class="small ${b.activa?'warning':'primary'}" onclick="toggleBilletera('${b.id}',${!b.activa})">${b.activa?'Pausar':'Activar'}</button><button class="small violet" onclick="setManual('${b.id}')">Manual</button><button class="small danger" onclick="deleteRow('${TABLES.billeteras}','${b.id}',loadBilleteras,'billetera')">Eliminar</button></div></td></tr>`).join("");
-}
-
 </script>
 </body>
-</html>async function loadBilleteras(render=true){
-  const pc=val("globalPc")||null;
-  const {data,error}=await supabaseClient.rpc("admin_get_billeteras",{
-    p_session_token:requireAdminToken(),
-    p_pc_codigo:pc
-  });
-  if(error)return toast("Error billeteras: "+error.message,"err");
-  billeteras=data||[];
-  if(render)renderAll();
-}
-async function loadChats(render=true){
-  const pc=val("globalPc")||null;
-  const {data:ses,error:e1}=await supabaseClient.rpc("admin_get_chat_sesiones",{
-    p_session_token:requireAdminToken(),
-    p_pc_codigo:pc
-  });
-  if(e1){console.warn(e1);chatSesiones=[];chatMensajes=[];return}
-  chatSesiones=ses||[];
-
-  const {data:ms,error:e2}=await supabaseClient.rpc("admin_get_chat_mensajes",{
-    p_session_token:requireAdminToken(),
-    p_pc_codigo:pc
-  });
-  if(e2){console.warn(e2);chatMensajes=[]}
-  else chatMensajes=ms||[];
-
-  if(render)renderAll();
-}
-async function loadWorkerJobs(render=true){
-  const pc=val("globalPc")||null;
-  const {data,error}=await supabaseClient.rpc("admin_get_worker_jobs",{
-    p_session_token:requireAdminToken(),
-    p_pc_codigo:pc,
-    p_limit:1500
-  });
-  if(error){console.warn(error);workerJobs=[];return toast("No pude leer worker_jobs: "+error.message,"err")}
-  workerJobs=data||[];
-  if(render)renderAll();
-}
-
+</html>
