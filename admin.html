@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>NODO · ADMIN FINAL V3</title>
+<title>NODO · ADMIN OFICINAS · PC4 SANCHEZ</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 /* =========================================================
@@ -1277,22 +1277,22 @@ document.addEventListener("DOMContentLoaded",()=>{
 </script>
 
 <div class="app">
-<aside><div class="brand"><h1>NODO ADMIN</h1><p>Panel general. Administrás operadores, billeteras, PCs y estadísticas.</p></div>
+<aside><div class="brand"><h1>NODO ADMIN</h1><p>Panel general multi-oficina. Administrás operadores, billeteras, workers, Mercado Pago y estadísticas.</p></div>
   <div class="nav">
     <button class="navBtn active" data-section="dashboard" onclick="showSection('dashboard')">Dashboard <span class="badge" id="badgeDashboard">0</span></button>
     <button class="navBtn" data-section="metricas" onclick="showSection('metricas')">Métricas <span class="badge" id="badgeMetricas">0</span></button>
     <button class="navBtn" data-section="worker" onclick="showSection('worker')">Worker <span class="badge" id="badgeWorker">0</span></button>
     <button class="navBtn" data-section="operadores" onclick="showSection('operadores')">Operadores <span class="badge" id="badgeOperadores">0</span></button>
     <button class="navBtn" data-section="billeteras" onclick="showSection('billeteras')">Billeteras <span class="badge" id="badgeBilleteras">0</span></button>
-    <button class="navBtn" data-section="pcs" onclick="showSection('pcs')">PCs <span class="badge" id="badgePcs">0</span></button>
+    <button class="navBtn" data-section="pcs" onclick="showSection('pcs')">Oficinas <span class="badge" id="badgePcs">0</span></button>
     <button class="navBtn" data-section="config" onclick="showSection('config')">Configuración <span class="badge" id="badgeConfig">0</span></button>
   </div>
 </aside>
 <main>
-<div class="top"><div><h2 id="pageTitle">Dashboard</h2><p id="pageSub">Resumen general navegable por PC.</p></div><div class="top-actions"><select id="globalPc" onchange="renderAll()"><option value="">Todas las PCs</option></select><button class="blue" onclick="reloadAll()">Actualizar todo</button><button class="logout-btn" onclick="adminLogout()">Cerrar sesión</button></div></div>
+<div class="top"><div><h2 id="pageTitle">Dashboard</h2><p id="pageSub">Resumen general navegable por oficina.</p></div><div class="top-actions"><select id="globalPc" onchange="cambiarOficinaAdmin()"><option value="">Todas las oficinas</option></select><button class="blue" onclick="reloadAll()">Actualizar todo</button><button class="logout-btn" onclick="adminLogout()">Cerrar sesión</button></div></div>
 
 <section id="section-dashboard" class="section active">
-  <div class="notice">Selector superior: elegí una PC para ver el dashboard filtrado o dejá “Todas las PCs” para la vista general.</div>
+  <div class="notice">Selector superior: elegí una PC para ver el dashboard filtrado o dejá “Todas las oficinas” para la vista general.</div>
   <div class="stats">
     <div class="stat"><small>Solicitudes hoy</small><strong id="stSolHoy">0</strong></div>
     <div class="stat"><small>Pendientes</small><strong id="stPend">0</strong></div>
@@ -1304,7 +1304,7 @@ document.addEventListener("DOMContentLoaded",()=>{
     <div class="card"><div class="card-h"><h3>Solicitudes por turno</h3></div><div class="card-b" id="dashTurnos"></div></div>
     <div class="card"><div class="card-h"><h3>Resumen por PC</h3></div><div class="card-b" id="dashPcs"></div></div>
   </div>
-  <div class="card"><div class="card-h"><h3>Últimas solicitudes</h3></div><div class="tableWrap"><table><thead><tr><th>Fecha</th><th>PC</th><th>Turno</th><th>Tipo</th><th>Usuario</th><th>Monto</th><th>Estado</th><th>Worker</th><th>Operador</th></tr></thead><tbody id="ultimasSolicitudes"></tbody></table></div></div>
+  <div class="card"><div class="card-h"><h3>Últimas solicitudes</h3></div><div class="tableWrap"><table><thead><tr><th>Fecha</th><th>Oficina</th><th>Turno</th><th>Tipo</th><th>Usuario</th><th>Monto</th><th>Estado</th><th>Worker</th><th>Operador</th></tr></thead><tbody id="ultimasSolicitudes"></tbody></table></div></div>
 </section>
 
 <section id="section-metricas" class="section">
@@ -1317,7 +1317,7 @@ document.addEventListener("DOMContentLoaded",()=>{
   </div>
   <div class="gridDash">
     <div class="card"><div class="card-h"><h3>Estadística por operador</h3></div><div class="tableWrap"><table><thead><tr><th>Operador</th><th>Tomadas</th><th>Realizadas</th><th>Rechazadas</th><th>Rápidas</th><th>Prom. aprobación</th><th>Resp. chat</th><th>Prom. chat</th></tr></thead><tbody id="statsOperadores"></tbody></table></div></div>
-    <div class="card"><div class="card-h"><h3>Estadística por PC</h3></div><div class="tableWrap"><table><thead><tr><th>PC</th><th>Total</th><th>Pend.</th><th>Real.</th><th>Rech.</th><th>TM</th><th>TT</th><th>TN</th></tr></thead><tbody id="statsPcs"></tbody></table></div></div>
+    <div class="card"><div class="card-h"><h3>Estadística por PC</h3></div><div class="tableWrap"><table><thead><tr><th>Oficina</th><th>Total</th><th>Pend.</th><th>Real.</th><th>Rech.</th><th>TM</th><th>TT</th><th>TN</th></tr></thead><tbody id="statsPcs"></tbody></table></div></div>
   </div>
 </section>
 
@@ -1369,7 +1369,7 @@ document.addEventListener("DOMContentLoaded",()=>{
           <tr>
             <th>Job</th>
             <th>Solicitud</th>
-            <th>PC</th>
+            <th>Oficina</th>
             <th>Usuario</th>
             <th>Tipo</th>
             <th>Monto</th>
@@ -1394,16 +1394,16 @@ document.addEventListener("DOMContentLoaded",()=>{
 <section id="section-operadores" class="section"><div class="grid2">
   <div class="card"><div class="card-h"><h3 id="opFormTitle">Crear operador</h3><button class="small" onclick="resetOperadorForm()">Limpiar</button></div><div class="card-b"><form id="operadorForm">
     <input type="hidden" id="op_id"><div class="row"><label>Usuario</label><input id="op_usuario" required></div><div class="row"><label>Nombre</label><input id="op_nombre" required></div><div class="g2"><div class="row"><label>Clave</label><input id="op_clave"></div><div class="row"><label>Password</label><input id="op_password"></div></div>
-    <div class="g3"><div class="row"><label>Rol</label><select id="op_rol"><option>OPERADOR</option><option>ENCARGADO</option><option>ADMIN</option></select></div><div class="row"><label>Tipo</label><select id="op_tipo"><option value="fijo">fijo</option><option value="admi">admi</option><option value="franquero">franquero</option></select></div><div class="row"><label>PC Código</label><select id="op_pc_codigo"></select></div></div>
+    <div class="g3"><div class="row"><label>Rol</label><select id="op_rol"><option>OPERADOR</option><option>ENCARGADO</option><option>ADMIN</option></select></div><div class="row"><label>Tipo</label><select id="op_tipo"><option value="fijo">fijo</option><option value="admi">admi</option><option value="franquero">franquero</option></select></div><div class="row"><label>Oficina</label><select id="op_pc_codigo"></select></div></div>
     <div class="g3"><div class="row"><label>Turno</label><select id="op_turno"><option value="">Sin turno</option><option>TM</option><option>TT</option><option>TN</option></select></div><div class="row"><label>Teléfono</label><input id="op_telefono"></div><div class="row"><label>Activo</label><select id="op_activo"><option value="true">Sí</option><option value="false">No</option></select></div></div>
     <div class="row"><label>Email</label><input id="op_email" type="email"></div><div class="row"><label>Observaciones</label><textarea id="op_observaciones"></textarea></div><div class="actions"><button class="primary" type="submit">Guardar operador</button><button type="button" onclick="resetOperadorForm()">Cancelar</button></div>
   </form></div></div>
-  <div class="card"><div class="card-h"><h3>Operadores</h3><button class="blue small" onclick="loadOperadores()">Actualizar</button></div><div class="filters"><input id="op_search" oninput="renderOperadores()" placeholder="Buscar..."><select id="op_filter_rol" onchange="renderOperadores()"><option value="">Todos roles</option><option>OPERADOR</option><option>ENCARGADO</option><option>ADMIN</option></select><select id="op_filter_pc" onchange="renderOperadores()"></select><select id="op_filter_activo" onchange="renderOperadores()"><option value="">Todos</option><option value="true">Activos</option><option value="false">Inactivos</option></select><button onclick="clearOpFilters()">Reset</button></div><div class="tableWrap"><table><thead><tr><th>ID</th><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Tipo</th><th>PC</th><th>Turno</th><th>Activo</th><th>Acciones</th></tr></thead><tbody id="operadoresBody"></tbody></table></div></div>
+  <div class="card"><div class="card-h"><h3>Operadores</h3><button class="blue small" onclick="loadOperadores()">Actualizar</button></div><div class="filters"><input id="op_search" oninput="renderOperadores()" placeholder="Buscar..."><select id="op_filter_rol" onchange="renderOperadores()"><option value="">Todos roles</option><option>OPERADOR</option><option>ENCARGADO</option><option>ADMIN</option></select><select id="op_filter_pc" onchange="renderOperadores()"></select><select id="op_filter_activo" onchange="renderOperadores()"><option value="">Todos</option><option value="true">Activos</option><option value="false">Inactivos</option></select><button onclick="clearOpFilters()">Reset</button></div><div class="tableWrap"><table><thead><tr><th>ID</th><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Tipo</th><th>Oficina</th><th>Turno</th><th>Activo</th><th>Acciones</th></tr></thead><tbody id="operadoresBody"></tbody></table></div></div>
 </div></section>
 
 <section id="section-billeteras" class="section"><div class="grid2">
   <div class="card"><div class="card-h"><h3 id="biFormTitle">Crear billetera</h3><button class="small" onclick="resetBilleteraForm()">Limpiar</button></div><div class="card-b"><form id="billeteraForm">
-    <input type="hidden" id="bi_id"><div class="g2"><div class="row"><label>PC Código</label><select id="bi_pc_codigo"></select></div><div class="row"><label>Banco</label><select id="bi_banco"><option value="">Seleccionar</option><option>MP</option><option>UALA</option><option>NJX</option><option>PERSONAL PAY</option><option>BRUBANK</option><option>PREX</option><option>OTRO</option></select></div></div>
+    <input type="hidden" id="bi_id"><div class="g2"><div class="row"><label>Oficina</label><select id="bi_pc_codigo"></select></div><div class="row"><label>Banco</label><select id="bi_banco"><option value="">Seleccionar</option><option>MP</option><option>UALA</option><option>NJX</option><option>PERSONAL PAY</option><option>BRUBANK</option><option>PREX</option><option>OTRO</option></select></div></div>
     <div class="row"><label>Nombre visible</label><input id="bi_nombre_visible" required></div><div class="row"><label>Titular</label><input id="bi_titular"></div><div class="row"><label>Alias</label><input id="bi_alias"></div><div class="row"><label>CBU / CVU</label><input id="bi_cbu"></div>
     <div class="g3"><div class="row"><label>Estado</label><select id="bi_estado"><option value="activa">activa</option><option value="pausada">pausada</option><option value="caida">caida</option><option value="revision">revision</option><option value="inactiva">inactiva</option></select></div><div class="row"><label>Prioridad</label><input id="bi_prioridad" type="number" value="0"></div><div class="row"><label>Orden</label><input id="bi_orden" type="number" value="0"></div></div>
     <div class="g2"><div class="row"><label>Activa</label><select id="bi_activa"><option value="true">Sí</option><option value="false">No</option></select></div><div class="row"><label>Seleccionada manual</label><select id="bi_manual"><option value="false">No</option><option value="true">Sí</option></select></div></div>
@@ -1467,10 +1467,10 @@ document.addEventListener("DOMContentLoaded",()=>{
 
     <div class="row"><label>Observaciones</label><textarea id="bi_observaciones"></textarea></div><div class="actions"><button class="primary" type="submit">Guardar billetera</button><button type="button" onclick="resetBilleteraForm()">Cancelar</button></div>
   </form></div></div>
-  <div class="card"><div class="card-h"><h3>Billeteras</h3><button class="blue small" onclick="loadBilleteras()">Actualizar</button></div><div class="filters"><input id="bi_search" oninput="renderBilleteras()" placeholder="Buscar..."><select id="bi_filter_banco" onchange="renderBilleteras()"><option value="">Todos bancos</option><option>MP</option><option>UALA</option><option>NJX</option><option>PERSONAL PAY</option><option>BRUBANK</option><option>PREX</option><option>OTRO</option></select><select id="bi_filter_pc" onchange="renderBilleteras()"></select><select id="bi_filter_activa" onchange="renderBilleteras()"><option value="">Todas</option><option value="true">Activas</option><option value="false">Inactivas</option></select><button onclick="clearBiFilters()">Reset</button></div><div class="tableWrap"><table><thead><tr><th>ID</th><th>PC</th><th>Nombre</th><th>Titular</th><th>Banco</th><th>Alias</th><th>Estado</th><th>MP</th><th>Prioridad</th><th>Manual</th><th>Acciones</th></tr></thead><tbody id="billeterasBody"></tbody></table></div></div>
+  <div class="card"><div class="card-h"><h3>Billeteras</h3><button class="blue small" onclick="loadBilleteras()">Actualizar</button></div><div class="filters"><input id="bi_search" oninput="renderBilleteras()" placeholder="Buscar..."><select id="bi_filter_banco" onchange="renderBilleteras()"><option value="">Todos bancos</option><option>MP</option><option>UALA</option><option>NJX</option><option>PERSONAL PAY</option><option>BRUBANK</option><option>PREX</option><option>OTRO</option></select><select id="bi_filter_pc" onchange="renderBilleteras()"></select><select id="bi_filter_activa" onchange="renderBilleteras()"><option value="">Todas</option><option value="true">Activas</option><option value="false">Inactivas</option></select><button onclick="clearBiFilters()">Reset</button></div><div class="tableWrap"><table><thead><tr><th>ID</th><th>Oficina</th><th>Nombre</th><th>Titular</th><th>Banco</th><th>Alias</th><th>Estado</th><th>MP</th><th>Prioridad</th><th>Manual</th><th>Acciones</th></tr></thead><tbody id="billeterasBody"></tbody></table></div></div>
 </div></section>
 
-<section id="section-pcs" class="section"><div class="grid2"><div class="card"><div class="card-h"><h3 id="pcFormTitle">Crear PC</h3><button class="small" onclick="resetPcForm()">Limpiar</button></div><div class="card-b"><form id="pcForm"><input type="hidden" id="pc_id"><div class="row"><label>Código</label><input id="pc_codigo" required placeholder="P1"></div><div class="row"><label>Nombre</label><input id="pc_nombre"></div><div class="row"><label>Descripción</label><textarea id="pc_descripcion"></textarea></div><div class="row"><label>Activa</label><select id="pc_activa"><option value="true">Sí</option><option value="false">No</option></select></div><div class="actions"><button class="primary" type="submit">Guardar PC</button><button type="button" onclick="resetPcForm()">Cancelar</button></div></form></div></div><div class="card"><div class="card-h"><h3>PCs</h3><button class="blue small" onclick="loadPcs()">Actualizar</button></div><div class="tableWrap"><table><thead><tr><th>ID</th><th>Código</th><th>Nombre</th><th>Descripción</th><th>Activa</th><th>Acciones</th></tr></thead><tbody id="pcsBody"></tbody></table></div></div></div></section>
+<section id="section-pcs" class="section"><div class="grid2"><div class="card"><div class="card-h"><h3 id="pcFormTitle">Crear oficina</h3><button class="small" onclick="resetPcForm()">Limpiar</button></div><div class="card-b"><form id="pcForm"><input type="hidden" id="pc_id"><div class="row"><label>Código</label><input id="pc_codigo" required placeholder="PC4"></div><div class="row"><label>Nombre visible</label><input id="pc_nombre" placeholder="PC4 - SANCHEZ"></div><div class="row"><label>Descripción</label><textarea id="pc_descripcion"></textarea></div><div class="row"><label>Activa</label><select id="pc_activa"><option value="true">Sí</option><option value="false">No</option></select></div><div class="actions"><button class="primary" type="submit">Guardar oficina</button><button type="button" onclick="resetPcForm()">Cancelar</button></div></form></div></div><div class="card"><div class="card-h"><h3>Oficinas</h3><button class="blue small" onclick="loadPcs()">Actualizar</button></div><div class="tableWrap"><table><thead><tr><th>ID</th><th>Código</th><th>Nombre</th><th>Descripción</th><th>Activa</th><th>Acciones</th></tr></thead><tbody id="pcsBody"></tbody></table></div></div></div></section>
 
 <section id="section-config" class="section"><div class="grid2"><div class="card"><div class="card-h"><h3 id="cfgFormTitle">Crear configuración</h3><button class="small" onclick="resetCfgForm()">Limpiar</button></div><div class="card-b"><form id="cfgForm"><input type="hidden" id="cfg_id"><div class="row"><label>Clave</label><input id="cfg_clave" required></div><div class="row"><label>Valor</label><input id="cfg_valor"></div><div class="row"><label>Descripción</label><textarea id="cfg_descripcion"></textarea></div><div class="actions"><button class="primary" type="submit">Guardar</button><button type="button" onclick="resetCfgForm()">Cancelar</button></div></form></div></div><div class="card"><div class="card-h"><h3>Configuración</h3><button class="blue small" onclick="loadConfig()">Actualizar</button></div><div class="tableWrap"><table><thead><tr><th>ID</th><th>Clave</th><th>Valor</th><th>Descripción</th><th>Acciones</th></tr></thead><tbody id="cfgBody"></tbody></table></div></div></div></section>
 </main></div>
@@ -1487,7 +1487,7 @@ const $=id=>document.getElementById(id);
 
 document.addEventListener("DOMContentLoaded",()=>{if($("operadorForm")){$("operadorForm").addEventListener("submit",saveOperador);}$("billeteraForm").addEventListener("submit",saveBilletera);$("pcForm").addEventListener("submit",savePc);$("cfgForm").addEventListener("submit",saveCfg);reloadAll();});
 
-function showSection(name){document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));document.querySelectorAll(".navBtn").forEach(b=>b.classList.remove("active"));$("section-"+name).classList.add("active");document.querySelector(`[data-section="${name}"]`)?.classList.add("active");const t={dashboard:["Dashboard","Resumen general navegable por PC."],metricas:["Métricas","Aprobación rápida, respuesta de chat y rendimiento por operador/PC."],worker:["Worker","Cola de automatización, logs, errores y reintentos."],operadores:["Operadores","Crear, editar, activar, desactivar o eliminar operadores."],billeteras:["Billeteras","Administrar cuentas, estados, prioridad, selección manual e integración Mercado Pago."],pcs:["PCs","Administrar catálogo de PCs."],config:["Configuración","Parámetros internos del sistema."]};$("pageTitle").textContent=t[name][0];$("pageSub").textContent=t[name][1];}
+function showSection(name){document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));document.querySelectorAll(".navBtn").forEach(b=>b.classList.remove("active"));$("section-"+name).classList.add("active");document.querySelector(`[data-section="${name}"]`)?.classList.add("active");const t={dashboard:["Dashboard","Resumen general navegable por oficina."],metricas:["Métricas","Aprobación rápida, respuesta de chat y rendimiento por operador/PC."],worker:["Worker","Cola de automatización, logs, errores y reintentos."],operadores:["Operadores","Crear, editar, activar, desactivar o eliminar operadores."],billeteras:["Billeteras","Administrar cuentas, estados, prioridad, selección manual e integración Mercado Pago."],pcs:["PCs","Administrar catálogo de PCs."],config:["Configuración","Parámetros internos del sistema."]};$("pageTitle").textContent=t[name][0];$("pageSub").textContent=t[name][1];}
 
 async function reloadAll(){await Promise.allSettled([loadPcs(false),loadOperadores(false),loadBilleteras(false),loadConfig(false),loadSolicitudes(false),loadChats(false),loadWorkerJobs(false)]);fillPcSelects();renderAll();toast("Datos actualizados","okb")}
 async function loadOperadores(render=true){const {data,error}=await supabaseClient.from(TABLES.operadores).select("*").order("nombre",{ascending:true});if(error)return toast("Error operadores: "+error.message,"err");operadores=data||[];if(render)renderAll()}
@@ -1985,7 +1985,7 @@ function renderCfg(){if(!configuracion.length)return empty("cfgBody",5,"No hay c
 function editCfg(id){const c=configuracion.find(x=>String(x.id)===String(id));if(!c)return;setVals({cfg_id:c.id,cfg_clave:c.clave,cfg_valor:c.valor,cfg_descripcion:c.descripcion});$("cfgFormTitle").textContent="Editar configuración";showSection("config")}function resetCfgForm(){$("cfgForm").reset();setVals({cfg_id:""});$("cfgFormTitle").textContent="Crear configuración"}
 
 async function toggleRow(table,id,col,value,reload){const {error}=await supabaseClient.from(table).update({[col]:value,updated_at:new Date().toISOString()}).eq("id",id);if(error)return toast(error.message,"err");await reload();toast("Actualizado","okb")}async function deleteRow(table,id,reload,label){if(!confirm(`¿Seguro que querés eliminar ${label}?`))return;const {error}=await supabaseClient.from(table).delete().eq("id",id);if(error)return toast("Error al eliminar: "+error.message,"err");await reload();toast("Eliminado","okb")}
-function fillPcSelects(){const cods=[...new Set(pcs.map(p=>p.codigo||p.nombre).filter(Boolean))];const opts=['<option value="">Seleccionar</option>'].concat(cods.map(c=>`<option value="${attr(c)}">${safe(c)}</option>`)).join("");const filt=['<option value="">Todas las PCs</option>'].concat(cods.map(c=>`<option value="${attr(c)}">${safe(c)}</option>`)).join("");["op_pc_codigo","bi_pc_codigo"].forEach(id=>{const el=$(id);if(el){const v=el.value;el.innerHTML=opts;el.value=v}});["op_filter_pc","bi_filter_pc","globalPc","wk_filter_pc"].forEach(id=>{const el=$(id);if(el){const v=el.value;el.innerHTML=filt;el.value=v}})}
+function fillPcSelects(){const cods=[...new Set(pcs.map(p=>p.codigo||p.nombre).filter(Boolean))];const opts=['<option value="">Seleccionar</option>'].concat(cods.map(c=>`<option value="${attr(c)}">${safe(c)}</option>`)).join("");const filt=['<option value="">Todas las oficinas</option>'].concat(cods.map(c=>`<option value="${attr(c)}">${safe(c)}</option>`)).join("");["op_pc_codigo","bi_pc_codigo"].forEach(id=>{const el=$(id);if(el){const v=el.value;el.innerHTML=opts;el.value=v}});["op_filter_pc","bi_filter_pc","globalPc","wk_filter_pc"].forEach(id=>{const el=$(id);if(el){const v=el.value;el.innerHTML=filt;el.value=v}})}
 function badges(){setText({badgeDashboard:solicitudes.length,badgeMetricas:solicitudes.filter(esRealizada).length,badgeWorker:workerJobs.filter(j=>["PENDIENTE","REINTENTAR","TOMADO","PROCESANDO","ERROR","REQUIERE_MANUAL"].includes(j.estado)).length,badgeOperadores:operadores.length,badgeBilleteras:billeteras.length,badgePcs:pcs.length,badgeConfig:configuracion.length})}
 function toast(msg,cls="okb"){const e=$("toast");e.className=`toast show ${cls}`;e.textContent=msg;clearTimeout(window.__to);window.__to=setTimeout(()=>e.classList.remove("show"),3200)}
 function empty(id,col,msg){$(id).innerHTML=`<tr><td colspan="${col}" class="empty">${safe(msg)}</td></tr>`}function val(id){return ($(id)?.value||"").trim()}function bool(id){return val(id)==="true"}function num(id){return Number(val(id)||0)}function norm(v){return String(v||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim()}function avg(a){return a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null}function money(n){return Number(n||0).toLocaleString("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0})}function fecha(f){if(!f)return"";return new Date(f).toLocaleString("es-AR",{timeZone:"America/Argentina/Buenos_Aires",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).replace(","," ·")}function fechaCompleta(f){if(!f)return"";return new Date(f).toLocaleString("es-AR",{timeZone:"America/Argentina/Buenos_Aires",day:"2-digit",month:"2-digit",year:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false}).replace(","," ·")}function estado(e){if(esRealizada({estado:e}))return pill(e||"Realizada","ok");if(norm(e)==="rechazada")return pill(e,"off");return pill(e||"Pendiente","warn")}
@@ -3315,7 +3315,7 @@ document.addEventListener("DOMContentLoaded",()=>{
     }catch(e){}
     const pc=forcedPc(); if(pc)cods=[pc];
     const opts=['<option value="">Seleccionar</option>',...cods.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`)].join('');
-    const filt=(pc?'':'<option value="">Todas las PCs</option>')+cods.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    const filt=(pc?'':'<option value="">Todas las oficinas</option>')+cods.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
     ['op_pc_codigo','bi_pc_codigo'].forEach(id=>{const el=$(id); if(el){const old=el.value; el.innerHTML=opts; el.value=pc||(cods.includes(String(old).toUpperCase())?old:''); el.disabled=!!pc;}});
     ['op_filter_pc','bi_filter_pc','globalPc','wk_filter_pc'].forEach(id=>{const el=$(id); if(el){const old=el.value; el.innerHTML=filt; el.value=pc||(cods.includes(String(old).toUpperCase())?old:''); el.disabled=!!pc;}});
   };
@@ -3359,6 +3359,259 @@ document.addEventListener("DOMContentLoaded",()=>{
   document.addEventListener('DOMContentLoaded',()=>setTimeout(initFinal,100));
 })();
 </script>
+
+
+
+<script>
+/* =========================================================
+   ADMIN OFICINAS · PC4 SANCHEZ · POLISH FINAL
+   - Admin general puede elegir oficina: todas / PC1 / PC2 / PC3 / PC4 / PC5.
+   - Encargado queda limitado a su oficina por scope.
+   - PC4 - SANCHEZ queda preparada como piloto.
+   - Crear oficina desde panel admin con fallback RPC/directo.
+========================================================= */
+(function(){
+  const OFI_ALIAS = {
+    PC1: "PC1", P1: "PC1",
+    PC2: "PC2", P2: "PC2",
+    PC3: "PC3", P3: "PC3",
+    PC4: "PC4 - SANCHEZ", P4: "PC4 - SANCHEZ",
+    PC5: "PC5", P5: "PC5"
+  };
+  const OFI_BASE = [
+    {codigo:"PC1", nombre:"PC1", descripcion:"Oficina 1"},
+    {codigo:"PC2", nombre:"PC2", descripcion:"Oficina 2"},
+    {codigo:"PC3", nombre:"PC3", descripcion:"Oficina 3"},
+    {codigo:"PC4", nombre:"PC4 - SANCHEZ", descripcion:"Oficina piloto · SANCHEZ"},
+    {codigo:"PC5", nombre:"PC5", descripcion:"Oficina 5"}
+  ];
+
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[c]));
+  const normCode = c => String(c||'').trim().toUpperCase();
+  const ofiLabel = code => {
+    const c = normCode(code);
+    const p = (window.pcs||[]).find(x => normCode(x.codigo||x.pc_codigo||x.nombre) === c);
+    const name = String(p?.nombre||p?.descripcion||OFI_ALIAS[c]||'').trim();
+    if(name && name !== c) return name.toUpperCase().startsWith(c) ? name : `${c} - ${name}`;
+    return OFI_ALIAS[c] || c;
+  };
+  window.ofiLabelAdmin = ofiLabel;
+
+  function toastMsg(msg,type){
+    if(typeof window.toast === 'function') return window.toast(msg,type||'okb');
+    console.log(msg);
+  }
+
+  function injectPolish(){
+    document.body.classList.add('admin-oficinas-final');
+
+    const brandP = document.querySelector('.brand p');
+    if(brandP) brandP.textContent = 'Panel maestro multi-oficina. Piloto activo: PC4 - SANCHEZ.';
+
+    const topActions = document.querySelector('.top-actions');
+    if(topActions && !$('ofiPilotBadge')){
+      const badge = document.createElement('div');
+      badge.id = 'ofiPilotBadge';
+      badge.className = 'notice';
+      badge.style.cssText = 'padding:10px 12px;margin:0;border-radius:12px;white-space:nowrap;font-size:12px';
+      badge.innerHTML = 'Piloto: <b>PC4 - SANCHEZ</b>';
+      topActions.prepend(badge);
+    }
+
+    const dash = $('section-dashboard');
+    if(dash && !$('ofiQuickPanel')){
+      const div = document.createElement('div');
+      div.id = 'ofiQuickPanel';
+      div.className = 'card';
+      div.innerHTML = `
+        <div class="card-h"><h3>🏢 Oficinas administrables</h3><div class="rowActions"><button class="small blue" onclick="showSection('pcs')">Crear / editar oficina</button><button class="small violet" onclick="prepararOficinaPc4()">Preparar PC4 - SANCHEZ</button></div></div>
+        <div class="card-b">
+          <div class="notice" style="margin-bottom:12px">El admin general puede trabajar sobre todas las oficinas o seleccionar una específica desde el selector superior. Los encargados quedan bloqueados a su oficina.</div>
+          <div id="ofiCards" class="stats"></div>
+        </div>`;
+      const afterNotice = dash.querySelector('.notice');
+      if(afterNotice && afterNotice.nextSibling) dash.insertBefore(div, afterNotice.nextSibling);
+      else dash.prepend(div);
+    }
+
+    const pcSection = $('section-pcs');
+    if(pcSection && !$('ofiBasePanel')){
+      const c = document.createElement('div');
+      c.id = 'ofiBasePanel';
+      c.className = 'notice';
+      c.style.marginBottom = '14px';
+      c.innerHTML = `<b>Base recomendada:</b> PC1, PC2, PC3, <b>PC4 - SANCHEZ</b>, PC5. Podés crear nuevas oficinas cuando escales. <button class="small violet" style="margin-left:8px" onclick="prepararOficinaPc4()">Cargar PC4 - SANCHEZ en el formulario</button>`;
+      pcSection.prepend(c);
+    }
+
+    if($('pc_codigo') && !$('pc_codigo').placeholder) $('pc_codigo').placeholder = 'PC4';
+    if($('pc_nombre') && !$('pc_nombre').placeholder) $('pc_nombre').placeholder = 'PC4 - SANCHEZ';
+  }
+
+  window.cambiarOficinaAdmin = async function(){
+    const pc = ($('globalPc')?.value || '').trim();
+    try{
+      if(typeof window.reloadAll === 'function') await window.reloadAll();
+      else if(typeof window.renderAll === 'function') window.renderAll();
+      toastMsg(pc ? `Trabajando sobre ${ofiLabel(pc)}` : 'Vista general de todas las oficinas','okb');
+    }catch(e){
+      console.error(e);
+      toastMsg('No pude cambiar de oficina: '+(e.message||e),'err');
+    }
+  };
+
+  window.prepararOficinaPc4 = function(){
+    if($('pc_id')) $('pc_id').value = '';
+    if($('pc_codigo')) $('pc_codigo').value = 'PC4';
+    if($('pc_nombre')) $('pc_nombre').value = 'PC4 - SANCHEZ';
+    if($('pc_descripcion')) $('pc_descripcion').value = 'Oficina piloto · SANCHEZ';
+    if($('pc_activa')) $('pc_activa').value = 'true';
+    if($('pcFormTitle')) $('pcFormTitle').textContent = 'Crear oficina · PC4 - SANCHEZ';
+    if(typeof window.showSection === 'function') window.showSection('pcs');
+    toastMsg('Formulario listo para PC4 - SANCHEZ','okb');
+  };
+
+  // Guardado de oficina robusto: intenta RPC si existe, si no usa el flujo directo que ya traía el admin.
+  const oldSavePc = window.savePc;
+  window.savePc = async function(e){
+    if(e && e.preventDefault) e.preventDefault();
+    const id = ($('pc_id')?.value || '').trim();
+    const codigo = normCode($('pc_codigo')?.value || '');
+    if(!codigo){ toastMsg('Completá el código de oficina. Ej: PC4','err'); return false; }
+    const payload = {
+      p_session_token: (typeof window.requireAdminToken === 'function' ? window.requireAdminToken() : null),
+      p_pc_id: id ? Number(id) : null,
+      p_codigo: codigo,
+      p_nombre: ($('pc_nombre')?.value || codigo).trim(),
+      p_descripcion: ($('pc_descripcion')?.value || '').trim(),
+      p_activa: String($('pc_activa')?.value || 'true') === 'true'
+    };
+    try{
+      if(payload.p_session_token){
+        const {data,error} = await supabaseClient.rpc('admin_guardar_pc', payload);
+        if(!error){
+          if(typeof resetPcForm === 'function') resetPcForm();
+          if(typeof loadPcs === 'function') await loadPcs(false);
+          if(typeof fillPcSelects === 'function') fillPcSelects();
+          if(typeof renderAll === 'function') renderAll();
+          toastMsg((Array.isArray(data)?data[0]?.mensaje:data?.mensaje) || 'Oficina guardada','okb');
+          return false;
+        }
+        console.warn('admin_guardar_pc no disponible o falló. Uso fallback directo:', error.message);
+      }
+    }catch(err){
+      console.warn('Fallback savePc directo:', err.message||err);
+    }
+    if(typeof oldSavePc === 'function') return oldSavePc(e);
+    toastMsg('No hay función disponible para guardar oficina. Falta RPC admin_guardar_pc o permiso directo sobre pcs.','err');
+    return false;
+  };
+
+  // Selectores con valor técnico y texto legible.
+  const oldFill = window.fillPcSelects;
+  window.fillPcSelects = function(){
+    let cods=[];
+    try{
+      const raw=[...(window.pcs||[]).map(p=>p.codigo||p.pc_codigo||p.nombre),...(window.solicitudes||[]).map(s=>s.pc_codigo),...(window.billeteras||[]).map(b=>b.pc_codigo),...(window.workerJobs||[]).map(w=>w.pc_codigo),...(window.operadores||[]).map(o=>o.pc_codigo)]
+        .filter(Boolean).map(x=>normCode(x)).filter(x=>x && x!=='TODAS');
+      cods=[...new Set(raw.concat(['PC1','PC2','PC3','PC4','PC5']))].sort((a,b)=>{const na=+a.replace(/\D/g,''), nb=+b.replace(/\D/g,''); return !isNaN(na)&&!isNaN(nb)&&na!==nb?na-nb:a.localeCompare(b);});
+    }catch(e){ cods=['PC1','PC2','PC3','PC4','PC5']; }
+
+    let forced='';
+    try{ forced = (typeof window.pcSeleccionada === 'function' && window.adminScope?.puede_todas===false) ? normCode(window.pcSeleccionada()) : ''; }catch(e){}
+    if(forced) cods=[forced];
+
+    const opts=['<option value="">Seleccionar oficina</option>',...cods.map(c=>`<option value="${esc(c)}">${esc(ofiLabel(c))}</option>`)].join('');
+    const filt=(forced?'':'<option value="">Todas las oficinas</option>')+cods.map(c=>`<option value="${esc(c)}">${esc(ofiLabel(c))}</option>`).join('');
+
+    ['op_pc_codigo','bi_pc_codigo'].forEach(id=>{const el=$(id); if(el){const old=normCode(el.value); el.innerHTML=opts; el.value=forced||(cods.includes(old)?old:el.value); el.disabled=!!forced; }});
+    ['op_filter_pc','bi_filter_pc','globalPc','wk_filter_pc'].forEach(id=>{const el=$(id); if(el){const old=normCode(el.value); el.innerHTML=filt; el.value=forced||(cods.includes(old)?old:''); el.disabled=!!forced; }});
+  };
+
+  // Render de oficinas más presentable.
+  window.renderPcs = function(){
+    const tbody = $('pcsBody');
+    if(!tbody) return;
+    const rows = window.pcs && window.pcs.length ? window.pcs : OFI_BASE;
+    tbody.innerHTML = rows.map(p=>{
+      const codigo = normCode(p.codigo||p.pc_codigo||'');
+      const nombre = p.nombre || OFI_ALIAS[codigo] || codigo;
+      return `<tr>
+        <td>${esc(p.id||'-')}</td>
+        <td><strong>${esc(codigo)}</strong></td>
+        <td>${esc(nombre)}</td>
+        <td>${esc(p.descripcion||'')}</td>
+        <td>${p.activa===false ? '<span class="pill off">Inactiva</span>' : '<span class="pill ok">Activa</span>'}</td>
+        <td><div class="rowActions"><button class="small blue" onclick="editPc('${esc(p.id||'')}')">Editar</button><button class="small violet" onclick="cargarOficinaEnForm('${esc(codigo)}')">Usar como plantilla</button></div></td>
+      </tr>`;
+    }).join('');
+  };
+
+  window.cargarOficinaEnForm = function(codigo){
+    const c = normCode(codigo);
+    const p = (window.pcs||[]).find(x=>normCode(x.codigo||x.pc_codigo||x.nombre)===c) || OFI_BASE.find(x=>x.codigo===c) || {codigo:c,nombre:ofiLabel(c),descripcion:''};
+    if($('pc_id')) $('pc_id').value = p.id || '';
+    if($('pc_codigo')) $('pc_codigo').value = p.codigo || c;
+    if($('pc_nombre')) $('pc_nombre').value = p.nombre || ofiLabel(c);
+    if($('pc_descripcion')) $('pc_descripcion').value = p.descripcion || '';
+    if($('pc_activa')) $('pc_activa').value = String(p.activa !== false);
+    if($('pcFormTitle')) $('pcFormTitle').textContent = p.id ? 'Editar oficina' : 'Crear oficina';
+    if(typeof window.showSection === 'function') window.showSection('pcs');
+  };
+
+  function renderOfiCards(){
+    const box = $('ofiCards');
+    if(!box) return;
+    const cods=[...new Set([...(window.pcs||[]).map(p=>normCode(p.codigo||p.pc_codigo||p.nombre)), 'PC1','PC2','PC3','PC4','PC5'].filter(Boolean))]
+      .sort((a,b)=>{const na=+a.replace(/\D/g,''), nb=+b.replace(/\D/g,''); return !isNaN(na)&&!isNaN(nb)&&na!==nb?na-nb:a.localeCompare(b);});
+    box.innerHTML = cods.map(c=>{
+      const sol=(window.solicitudes||[]).filter(s=>normCode(s.pc_codigo)===c).length;
+      const bis=(window.billeteras||[]).filter(b=>normCode(b.pc_codigo)===c && b.activa!==false).length;
+      const jobs=(window.workerJobs||[]).filter(w=>normCode(w.pc_codigo)===c && ['PENDIENTE','REINTENTAR','ERROR','REQUIERE_MANUAL','TOMADO','PROCESANDO'].includes(String(w.estado||'').toUpperCase())).length;
+      return `<div class="stat" style="cursor:pointer" onclick="seleccionarOficinaRapida('${esc(c)}')"><small>${esc(ofiLabel(c))}</small><strong>${sol}</strong><div class="muted">Solicitudes · ${bis} billeteras activas · ${jobs} jobs</div></div>`;
+    }).join('');
+  }
+  window.seleccionarOficinaRapida = async function(c){
+    const el=$('globalPc'); if(el){ el.value=normCode(c); await window.cambiarOficinaAdmin(); }
+  };
+
+  const oldRenderAll = window.renderAll;
+  window.renderAll = function(){
+    if(typeof oldRenderAll === 'function') oldRenderAll();
+    try{ injectPolish(); window.fillPcSelects(); renderOfiCards(); }catch(e){ console.warn(e); }
+  };
+
+  const oldShow = window.showSection;
+  window.showSection = function(name){
+    if(typeof oldShow === 'function') oldShow(name);
+    const titles = {
+      dashboard:['Dashboard','Resumen general navegable por oficina.'],
+      metricas:['Métricas','Aprobación rápida, respuesta de chat y rendimiento por operador/oficina.'],
+      worker:['Worker','Cola de automatización, logs, errores y reintentos por oficina.'],
+      operadores:['Operadores','Crear, editar, activar, desactivar o eliminar operadores por oficina.'],
+      billeteras:['Billeteras','Administrar cuentas, estados, prioridad, selección manual e integración Mercado Pago.'],
+      pcs:['Oficinas','Administrar catálogo de oficinas y preparar nuevas sedes.'],
+      config:['Configuración','Parámetros internos del sistema.']
+    };
+    if(titles[name]){
+      if($('pageTitle')) $('pageTitle').textContent=titles[name][0];
+      if($('pageSub')) $('pageSub').textContent=titles[name][1];
+    }
+  };
+
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{injectPolish(); if(typeof window.fillPcSelects==='function') window.fillPcSelects(); if(typeof window.renderAll==='function') window.renderAll();},450));
+})();
+</script>
+
+<style>
+.admin-oficinas-final aside{background:linear-gradient(180deg,#0f172a,#111827 55%,#17131f)}
+.admin-oficinas-final .brand h1::after{content:' · OFICINAS';color:#a78bfa;font-size:14px;margin-left:6px}
+.admin-oficinas-final #globalPc{min-width:210px;border:1px solid rgba(167,139,250,.45)}
+.admin-oficinas-final .navBtn[data-section="pcs"]{border-color:rgba(167,139,250,.35)}
+.admin-oficinas-final #ofiQuickPanel .stats{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.admin-oficinas-final #ofiQuickPanel .stat:hover{border-color:rgba(167,139,250,.55);transform:translateY(-1px)}
+</style>
 
 </body>
 </html>
