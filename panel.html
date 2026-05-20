@@ -202,6 +202,17 @@ table{width:100%;border-collapse:collapse}th,td{padding:11px;border-bottom:1px s
 .transfer-chat-card.clean .transfer-chat-value{font-weight:900;color:#fff;word-break:break-all}
 .transfer-chat-card.clean .transfer-chat-note{color:#ffd98f;font-size:12px;margin-top:10px;line-height:1.35}
 
+
+/* === SALDOS OPERATIVOS V16 === */
+.balance-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-bottom:16px}
+.balance-card{background:#151c2a;border:1px solid #30384a;border-radius:16px;padding:14px}
+.balance-card.fichas{border-color:rgba(124,58,237,.5)}
+.balance-card.wallet{border-color:rgba(18,183,106,.35)}
+.balance-title{font-size:12px;color:#98a2b3;font-weight:900;text-transform:uppercase;letter-spacing:.3px;margin-bottom:8px}
+.balance-value{font-size:23px;font-weight:900}
+.balance-sub{font-size:12px;color:#98a2b3;margin-top:6px;line-height:1.35}
+.balance-positive{color:#b9f7cb}.balance-negative{color:#ffd0d0}
+
 </style>
 </head>
 
@@ -259,6 +270,8 @@ table{width:100%;border-collapse:collapse}th,td{padding:11px;border-bottom:1px s
           <div class="stat-card"><div class="stat-title">Chats sin leer</div><div class="stat-value" id="statChats">0</div><div class="stat-sub">Consultas landing</div></div>
           <div class="stat-card"><div class="stat-title">Billetera en landing</div><div class="stat-value" id="statBilletera">-</div><div class="stat-sub" id="statBilleteraTipo">-</div></div>
         </div>
+
+        <div id="saldosOperativosGrid" class="balance-grid"></div>
 
         <div class="card">
           <h2 class="card-title">Solicitudes por turno · PC actual</h2>
@@ -811,6 +824,7 @@ table{width:100%;border-collapse:collapse}th,td{padding:11px;border-bottom:1px s
     `);
     setBox("resumenTurnosOperativo",resumenTurnosOperativoHTML(solicitudes));
     setBox("tablaSolicitudesInicio",tablaSolicitudesHTML(pendientes.slice(0,40)));
+  renderSaldosOperativos();
     window.updateBadgeChatLateralV8();
   };
 
@@ -885,7 +899,7 @@ let operador=null, pcOperativa=null, panelSessionToken="";
 const LS_OPERADOR="nodo_operador_lite";
 const LS_PC="nodo_pc_operativa_lite";
 const LS_TOKEN="nodo_panel_session_token_lite";
-let solicitudes=[], billeteras=[], billeterasTodas=[], chats=[], chatMensajes=[], workerJobs=[];
+let solicitudes=[], billeteras=[], billeterasTodas=[], chats=[], chatMensajes=[], workerJobs=[], saldosOperativos=null;
 let timersIniciados=false;
 let lastPendientesIds=new Set(), lastChatUnread=0;
 let chatActualId="", chatImagenBase64="", chatImagenNombre="";
@@ -1330,6 +1344,7 @@ function finalizarLogin(guardar=true){
     setInterval(()=>cargarSolicitudes(true),2500);
     setInterval(()=>cargarChats(true),3000);
     setInterval(()=>cargarBilleteras(false),12000);
+    setInterval(()=>cargarSaldosOperativos(true),5000);
     setInterval(()=>cargarWorkerJobs(false),2500);
     setInterval(()=>{ if(chatActualId) cargarChatActual(true); },3500);
   }
@@ -1363,6 +1378,7 @@ function mostrarVista(vista){
 async function refrescarTodo(showToast=true){
   await cargarSolicitudes(false);
   await cargarBilleteras(false);
+  await cargarSaldosOperativos(true);
   await cargarChats(false);
   await cargarWorkerJobs(false);
   renderInicio();
@@ -1382,6 +1398,65 @@ async function cargarSolicitudes(silencioso=false){
   renderInicio();
   verificarSolicitudes(silencioso);
 }
+
+async function cargarSaldosOperativos(silencioso=true){
+  if(!panelSessionToken || !pcOperativa) return;
+
+  const { data, error } = await supabaseClient.rpc("panel_operativo_get_saldos_operativos", {
+    p_session_token: requireSessionToken(),
+    p_pc_codigo: pcOperativa
+  });
+
+  if(error){
+    console.warn("Saldos operativos no disponibles todavía:", error.message || error);
+    saldosOperativos = null;
+    renderSaldosOperativos();
+    return;
+  }
+
+  saldosOperativos = Array.isArray(data) ? data[0] : data;
+  renderSaldosOperativos();
+}
+
+function renderSaldosOperativos(){
+  const box = document.getElementById("saldosOperativosGrid");
+  if(!box) return;
+
+  if(!saldosOperativos || saldosOperativos.ok === false){
+    box.innerHTML = `
+      <div class="balance-card">
+        <div class="balance-title">Saldos operativos</div>
+        <div class="balance-value">Pendiente</div>
+        <div class="balance-sub">Ejecutá el SQL de movimientos para ver fichas y saldos de billeteras en tiempo operativo.</div>
+      </div>
+    `;
+    return;
+  }
+
+  const fichas = saldosOperativos.fichas || {};
+  const billeterasSaldo = saldosOperativos.billeteras || [];
+
+  let html = `
+    <div class="balance-card fichas">
+      <div class="balance-title">Fichas agente · ${escapeHtml(pcOperativa || "")}</div>
+      <div class="balance-value">${money(fichas.saldo || 0)}</div>
+      <div class="balance-sub">Carga al usuario: resta fichas · Retiro: recupera fichas</div>
+    </div>
+  `;
+
+  billeterasSaldo.forEach(b=>{
+    html += `
+      <div class="balance-card wallet">
+        <div class="balance-title">${escapeHtml(b.nombre_visible || b.nombre || "Billetera")}</div>
+        <div class="balance-value">${money(b.saldo || 0)}</div>
+        <div class="balance-sub">${escapeHtml(b.banco || b.tipo || "")} · ${escapeHtml(b.titular || "")}<br>Alias: ${escapeHtml(b.alias || "-")}</div>
+      </div>
+    `;
+  });
+
+  box.innerHTML = html;
+}
+
 function mapBilleteraSupabase(b){
   return {
     ID_BILLETERA: b.id,
@@ -1551,6 +1626,7 @@ function renderInicio(){
   `);
   setBox("resumenTurnosOperativo",resumenTurnosOperativoHTML(solicitudes));
   setBox("tablaSolicitudesInicio",tablaSolicitudesHTML(pendientes.slice(0,40)));
+  renderSaldosOperativos();
 }
 function renderSolicitudes(){
   let lista=solicitudes.slice();
@@ -2149,16 +2225,6 @@ function resumenMensajeChatPreview(texto, imagenUrl=""){
   return "";
 }
 
-function renderTransferCardChat(card){
-  return `<div class="transfer-chat-card">
-    <div class="transfer-chat-title">💳 ${escapeHtml(card.nombre_visible || "Datos para transferir")}</div>
-    <div class="transfer-chat-row"><div class="transfer-chat-label">Alias</div><div class="transfer-chat-value">${escapeHtml(card.alias || "Consultar")}</div></div>
-    <div class="transfer-chat-row"><div class="transfer-chat-label">CBU / CVU</div><div class="transfer-chat-value">${escapeHtml(card.cbu || "Consultar")}</div></div>
-    <div class="transfer-chat-row"><div class="transfer-chat-label">Titular</div><div class="transfer-chat-value">${escapeHtml(card.titular || "Consultar")}</div></div>
-    <div style="margin-top:10px;font-size:13px"><b>Banco:</b> ${escapeHtml(card.banco || "Billetera")} ${card.pc_codigo ? `· <b>PC:</b> ${escapeHtml(card.pc_codigo)}` : ""}</div>
-    <div class="transfer-chat-note">El usuario recibe esta tarjeta con botones para copiar alias y CBU/CVU.</div>
-  </div>`;
-}
 
 function billeterasDisponiblesChat(){
   const all = billeterasTodas && billeterasTodas.length ? billeterasTodas : billeteras;
@@ -2474,27 +2540,6 @@ function getWalletById(id){
   return (billeteras || billeterasTodas || []).find(b => String(b.ID_BILLETERA || b.id || "") === String(id || ""));
 }
 
-function renderTransferCardChat(raw){
-  let w = null;
-  try{ w = JSON.parse(raw || "{}"); }catch(e){ w = null; }
-  if(!w){
-    return `<div class="transfer-chat-card clean"><div class="transfer-chat-title">💳 Datos de transferencia</div><div class="transfer-chat-row"><div class="transfer-chat-value">${escapeHtml(String(raw || ""))}</div></div></div>`;
-  }
-  const nombre = w.nombre_visible || w.NOMBRE_VISIBLE || w.BILLETERA_NOMBRE || w.nombre || "Billetera";
-  const titular = w.titular || w.TITULAR || "-";
-  const alias = w.alias || w.ALIAS || "-";
-  const cbu = w.cbu || w.CVU_CBU || w.CBU || "-";
-  const banco = w.banco || w.TIPO || w.BANCO || "-";
-  return `<div class="transfer-chat-card clean">
-    <div class="transfer-chat-title">💳 Datos para transferir</div>
-    <div class="transfer-chat-row"><div class="transfer-chat-label">Billetera</div><div class="transfer-chat-value">${escapeHtml(nombre)}</div></div>
-    <div class="transfer-chat-row"><div class="transfer-chat-label">Titular</div><div class="transfer-chat-value">${escapeHtml(titular)}</div></div>
-    <div class="transfer-chat-row"><div class="transfer-chat-label">Alias</div><div class="transfer-chat-value">${escapeHtml(alias)}</div></div>
-    <div class="transfer-chat-row"><div class="transfer-chat-label">CBU/CVU</div><div class="transfer-chat-value">${escapeHtml(cbu)}</div></div>
-    <div class="transfer-chat-row"><div class="transfer-chat-label">Banco</div><div class="transfer-chat-value">${escapeHtml(banco)}</div></div>
-    <div class="transfer-chat-note">Cuando realices la transferencia, enviá el comprobante por acá.</div>
-  </div>`;
-}
 
 function workerEstadoBadge(e){
   const x = normalizar(e);
@@ -3154,6 +3199,7 @@ async function cerrarSesion(){
     `);
     setBox("resumenTurnosOperativo",resumenTurnosOperativoHTML(solicitudes));
     setBox("tablaSolicitudesInicio",tablaSolicitudesHTML(pendientes.slice(0,40)));
+  renderSaldosOperativos();
     window.updateBadgeChatLateralV8();
   };
 
@@ -3634,6 +3680,7 @@ async function cerrarSesion(){
     `);
     setBox("resumenTurnosOperativo",resumenTurnosOperativoHTML(solicitudes));
     setBox("tablaSolicitudesInicio",tablaSolicitudesHTML(pendientes.slice(0,40)));
+  renderSaldosOperativos();
     window.updateBadgeChatLateralV8();
   };
 
@@ -3697,53 +3744,6 @@ async function cerrarSesion(){
 
 </script>
 
-
-<script>
-/* === OVERRIDES OPERATIVO V15 === */
-window.enviarTarjetaTransferencia = async function(){
-  if(!chatActualId){
-    alert("Seleccioná un chat primero.");
-    return;
-  }
-
-  const id = val("chatWalletSelect");
-  const wallet = getWalletById(id);
-
-  if(!wallet){
-    alert("Seleccioná una billetera.");
-    return;
-  }
-
-  const payload = {
-    id: wallet.ID_BILLETERA || wallet.id || "",
-    pc_codigo: wallet.PC || pcOperativa || "",
-    nombre_visible: wallet.NOMBRE_VISIBLE || wallet.BILLETERA_NOMBRE || "",
-    titular: wallet.TITULAR || "",
-    alias: wallet.ALIAS || "",
-    cbu: wallet.CVU_CBU || wallet.CBU || "",
-    banco: wallet.TIPO || "",
-    observaciones: wallet.OBSERVACIONES || ""
-  };
-
-  const mensaje = "TRANSFER_CARD:" + JSON.stringify(payload);
-
-  const { error } = await supabaseClient.rpc("panel_operativo_enviar_chat_mensaje", {
-    p_session_token: requireSessionToken(),
-    p_chat_id: chatActualId,
-    p_mensaje: mensaje,
-    p_imagen_base64: null,
-    p_imagen_nombre: null
-  });
-
-  if(error){
-    alert("Error enviando tarjeta: " + error.message);
-    return;
-  }
-
-  toast("Tarjeta de transferencia enviada", "green");
-  await cargarChatActual(true);
-};
-</script>
 
 </body>
 </html>
