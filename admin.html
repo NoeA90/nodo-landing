@@ -3613,5 +3613,210 @@ document.addEventListener("DOMContentLoaded",()=>{
 .admin-oficinas-final #ofiQuickPanel .stat:hover{border-color:rgba(167,139,250,.55);transform:translateY(-1px)}
 </style>
 
+
+
+<script>
+/* =========================================================
+   FIX FINAL · OFICINAS CON CÓDIGO INTERNO P1/P2/P3/P4/P5
+   - El selector muestra PC4 - SANCHEZ, pero el value real es P4.
+   - La landing sigue usando ?pc=P4.
+   - Admin general filtra correctamente billeteras, operadores, worker y solicitudes.
+========================================================= */
+(function(){
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[c]));
+
+  function normPc(code){
+    let v = String(code || '').trim().toUpperCase();
+    if(!v || v === 'TODOS' || v === 'TODAS' || v === 'TODAS LAS OFICINAS') return '';
+    v = v.replace(/\s+/g,'').replace(/-/g,'').replace(/_/g,'');
+    if(/^PC\d+$/.test(v)) return 'P' + v.replace('PC','');
+    if(/^P\d+$/.test(v)) return v;
+    if(/^\d+$/.test(v)) return 'P' + v;
+    return v;
+  }
+
+  function pcNum(code){
+    const n = parseInt(String(normPc(code)).replace(/\D/g,''),10);
+    return Number.isFinite(n) ? n : 999;
+  }
+
+  function pcLabel(code){
+    const c = normPc(code);
+    const fromTable = (window.pcs || []).find(p => normPc(p.codigo || p.pc_codigo || p.nombre) === c);
+    if(fromTable){
+      const name = String(fromTable.nombre || fromTable.nombre_visible || '').trim();
+      if(name) return name;
+    }
+    if(c === 'P4') return 'PC4 - SANCHEZ';
+    if(/^P\d+$/.test(c)) return 'PC' + c.replace('P','');
+    return c || 'Todas las oficinas';
+  }
+
+  window.normPcAdmin = normPc;
+  window.pcLabelAdmin = pcLabel;
+  window.ofiLabelAdmin = pcLabel;
+
+  function adminScopePc(){
+    const s = window.adminScope || null;
+    if(s && s.puede_todas === false && s.pc_codigo) return normPc(s.pc_codigo);
+    return '';
+  }
+
+  window.pcSeleccionada = function(){
+    return adminScopePc() || normPc(($('globalPc') || {}).value || '');
+  };
+
+  function pcMatches(rowPc, selectedPc){
+    const sel = normPc(selectedPc);
+    if(!sel) return true;
+    return normPc(rowPc) === sel;
+  }
+
+  function collectPcs(){
+    const raw = [
+      ...(window.pcs || []).map(p => p.codigo || p.pc_codigo || p.nombre),
+      ...(window.billeteras || []).map(b => b.pc_codigo),
+      ...(window.operadores || []).map(o => o.pc_codigo),
+      ...(window.solicitudes || []).map(s => s.pc_codigo),
+      ...(window.workerJobs || []).map(w => w.pc_codigo),
+      'P1','P2','P3','P4','P5'
+    ].map(normPc).filter(Boolean);
+    return [...new Set(raw)].sort((a,b)=>pcNum(a)-pcNum(b) || a.localeCompare(b));
+  }
+
+  window.fillPcSelects = function(){
+    let cods = collectPcs();
+    const forced = adminScopePc();
+    if(forced) cods = [forced];
+
+    const formOpts = ['<option value="">Seleccionar oficina</option>']
+      .concat(cods.map(c => `<option value="${esc(c)}">${esc(pcLabel(c))}</option>`)).join('');
+    const filterOpts = (forced ? '' : '<option value="">Todas las oficinas</option>')
+      + cods.map(c => `<option value="${esc(c)}">${esc(pcLabel(c))}</option>`).join('');
+
+    ['op_pc_codigo','bi_pc_codigo'].forEach(id=>{
+      const el=$(id); if(!el) return;
+      const old = normPc(el.value);
+      el.innerHTML = formOpts;
+      el.value = forced || (cods.includes(old) ? old : '');
+      el.disabled = !!forced;
+    });
+
+    ['op_filter_pc','bi_filter_pc','globalPc','wk_filter_pc'].forEach(id=>{
+      const el=$(id); if(!el) return;
+      const old = normPc(el.value);
+      el.innerHTML = filterOpts;
+      el.value = forced || (cods.includes(old) ? old : '');
+      el.disabled = !!forced;
+    });
+  };
+
+  async function rpcList(name, params){
+    const {data,error} = await supabaseClient.rpc(name, params || {});
+    if(error) throw error;
+    return data || [];
+  }
+
+  function token(){
+    if(typeof window.requireAdminToken === 'function') return window.requireAdminToken();
+    if(window.adminSessionToken) return window.adminSessionToken;
+    return localStorage.getItem('nodo_admin_session_token_final_v3') || localStorage.getItem('nodo_admin_session_token') || '';
+  }
+
+  window.loadPcs = async function(render=true){
+    try{
+      window.pcs = await rpcList('admin_get_pcs',{p_session_token:token()});
+      if(render) window.renderAll && window.renderAll();
+    }catch(e){ console.error(e); window.pcs=[]; if(typeof toast==='function') toast('Error oficinas: '+e.message,'err'); }
+  };
+
+  window.loadBilleteras = async function(render=true){
+    const pc = window.pcSeleccionada();
+    try{
+      const rows = await rpcList('admin_get_billeteras',{p_session_token:token(), p_pc_codigo: pc || null});
+      window.billeteras = (rows || []).filter(b => pcMatches(b.pc_codigo, pc));
+      if(render) window.renderAll && window.renderAll();
+    }catch(e){ console.error(e); window.billeteras=[]; if(typeof toast==='function') toast('Error billeteras: '+e.message,'err'); }
+  };
+
+  window.loadOperadores = async function(render=true){
+    const pc = window.pcSeleccionada();
+    try{
+      const rows = await rpcList('admin_get_operadores',{p_session_token:token()});
+      window.operadores = (rows || []).filter(o => pcMatches(o.pc_codigo, pc));
+      if(render) window.renderAll && window.renderAll();
+    }catch(e){ console.error(e); window.operadores=[]; if(typeof toast==='function') toast('Error operadores: '+e.message,'err'); }
+  };
+
+  window.loadSolicitudes = async function(render=true){
+    const pc = window.pcSeleccionada();
+    try{
+      const rows = await rpcList('admin_get_solicitudes',{p_session_token:token(), p_pc_codigo: pc || null, p_limit:1000});
+      window.solicitudes = (rows || []).filter(s => pcMatches(s.pc_codigo, pc));
+      if(render) window.renderAll && window.renderAll();
+    }catch(e){ console.error(e); window.solicitudes=[]; if(typeof toast==='function') toast('Error solicitudes: '+e.message,'err'); }
+  };
+
+  window.loadWorkerJobs = async function(render=true){
+    const pc = window.pcSeleccionada();
+    try{
+      const rows = await rpcList('admin_get_worker_jobs',{p_session_token:token(), p_pc_codigo: pc || null, p_limit:1500});
+      window.workerJobs = (rows || []).filter(w => pcMatches(w.pc_codigo, pc));
+      if(render) window.renderAll && window.renderAll();
+    }catch(e){ console.error(e); window.workerJobs=[]; if(typeof toast==='function') toast('Error worker: '+e.message,'err'); }
+  };
+
+  window.loadChats = async function(render=true){
+    const pc = window.pcSeleccionada();
+    try{
+      const ses = await rpcList('admin_get_chat_sesiones',{p_session_token:token(), p_pc_codigo: pc || null});
+      window.chatSesiones = (ses || []).filter(c => pcMatches(c.pc_codigo, pc));
+      try{
+        window.chatMensajes = await rpcList('admin_get_chat_mensajes',{p_session_token:token(), p_pc_codigo: pc || null});
+      }catch(e2){ window.chatMensajes=[]; }
+      if(render) window.renderAll && window.renderAll();
+    }catch(e){ console.error(e); window.chatSesiones=[]; window.chatMensajes=[]; }
+  };
+
+  window.cambiarOficinaAdmin = async function(){
+    const pc = window.pcSeleccionada();
+    try{
+      if(typeof window.reloadAll === 'function') await window.reloadAll();
+      else if(typeof window.renderAll === 'function') window.renderAll();
+      if(typeof toast === 'function') toast(pc ? `Trabajando sobre ${pcLabel(pc)}` : 'Vista general de todas las oficinas','okb');
+    }catch(e){
+      console.error(e);
+      if(typeof toast === 'function') toast('No pude cambiar de oficina: '+(e.message||e),'err');
+    }
+  };
+
+  const oldReload = window.reloadAll;
+  window.reloadAll = async function(){
+    await Promise.allSettled([
+      window.loadPcs(false),
+      window.loadOperadores(false),
+      window.loadBilleteras(false),
+      window.loadConfig ? window.loadConfig(false) : Promise.resolve(),
+      window.loadSolicitudes(false),
+      window.loadChats(false),
+      window.loadWorkerJobs(false)
+    ]);
+    window.fillPcSelects && window.fillPcSelects();
+    window.renderAll && window.renderAll();
+  };
+
+  const oldRenderAll = window.renderAll;
+  window.renderAll = function(){
+    if(typeof oldRenderAll === 'function') oldRenderAll();
+    try{ window.fillPcSelects && window.fillPcSelects(); }catch(e){ console.warn(e); }
+  };
+
+  document.addEventListener('DOMContentLoaded',()=>{
+    setTimeout(()=>{ try{ window.fillPcSelects && window.fillPcSelects(); }catch(e){} },700);
+  });
+})();
+</script>
+
 </body>
 </html>
