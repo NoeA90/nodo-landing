@@ -3870,5 +3870,187 @@ async function cerrarSesion(){
 </script>
 
 
+
+<script>
+/* === FIX V18 · ENVÍO TARJETA BILLETERA + ACCIONES INICIO === */
+
+window.enviarTarjetaTransferencia = async function(){
+  if(!chatActualId){
+    alert("Seleccioná un chat primero.");
+    return;
+  }
+
+  const id = val("chatWalletSelect");
+  const wallet = getWalletById(id);
+
+  if(!wallet){
+    alert("Seleccioná una billetera.");
+    return;
+  }
+
+  const payload = {
+    id: wallet.ID_BILLETERA || wallet.id || "",
+    pc_codigo: wallet.PC || pcOperativa || "",
+    nombre_visible: wallet.NOMBRE_VISIBLE || wallet.BILLETERA_NOMBRE || wallet.nombre_visible || "",
+    titular: wallet.TITULAR || wallet.titular || "",
+    alias: wallet.ALIAS || wallet.alias || "",
+    cbu: wallet.CVU_CBU || wallet.CBU || wallet.cbu || "",
+    banco: wallet.TIPO || wallet.banco || "",
+    observaciones: wallet.OBSERVACIONES || wallet.observaciones || ""
+  };
+
+  const mensaje = "TRANSFER_CARD:" + JSON.stringify(payload);
+
+  const { data, error } = await supabaseClient.rpc("panel_operativo_enviar_chat_mensaje", {
+    p_chat_id: chatActualId,
+    p_imagen_base64: null,
+    p_imagen_nombre: null,
+    p_mensaje: mensaje,
+    p_session_token: requireSessionToken()
+  });
+
+  if(error){
+    alert("Error enviando tarjeta: " + error.message);
+    return;
+  }
+
+  const r = Array.isArray(data) ? data[0] : data;
+  if(r && r.ok === false){
+    alert(r.error || r.mensaje || "No se pudo enviar la tarjeta.");
+    return;
+  }
+
+  toast("Tarjeta de transferencia enviada", "green");
+  await cargarChatActual(true);
+};
+
+function solicitudEsAccionableInicio(r){
+  const e = normalizar(r.estado || "");
+  const w = normalizar(r.worker || "");
+  return r.origen === "LANDING" && (
+    e === "PENDIENTE" ||
+    e === "NUEVA" ||
+    e === "NUEVO" ||
+    e === "EN_REVISION" ||
+    e === "VALIDADA" ||
+    w === "SIN_WORKER"
+  );
+}
+
+if(typeof window.__renderColaUnificadaV18Original === "undefined" && typeof renderColaUnificada === "function"){
+  window.__renderColaUnificadaV18Original = renderColaUnificada;
+}
+
+window.renderColaUnificada = function(){
+  const texto = normalizar(val("opsFiltroTexto"));
+  const filtro = normalizar(val("opsFiltroEstado"));
+  let rows = [];
+
+  (solicitudes || []).forEach(s => rows.push({
+    origen: "LANDING",
+    fecha: s.FECHA_CREACION || s.FECHA,
+    usuario: s.USUARIO || s.USUARIO_JUGADOR || "",
+    tipo: s.TIPO_SOLICITUD || s.TIPO || "",
+    monto: s.MONTO_DECLARADO || s.MONTO_REAL || 0,
+    estado: s.ESTADO || "",
+    worker: s.ESTADO_WORKER || "",
+    job: s.WORKER_JOB_ID || "",
+    error: s.WORKER_ERROR || "",
+    solicitudId: s.ID || s.SOLICITUD_ID || ""
+  }));
+
+  (workerJobs || []).filter(j => !j.solicitud_id).forEach(j => rows.push({
+    origen: "MANUAL",
+    fecha: j.created_at || j.updated_at,
+    usuario: j.usuario || "",
+    tipo: j.tipo_accion || "",
+    monto: j.monto || 0,
+    estado: j.estado || "",
+    worker: j.estado || "",
+    job: j.id || "",
+    error: j.error_mensaje || "",
+    solicitudId: ""
+  }));
+
+  rows.sort((a,b) => new Date(b.fecha || 0) - new Date(a.fecha || 0));
+
+  if(filtro){
+    rows = rows.filter(r => normalizar(`${r.estado} ${r.worker}`).includes(filtro));
+  }
+
+  if(texto){
+    rows = rows.filter(r => normalizar(`${r.usuario} ${r.tipo} ${r.estado} ${r.worker} ${r.error} ${r.job} ${r.solicitudId}`).includes(texto));
+  }
+
+  rows = rows.slice(0, 80);
+
+  if(!rows.length){
+    setBox("opsColaUnificada", `<div class="alert-box">No hay movimientos para mostrar.</div>`);
+    return;
+  }
+
+  let h = `<div class="ops-table-wrap"><table class="ops-main-table"><thead><tr>
+    <th>Hora</th>
+    <th>Origen</th>
+    <th>Usuario</th>
+    <th>Tipo</th>
+    <th>Monto</th>
+    <th>Estado</th>
+    <th>Worker</th>
+    <th>Error</th>
+    <th>Acciones</th>
+  </tr></thead><tbody>`;
+
+  rows.forEach(r => {
+    const cls = r.origen === "LANDING" ? "landing" : "manual";
+    const job = r.job || "";
+    const sid = r.solicitudId || "";
+
+    let acciones = `<div class="ops-compact-actions">`;
+
+    if(r.origen === "LANDING" && sid){
+      if(typeof verSolicitud === "function"){
+        acciones += `<button class="mini-btn blue" onclick="verSolicitud('${escapeAttr(sid)}')">Ver</button>`;
+      }
+
+      if(solicitudEsAccionableInicio(r)){
+        if(typeof aprobarSolicitud === "function"){
+          acciones += `<button class="mini-btn green" onclick="aprobarSolicitud('${escapeAttr(sid)}')">Aprobar</button>`;
+        }
+        if(typeof rechazarSolicitud === "function"){
+          acciones += `<button class="mini-btn red" onclick="rechazarSolicitud('${escapeAttr(sid)}')">Rechazar</button>`;
+        }
+      }
+    }
+
+    if(job){
+      acciones += `<button class="mini-btn blue" onclick="abrirWorkerLogs('${escapeAttr(job)}')">Logs</button>`;
+
+      if(!["COMPLETADO","CANCELADO"].includes(normalizar(r.worker))){
+        acciones += `<button class="mini-btn green" onclick="workerPanelReintentarJob('${escapeAttr(job)}')">Reintentar</button>`;
+        acciones += `<button class="mini-btn red" onclick="workerPanelCancelarJob('${escapeAttr(job)}')">Cancelar</button>`;
+      }
+    }
+
+    acciones += `</div>`;
+
+    h += `<tr>
+      <td>${formatFecha(r.fecha)}</td>
+      <td><span class="ops-origin ${cls}">${escapeHtml(r.origen)}</span></td>
+      <td><b>${escapeHtml(r.usuario)}</b></td>
+      <td>${escapeHtml(r.tipo)}</td>
+      <td>${money(r.monto || 0)}</td>
+      <td>${estadoBadge(r.estado || "-")}</td>
+      <td>${job ? `#${escapeHtml(job)}<br>${workerEstadoBadge(r.worker)}` : workerEstadoBadge(r.worker || "SIN_WORKER")}</td>
+      <td>${r.error ? `<span class="worker-error-chip">${escapeHtml(r.error)}</span>` : `<span class="small">-</span>`}</td>
+      <td>${acciones}</td>
+    </tr>`;
+  });
+
+  h += `</tbody></table></div>`;
+  setBox("opsColaUnificada", h);
+};
+</script>
+
 </body>
 </html>
