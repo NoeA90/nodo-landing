@@ -213,6 +213,28 @@ table{width:100%;border-collapse:collapse}th,td{padding:11px;border-bottom:1px s
 .balance-sub{font-size:12px;color:#98a2b3;margin-top:6px;line-height:1.35}
 .balance-positive{color:#b9f7cb}.balance-negative{color:#ffd0d0}
 
+
+/* === CENTRO OPERATIVO V17 === */
+.ops-head{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.ops-title{font-size:26px;font-weight:900}.ops-sub{font-size:12px;color:#98a2b3}
+.ops-grid{display:grid;grid-template-columns:1.25fr .75fr;gap:14px;align-items:start}
+.ops-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:14px}
+.ops-kpi{background:#151c2a;border:1px solid #30384a;border-radius:16px;padding:13px}
+.ops-kpi-title{font-size:11px;color:#98a2b3;text-transform:uppercase;font-weight:900;letter-spacing:.35px;margin-bottom:7px}
+.ops-kpi-value{font-size:23px;font-weight:900}.ops-kpi-sub{font-size:12px;color:#98a2b3;margin-top:4px}
+.ops-wallet-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-bottom:14px}
+.ops-wallet{background:#121a27;border:1px solid rgba(18,183,106,.35);border-radius:16px;padding:12px}
+.ops-wallet-name{font-weight:900;margin-bottom:5px}.ops-wallet-saldo{font-size:21px;font-weight:900;color:#b9f7cb;margin-bottom:5px}
+.ops-wallet-meta{font-size:11px;color:#98a2b3;line-height:1.35}.ops-wallet-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.ops-panel{background:#191d27;border:1px solid #2c3140;border-radius:16px;padding:14px;margin-bottom:14px}
+.ops-panel-title{font-size:18px;font-weight:900;margin-bottom:10px}
+.ops-manual-grid{display:grid;grid-template-columns:1fr;gap:9px;align-items:end}.ops-manual-grid input,.ops-manual-grid select{margin-bottom:0}
+.ops-table-wrap{max-height:570px;overflow:auto;border-radius:14px;border:1px solid #2d3342}
+.ops-origin{font-size:11px;font-weight:900;border-radius:999px;padding:5px 8px;display:inline-block}.ops-origin.landing{background:#16235f;color:#cbd5ff}.ops-origin.manual{background:#3b2606;color:#ffd98f}.ops-origin.worker{background:#11371f;color:#b9f7cb}
+.ops-alert{border:1px solid rgba(253,176,34,.35);background:#2a210d;color:#ffd98f;border-radius:14px;padding:10px;font-size:12px;margin-bottom:10px}
+.ops-compact-actions{display:flex;gap:6px;flex-wrap:wrap}.ops-main-table td,.ops-main-table th{font-size:12px;padding:9px}
+@media(max-width:1100px){.ops-grid{grid-template-columns:1fr}.ops-title{font-size:22px}}
+
 </style>
 </head>
 
@@ -248,39 +270,69 @@ table{width:100%;border-collapse:collapse}th,td{padding:11px;border-bottom:1px s
       <button id="navBilleteras" class="nav-btn" onclick="mostrarVista('billeteras')">💳 Billeteras</button>
       <button id="navChat" class="nav-btn" onclick="mostrarVista('chat')">💬 Chat <span id="badgeChat" class="badge-alert badge-chat hidden">0</span></button>
       <button id="navWorker" class="nav-btn" onclick="mostrarVista('worker')">⚙️ Worker <span id="badgeWorker" class="badge-alert hidden">0</span></button>
+      <button id="navAjustes" class="nav-btn" onclick="mostrarVista('ajustes')">🧾 Ajustes</button>
 
       <button class="nav-btn" onclick="cerrarSesion()">🚪 Cerrar sesión</button>
     </aside>
 
     <main class="main">
       <section id="viewInicio">
-        <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+        <div class="ops-head">
           <div>
-            <h1 style="font-size:26px">Inicio operativo</h1>
-            <div class="small">Solicitudes pendientes, chats y billetera activa de landing.</div>
+            <div class="ops-title">Centro Operativo</div>
+            <div class="ops-sub">PC actual · solicitudes · worker · billeteras · fichas en una sola vista.</div>
           </div>
-          <button class="mini-btn blue" onclick="refrescarTodo(true)">🔄 Actualizar</button>
+          <div class="ops-compact-actions">
+            <button class="mini-btn blue" onclick="refrescarTodo(true)">🔄 Actualizar</button>
+            <button class="mini-btn green" onclick="mostrarVista('chat')">💬 Chat</button>
+            <button class="mini-btn yellow" onclick="mostrarVista('ajustes')">🧾 Ajustes</button>
+          </div>
         </div>
 
         <div id="alertas"></div>
+        <div id="opsKpis" class="ops-kpis"></div>
+        <div id="opsWalletStrip" class="ops-wallet-strip"></div>
 
-        <div class="top-grid">
-          <div class="stat-card"><div class="stat-title">Solicitudes pendientes</div><div class="stat-value" id="statPendientes">0</div><div class="stat-sub" id="statRetiros">Retiros: 0</div></div>
-          <div class="stat-card"><div class="stat-title">Solicitudes hoy</div><div class="stat-value" id="statSolicitudesHoy">0</div><div class="stat-sub" id="statSolicitudesTotalPc">Total PC: 0</div></div>
-          <div class="stat-card"><div class="stat-title">Chats sin leer</div><div class="stat-value" id="statChats">0</div><div class="stat-sub">Consultas landing</div></div>
-          <div class="stat-card"><div class="stat-title">Billetera en landing</div><div class="stat-value" id="statBilletera">-</div><div class="stat-sub" id="statBilleteraTipo">-</div></div>
-        </div>
+        <div class="ops-grid">
+          <div class="ops-panel">
+            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
+              <div>
+                <div class="ops-panel-title">📌 Cola operativa</div>
+                <div class="small">Solicitudes de landing + acciones manuales + jobs del worker.</div>
+              </div>
+              <div class="ops-compact-actions">
+                <select id="opsFiltroEstado" onchange="renderCentroOperativo()" style="width:auto;margin:0">
+                  <option value="">Todos</option><option value="PENDIENTE">Pendientes</option><option value="REINTENTAR">Reintentar</option><option value="ERROR">Errores</option><option value="COMPLETADO">Completados</option>
+                </select>
+                <input id="opsFiltroTexto" placeholder="Buscar usuario, error, job..." oninput="renderCentroOperativo()" style="width:230px;margin:0">
+              </div>
+            </div>
+            <div id="opsColaUnificada" style="margin-top:12px"></div>
+          </div>
 
-        <div id="saldosOperativosGrid" class="balance-grid"></div>
-
-        <div class="card">
-          <h2 class="card-title">Solicitudes por turno · PC actual</h2>
-          <div id="resumenTurnosOperativo"></div>
-        </div>
-
-        <div class="card">
-          <h2 class="card-title">Solicitudes pendientes</h2>
-          <div id="tablaSolicitudesInicio"></div>
+          <div>
+            <div class="ops-panel">
+              <div class="ops-panel-title">⚡ Acción rápida</div>
+              <div class="ops-alert">Carga: suma dinero a billetera y resta fichas. Retiro: resta dinero y recupera fichas.</div>
+              <div class="ops-manual-grid">
+                <div><label>Usuario</label><input id="manualWorkerUsuarioInicio" placeholder="ej: pruebasan"></div>
+                <div><label>Tipo</label><select id="manualWorkerTipoInicio" onchange="ajustarMontoWorkerManualInicio()"><option value="VALIDAR_USUARIO">Validar usuario</option><option value="CARGAR_FICHAS">Cargar fichas</option><option value="PROCESAR_RETIRO">Retirar fichas</option></select></div>
+                <div><label>Monto</label><input id="manualWorkerMontoInicio" type="number" min="0" step="1" placeholder="ej: 2000"></div>
+                <div><label>Billetera impactada</label><select id="manualWorkerBilleteraInicio"><option value="">No aplica / seleccionar</option></select></div>
+                <div><label>Observación</label><input id="manualWorkerObsInicio" placeholder="opcional"></div>
+              </div>
+              <button class="btn btn-green" style="margin-top:12px" onclick="crearWorkerJobManualInicio()">Enviar al worker</button>
+              <div id="manualWorkerResultadoInicio" style="margin-top:12px"></div>
+            </div>
+            <div class="ops-panel">
+              <div class="ops-panel-title">🧾 Ajustes rápidos</div>
+              <div class="ops-compact-actions">
+                <button class="mini-btn purple" onclick="abrirAjusteFichas()">Ajustar fichas</button>
+                <button class="mini-btn yellow" onclick="abrirAjusteBilletera()">Ajustar billetera</button>
+                <button class="mini-btn blue" onclick="mostrarVista('ajustes')">Ver ajustes</button>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -448,6 +500,31 @@ table{width:100%;border-collapse:collapse}th,td{padding:11px;border-bottom:1px s
           <div id="tablaWorkerOperativo"></div>
         </div>
       </section>
+      <section id="viewAjustes" class="hidden">
+        <div class="ops-head"><div><div class="ops-title">Ajustes</div><div class="ops-sub">Correcciones con motivo obligatorio. Todo queda trazado por operador y fecha.</div></div><button class="mini-btn blue" onclick="refrescarTodo(true)">🔄 Actualizar</button></div>
+        <div class="ops-grid">
+          <div class="ops-panel">
+            <div class="ops-panel-title">🎰 Ajuste de fichas</div>
+            <label>Tipo</label><select id="ajusteFichasSigno"><option value="1">Sumar fichas al agente</option><option value="-1">Restar fichas al agente</option></select>
+            <label>Monto</label><input id="ajusteFichasMonto" type="number" min="1" placeholder="ej: 10000">
+            <label>Usuario relacionado</label><input id="ajusteFichasUsuario" placeholder="opcional">
+            <label>Motivo</label><input id="ajusteFichasMotivo" placeholder="obligatorio">
+            <button class="btn btn-primary" onclick="guardarAjusteFichas()">Guardar ajuste de fichas</button>
+            <div id="ajusteFichasResultado" style="margin-top:12px"></div>
+          </div>
+          <div class="ops-panel">
+            <div class="ops-panel-title">💳 Ajuste de billetera</div>
+            <label>Billetera</label><select id="ajusteBilleteraId"></select>
+            <label>Tipo</label><select id="ajusteBilleteraSigno"><option value="1">Sumar dinero</option><option value="-1">Restar dinero</option></select>
+            <label>Monto</label><input id="ajusteBilleteraMonto" type="number" min="1" placeholder="ej: 10000">
+            <label>Usuario relacionado</label><input id="ajusteBilleteraUsuario" placeholder="opcional">
+            <label>Motivo</label><input id="ajusteBilleteraMotivo" placeholder="obligatorio">
+            <button class="btn btn-yellow" onclick="guardarAjusteBilletera()">Guardar ajuste de billetera</button>
+            <div id="ajusteBilleteraResultado" style="margin-top:12px"></div>
+          </div>
+        </div>
+      </section>
+
     </main>
   </div>
 </div>
@@ -1361,7 +1438,7 @@ function iniciarRealtimeSolicitudes(){
 }
 
 function mostrarVista(vista){
-  ["Inicio","Solicitudes","Billeteras","Chat","Worker"].forEach(v=>{
+  ["Inicio","Solicitudes","Billeteras","Chat","Worker","Ajustes"].forEach(v=>{
     document.getElementById("view"+v)?.classList.add("hidden");
     document.getElementById("nav"+v)?.classList.remove("active");
   });
@@ -1372,6 +1449,7 @@ function mostrarVista(vista){
   if(vista==="billeteras")cargarBilleteras();
   if(vista==="chat")cargarChats();
   if(vista==="worker")cargarWorkerJobs(false);
+  if(vista==="ajustes"){renderSelectsAjustes();renderSaldosOperativos();}
   cerrarMenuMobile();
 }
 
@@ -1382,6 +1460,7 @@ async function refrescarTodo(showToast=true){
   await cargarChats(false);
   await cargarWorkerJobs(false);
   renderInicio();
+  if(typeof renderCentroOperativo==='function')renderCentroOperativo();
   if(showToast)toast("Panel actualizado","green");
 }
 async function cargarSolicitudes(silencioso=false){
@@ -2597,12 +2676,13 @@ async function crearWorkerJobManualDesdePanel(){
 
   setBox("manualWorkerResultado", `<div class="alert-box">Enviando orden al worker...</div>`);
 
-  const { data, error } = await supabaseClient.rpc("operativo_crear_worker_job_manual", {
+  const { data, error } = await supabaseClient.rpc("operativo_crear_worker_job_manual_v2", {
     p_pc_codigo: pcOperativa,
     p_usuario: usuario,
     p_tipo_accion: tipo,
     p_monto: tipo === "VALIDAR_USUARIO" ? 0 : monto,
     p_origen: "PANEL_OPERATIVO",
+    p_billetera_id: billeteraId ? Number(billeteraId) : null,
     p_observacion: [
       obs || "",
       billetera ? `Billetera: ${billetera.NOMBRE_VISIBLE || billetera.BILLETERA_NOMBRE || ""} (${billetera.TIPO || ""})` : "",
@@ -2649,6 +2729,7 @@ async function cargarWorkerJobs(showToast=false){
 
   workerJobs = data || [];
   renderWorkerJobs();
+  if(typeof renderCentroOperativo==='function')renderCentroOperativo();
 
   if(showToast) toast("Worker actualizado", "green");
 }
@@ -2832,6 +2913,50 @@ async function workerPanelManualJob(jobId){
   await cargarSolicitudes(true);
 }
 
+
+
+function renderCentroOperativo(){renderOpsKpis();renderOpsWallets();renderColaUnificada();renderWalletSelectWorkerInicio();}
+function renderOpsKpis(){
+  const pendientes=solicitudes.filter(esPendiente);
+  const activos=(workerJobs||[]).filter(j=>["PENDIENTE","PROCESANDO","REINTENTAR","ERROR","ERROR_JOB","REQUIERE_MANUAL"].includes(normalizar(j.estado)));
+  const errores=(workerJobs||[]).filter(j=>["REINTENTAR","ERROR","ERROR_JOB","REQUIERE_MANUAL"].includes(normalizar(j.estado)));
+  const unread=typeof window.updateBadgeChatLateralV8==="function"?window.updateBadgeChatLateralV8():chats.reduce((a,c)=>a+Number(c.SIN_LEER||0),0);
+  const fichas=saldosOperativos?.fichas?.saldo||0;
+  const bs=saldosOperativos?.billeteras||[];
+  const total=bs.reduce((a,b)=>a+Number(b.saldo||0),0);
+  setBox("opsKpis",`
+    <div class="ops-kpi"><div class="ops-kpi-title">Fichas agente</div><div class="ops-kpi-value">${money(fichas)}</div><div class="ops-kpi-sub">Carga resta · retiro suma</div></div>
+    <div class="ops-kpi"><div class="ops-kpi-title">Total billeteras</div><div class="ops-kpi-value">${money(total)}</div><div class="ops-kpi-sub">${bs.length} billetera/s PC ${escapeHtml(pcOperativa||"")}</div></div>
+    <div class="ops-kpi"><div class="ops-kpi-title">Pendientes landing</div><div class="ops-kpi-value">${pendientes.length}</div><div class="ops-kpi-sub">Solicitudes sin cerrar</div></div>
+    <div class="ops-kpi"><div class="ops-kpi-title">Worker activo</div><div class="ops-kpi-value">${activos.length}</div><div class="ops-kpi-sub">${errores.length} error/reintento/manual</div></div>
+    <div class="ops-kpi"><div class="ops-kpi-title">Chats sin leer</div><div class="ops-kpi-value">${unread}</div><div class="ops-kpi-sub">Consultas por landing</div></div>`);
+}
+function renderOpsWallets(){
+  const lista=saldosOperativos?.billeteras||[];
+  if(!lista.length){setBox("opsWalletStrip",`<div class="ops-wallet"><div class="ops-wallet-name">Billeteras</div><div class="ops-wallet-meta">Sin saldos cargados todavía.</div></div>`);return;}
+  setBox("opsWalletStrip",lista.map(b=>`<div class="ops-wallet"><div class="ops-wallet-name">${escapeHtml(b.nombre_visible||"Billetera")}</div><div class="ops-wallet-saldo">${money(b.saldo||0)}</div><div class="ops-wallet-meta">${escapeHtml(b.banco||"")} · ${escapeHtml(b.titular||"")}<br>Alias: ${escapeHtml(b.alias||"-")}</div><div class="ops-wallet-actions"><button class="mini-btn gray" onclick="copiarTextoOperativo('${escapeAttr(b.alias||"")}','Alias')">Alias</button><button class="mini-btn gray" onclick="copiarTextoOperativo('${escapeAttr(b.cbu||"")}','CBU/CVU')">CBU</button><button class="mini-btn yellow" onclick="abrirAjusteBilletera('${escapeAttr(b.id)}')">Ajustar</button></div></div>`).join(""));
+}
+function renderColaUnificada(){
+  const texto=normalizar(val("opsFiltroTexto")),filtro=normalizar(val("opsFiltroEstado"));let rows=[];
+  (solicitudes||[]).forEach(s=>rows.push({origen:"LANDING",fecha:s.FECHA_CREACION||s.FECHA,usuario:s.USUARIO||s.USUARIO_JUGADOR||"",tipo:s.TIPO_SOLICITUD||s.TIPO||"",monto:s.MONTO_DECLARADO||s.MONTO_REAL||0,estado:s.ESTADO||"",worker:s.ESTADO_WORKER||"",job:s.WORKER_JOB_ID||"",error:s.WORKER_ERROR||""}));
+  (workerJobs||[]).filter(j=>!j.solicitud_id).forEach(j=>rows.push({origen:"MANUAL",fecha:j.created_at||j.updated_at,usuario:j.usuario||"",tipo:j.tipo_accion||"",monto:j.monto||0,estado:j.estado||"",worker:j.estado||"",job:j.id||"",error:j.error_mensaje||""}));
+  rows.sort((a,b)=>new Date(b.fecha||0)-new Date(a.fecha||0));
+  if(filtro)rows=rows.filter(r=>normalizar(`${r.estado} ${r.worker}`).includes(filtro));
+  if(texto)rows=rows.filter(r=>normalizar(`${r.usuario} ${r.tipo} ${r.estado} ${r.worker} ${r.error} ${r.job}`).includes(texto));
+  rows=rows.slice(0,80);
+  if(!rows.length){setBox("opsColaUnificada",`<div class="alert-box">No hay movimientos para mostrar.</div>`);return;}
+  let h=`<div class="ops-table-wrap"><table class="ops-main-table"><thead><tr><th>Hora</th><th>Origen</th><th>Usuario</th><th>Tipo</th><th>Monto</th><th>Estado</th><th>Worker</th><th>Error</th><th>Acciones</th></tr></thead><tbody>`;
+  rows.forEach(r=>{const cls=r.origen==="LANDING"?"landing":"manual";const job=r.job||"";h+=`<tr><td>${formatFecha(r.fecha)}</td><td><span class="ops-origin ${cls}">${escapeHtml(r.origen)}</span></td><td><b>${escapeHtml(r.usuario)}</b></td><td>${escapeHtml(r.tipo)}</td><td>${money(r.monto||0)}</td><td>${estadoBadge(r.estado||"-")}</td><td>${job?`#${escapeHtml(job)}<br>${workerEstadoBadge(r.worker)}`:workerEstadoBadge(r.worker||"SIN_WORKER")}</td><td>${r.error?`<span class="worker-error-chip">${escapeHtml(r.error)}</span>`:`<span class="small">-</span>`}</td><td><div class="ops-compact-actions">${job?`<button class="mini-btn blue" onclick="abrirWorkerLogs('${escapeAttr(job)}')">Logs</button>`:""}${job&&!["COMPLETADO","CANCELADO"].includes(normalizar(r.worker))?`<button class="mini-btn green" onclick="workerPanelReintentarJob('${escapeAttr(job)}')">Reintentar</button><button class="mini-btn red" onclick="workerPanelCancelarJob('${escapeAttr(job)}')">Cancelar</button>`:""}</div></td></tr>`});
+  setBox("opsColaUnificada",h+`</tbody></table></div>`);
+}
+function renderWalletSelectWorkerInicio(){const sel=document.getElementById("manualWorkerBilleteraInicio");if(!sel)return;const tipo=val("manualWorkerTipoInicio");const lista=saldosOperativos?.billeteras||[];sel.innerHTML=`<option value="">${tipo==="VALIDAR_USUARIO"?"No aplica para validar":"Seleccionar billetera"}</option>`+lista.map(b=>`<option value="${escapeAttr(b.id)}">${escapeHtml(b.nombre_visible||"Billetera")} · ${escapeHtml(b.banco||"")} · ${money(b.saldo||0)}</option>`).join("");}
+function ajustarMontoWorkerManualInicio(){const tipo=val("manualWorkerTipoInicio"),m=document.getElementById("manualWorkerMontoInicio"),w=document.getElementById("manualWorkerBilleteraInicio");if(tipo==="VALIDAR_USUARIO"){if(m){m.value="0";m.disabled=true}if(w){w.value="";w.disabled=true}}else{if(m)m.disabled=false;if(w)w.disabled=false}renderWalletSelectWorkerInicio();}
+async function crearWorkerJobManualInicio(){document.getElementById("manualWorkerUsuario").value=val("manualWorkerUsuarioInicio");document.getElementById("manualWorkerTipo").value=val("manualWorkerTipoInicio");document.getElementById("manualWorkerMonto").value=val("manualWorkerMontoInicio");document.getElementById("manualWorkerBilletera").value=val("manualWorkerBilleteraInicio");document.getElementById("manualWorkerObs").value=val("manualWorkerObsInicio");await crearWorkerJobManualDesdePanel();setBox("manualWorkerResultadoInicio",document.getElementById("manualWorkerResultado")?.innerHTML||"");await refrescarTodo(false);}
+function renderSelectsAjustes(){const sel=document.getElementById("ajusteBilleteraId");if(!sel)return;sel.innerHTML=(saldosOperativos?.billeteras||[]).map(b=>`<option value="${escapeAttr(b.id)}">${escapeHtml(b.nombre_visible||"Billetera")} · ${money(b.saldo||0)}</option>`).join("");}
+function abrirAjusteFichas(){mostrarVista("ajustes");setTimeout(()=>document.getElementById("ajusteFichasMonto")?.focus(),100)}
+function abrirAjusteBilletera(id=""){mostrarVista("ajustes");setTimeout(()=>{if(id)document.getElementById("ajusteBilleteraId").value=id;document.getElementById("ajusteBilleteraMonto")?.focus()},100)}
+async function guardarAjusteFichas(){const monto=Number(val("ajusteFichasMonto")||0),signo=Number(val("ajusteFichasSigno")||0),motivo=val("ajusteFichasMotivo").trim(),usuario=val("ajusteFichasUsuario").trim();if(!monto||monto<=0||!motivo){setBox("ajusteFichasResultado",`<div class="err-box">Monto y motivo son obligatorios.</div>`);return;}const {error}=await supabaseClient.rpc("admin_registrar_fichas_movimiento",{p_session_token:requireSessionToken(),p_pc_codigo:pcOperativa,p_tipo_movimiento:signo===1?"AJUSTE_FICHAS_POSITIVO":"AJUSTE_FICHAS_NEGATIVO",p_monto:monto,p_signo:signo,p_motivo:motivo,p_origen:"PANEL_OPERATIVO_AJUSTE",p_usuario:usuario||null,p_solicitud_id:null,p_worker_job_id:null});if(error){setBox("ajusteFichasResultado",`<div class="err-box">${escapeHtml(error.message)}</div>`);return;}setBox("ajusteFichasResultado",`<div class="ok-box">Ajuste guardado.</div>`);await cargarSaldosOperativos(true);renderCentroOperativo();}
+async function guardarAjusteBilletera(){const billeteraId=Number(val("ajusteBilleteraId")||0),monto=Number(val("ajusteBilleteraMonto")||0),signo=Number(val("ajusteBilleteraSigno")||0),motivo=val("ajusteBilleteraMotivo").trim(),usuario=val("ajusteBilleteraUsuario").trim();if(!billeteraId||!monto||monto<=0||!motivo){setBox("ajusteBilleteraResultado",`<div class="err-box">Billetera, monto y motivo son obligatorios.</div>`);return;}const {error}=await supabaseClient.rpc("admin_registrar_billetera_movimiento",{p_session_token:requireSessionToken(),p_billetera_id:billeteraId,p_tipo_movimiento:signo===1?"AJUSTE_BILLETERA_POSITIVO":"AJUSTE_BILLETERA_NEGATIVO",p_monto:monto,p_signo:signo,p_motivo:motivo,p_origen:"PANEL_OPERATIVO_AJUSTE",p_usuario:usuario||null,p_solicitud_id:null,p_worker_job_id:null});if(error){setBox("ajusteBilleteraResultado",`<div class="err-box">${escapeHtml(error.message)}</div>`);return;}setBox("ajusteBilleteraResultado",`<div class="ok-box">Ajuste guardado.</div>`);await cargarSaldosOperativos(true);renderCentroOperativo();renderSelectsAjustes();}
 
 function cerrarModal(){document.getElementById("modalOverlay").classList.add("hidden")}
 
