@@ -733,7 +733,205 @@ function copiarDesdeTarjeta(elementId, mensajeOk){
       alert("No se pudo copiar. Mantené presionado el dato y copialo manualmente.");
     });
 }  
-  
+function renderMensajeChatLite(texto){
+  const raw = String(texto || "").trim();
+
+  let payloadText = null;
+
+  if(raw.startsWith("::TRANSFER_CARD::")){
+    payloadText = raw.replace("::TRANSFER_CARD::", "").trim();
+  } else if(raw.startsWith("TRANSFER_CARD:")){
+    payloadText = raw.replace("TRANSFER_CARD:", "").trim();
+  }
+
+  if(!payloadText){
+    return escapeHtml(raw).replace(/\n/g, "<br>");
+  }
+
+  try{
+    const data = JSON.parse(payloadText);
+
+    const nombre = escapeHtml(data.nombre_visible || data.nombre || "Billetera");
+    const titular = escapeHtml(data.titular || "");
+    const aliasRaw = String(data.alias || "").trim();
+    const cbuRaw = String(data.cbu || data.cvu || data.cvu_cbu || "").trim();
+    const alias = escapeHtml(aliasRaw);
+    const cbu = escapeHtml(cbuRaw);
+    const banco = escapeHtml(data.banco || data.tipo || "");
+
+    const aliasId = "alias_" + Math.random().toString(36).slice(2);
+    const cbuId = "cbu_" + Math.random().toString(36).slice(2);
+
+    return `
+      <div style="
+        border:1px solid rgba(212,175,55,.45);
+        background:linear-gradient(180deg, rgba(212,175,55,.12), rgba(15,23,42,.92));
+        border-radius:16px;
+        padding:13px;
+        min-width:240px;
+        max-width:320px;
+        box-shadow:0 10px 24px rgba(0,0,0,.28);
+      ">
+        <div style="font-weight:900;color:#f7d774;margin-bottom:10px;font-size:15px;">
+          💳 ${nombre}
+        </div>
+
+        ${alias ? `
+          <div style="font-size:11px;color:#94a3b8;font-weight:800;margin-bottom:4px;">ALIAS</div>
+          <div id="${aliasId}" style="
+            font-weight:900;
+            margin-bottom:8px;
+            word-break:break-all;
+            background:rgba(255,255,255,.07);
+            border:1px solid rgba(255,255,255,.08);
+            padding:8px;
+            border-radius:10px;
+          ">
+            ${alias}
+          </div>
+          <button
+            type="button"
+            onclick="copiarDesdeTarjeta('${aliasId}', 'Alias copiado')"
+            style="
+              width:100%;
+              margin:0 0 10px 0;
+              padding:9px 10px;
+              border-radius:10px;
+              border:0;
+              background:#f7d774;
+              color:#111827;
+              font-weight:900;
+              cursor:pointer;
+              box-shadow:none;
+              font-size:13px;
+            "
+          >
+            Copiar alias
+          </button>
+        ` : ""}
+
+        ${cbu ? `
+          <div style="font-size:11px;color:#94a3b8;font-weight:800;margin-bottom:4px;">CBU / CVU</div>
+          <div id="${cbuId}" style="
+            font-weight:900;
+            margin-bottom:8px;
+            word-break:break-all;
+            background:rgba(255,255,255,.07);
+            border:1px solid rgba(255,255,255,.08);
+            padding:8px;
+            border-radius:10px;
+          ">
+            ${cbu}
+          </div>
+          <button
+            type="button"
+            onclick="copiarDesdeTarjeta('${cbuId}', 'CBU/CVU copiado')"
+            style="
+              width:100%;
+              margin:0 0 10px 0;
+              padding:9px 10px;
+              border-radius:10px;
+              border:0;
+              background:#f7d774;
+              color:#111827;
+              font-weight:900;
+              cursor:pointer;
+              box-shadow:none;
+              font-size:13px;
+            "
+          >
+            Copiar CBU / CVU
+          </button>
+        ` : ""}
+
+        ${titular ? `
+          <div style="font-size:11px;color:#94a3b8;font-weight:800;margin-bottom:4px;">TITULAR</div>
+          <div style="font-weight:900;margin-bottom:9px;word-break:break-word;">
+            ${titular}
+          </div>
+        ` : ""}
+
+        ${banco ? `
+          <div style="font-size:12px;color:#cbd5e1;font-weight:800;margin-top:6px;">
+            Banco: ${banco}
+          </div>
+        ` : ""}
+
+        <div style="
+          margin-top:10px;
+          color:#f7d774;
+          font-size:12px;
+          line-height:1.35;
+          font-weight:700;
+        ">
+          Cuando realices la transferencia, enviá el comprobante por acá.
+        </div>
+      </div>
+    `;
+  }catch(e){
+    return escapeHtml(raw).replace(/\n/g, "<br>");
+  }
+}
+
+function copiarDesdeTarjeta(elementId, mensajeOk){
+  const el = document.getElementById(elementId);
+  const texto = (el?.innerText || "").trim();
+
+  if(!texto){
+    alert("No hay dato para copiar.");
+    return;
+  }
+
+  const mostrarAviso = () => {
+    const aviso = document.createElement("div");
+    aviso.innerText = mensajeOk || "Copiado";
+    aviso.style.position = "fixed";
+    aviso.style.left = "50%";
+    aviso.style.bottom = "95px";
+    aviso.style.transform = "translateX(-50%)";
+    aviso.style.background = "rgba(22,163,74,.96)";
+    aviso.style.color = "white";
+    aviso.style.padding = "10px 14px";
+    aviso.style.borderRadius = "999px";
+    aviso.style.fontWeight = "900";
+    aviso.style.zIndex = "99999";
+    aviso.style.boxShadow = "0 10px 30px rgba(0,0,0,.35)";
+    document.body.appendChild(aviso);
+
+    setTimeout(() => aviso.remove(), 1400);
+  };
+
+  if(navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(texto)
+      .then(mostrarAviso)
+      .catch(() => {
+        copiarFallback(texto);
+        mostrarAviso();
+      });
+  } else {
+    copiarFallback(texto);
+    mostrarAviso();
+  }
+}
+
+function copiarFallback(texto){
+  const area = document.createElement("textarea");
+  area.value = texto;
+  area.style.position = "fixed";
+  area.style.left = "-9999px";
+  area.style.top = "-9999px";
+  document.body.appendChild(area);
+  area.focus();
+  area.select();
+
+  try{
+    document.execCommand("copy");
+  }catch(e){
+    alert("No se pudo copiar. Mantené presionado el dato y copialo manualmente.");
+  }
+
+  area.remove();
+}  
 function renderChatLite(mensajes){const box=$("chatLiteBody");let html=`<div class="chat-day">Chat de soporte</div>`;if(!mensajes.length)html+=`<div class="chat-msg operator"><div class="chat-bubble">Hola 👋 Escribinos tu consulta o adjuntá el comprobante si necesitás ayuda.</div><div class="chat-meta">Soporte</div></div>`;mensajes.forEach(m=>{const es=String(m.TIPO_EMISOR||"").toUpperCase()==="USUARIO", cls=es?"user":"operator", h=formatearHoraChat(m.FECHA), leido=String(m.LEIDO||"").toUpperCase()==="SI";html+=`<div class="chat-msg ${cls}"><div class="chat-bubble">${renderMensajeChatLite(m.MENSAJE||"")}${m.IMAGEN_URL?`<img src="${normalizarImagenUrl(m.IMAGEN_URL)}" alt="Imagen adjunta">`:""}</div><div class="chat-meta">${es?(leido?"✓✓ recibido":"✓ enviado"):"Soporte"} · ${h}</div></div>`});box.innerHTML=html;box.scrollTop=box.scrollHeight}
 function normalizarImagenUrl(u){u=String(u||"");return u.startsWith("data:image")?u:u}
 function formatearHoraChat(f){try{return new Date(f).toLocaleTimeString("es-AR",{timeZone:"America/Argentina/Buenos_Aires",hour:"2-digit",minute:"2-digit",hour12:false})}catch(e){return""}}
