@@ -1231,19 +1231,51 @@ async function cargarWorkerLogs(jobId){
 }
 
 async function abrirWorkerLogs(jobId){
-  const logs = await cargarWorkerLogs(jobId);
+  const id = Number(jobId);
+  const j = (workerJobs || []).find(x => Number(x.id) === id) || null;
 
-  const html = logs.length
-    ? logs.map(l => `
-        <div class="alert-box">
-          <b>${l.nivel || ""}</b> · ${l.paso || ""}<br>
-          ${escapeHtml(l.mensaje || "")}<br>
-          <span class="small">${formatFecha(l.created_at)}</span>
+  let detalle = "";
+
+  if(j){
+    detalle = `
+      <div class="verify-box">
+        <div class="verify-title">Job #${escapeHtml(j.id)}</div>
+        ${verifyRow("PC", j.pc_codigo || "-")}
+        ${verifyRow("Usuario", j.usuario || "-")}
+        ${verifyRow("Tipo", j.tipo_accion || "-")}
+        ${verifyRow("Monto", money(j.monto || 0))}
+        ${verifyRow("Estado", j.estado || "-")}
+        ${verifyRow("Intentos", `${j.intentos || 0} / ${j.max_intentos || 3}`)}
+        ${verifyRow("Resultado", j.resultado || "-")}
+        ${verifyRow("Error", j.error_mensaje || "-")}
+      </div>
+    `;
+  }
+
+  let logsHtml = "";
+
+  try{
+    const { data, error } = await supabaseClient
+      .from("worker_logs")
+      .select("*")
+      .eq("worker_job_id", id)
+      .order("created_at", { ascending: false })
+      .limit(30);
+
+    if(!error && data && data.length){
+      logsHtml = data.map(l => `
+        <div class="verify-box">
+          <div class="verify-title">${escapeHtml(l.nivel || l.tipo || "LOG")} · ${formatFecha(l.created_at || "")}</div>
+          <div class="small">${escapeHtml(l.mensaje || l.detalle || JSON.stringify(l))}</div>
         </div>
-      `).join("")
-    : `<div class="alert-box">Todavía no hay logs para este worker.</div>`;
+      `).join("");
+    }
+  }catch(e){}
 
-  abrirModal("Logs del worker", html, async()=>cerrarModal(), "Cerrar");
+  abrirModal("Logs del worker", `
+    ${detalle || ""}
+    ${logsHtml || `<div class="alert-box">Todavía no hay logs detallados para este job. Se muestra el estado actual del job arriba.</div>`}
+  `, async()=>cerrarModal(), "Cerrar");
 }
 
 async function reintentarWorker(jobId){
@@ -2365,7 +2397,8 @@ async function enviarTarjetaTransferencia(){
     observaciones: wallet.OBSERVACIONES || wallet.observaciones || ""
   };
 
-  const mensaje = "TRANSFER_CARD:" + JSON.stringify(payload);
+  // Enviamos texto humano para que el usuario nunca vea JSON crudo.
+  const mensaje = transferCardTextoHumano(payload);
 
   const { data, error } = await supabaseClient.rpc("panel_operativo_enviar_chat", {
     p_session_token: requireSessionToken(),
@@ -2386,7 +2419,7 @@ async function enviarTarjetaTransferencia(){
     return;
   }
 
-  toast("Tarjeta de transferencia enviada", "green");
+  toast("Datos de transferencia enviados", "green");
   await cargarChatActual(true);
 }
 
@@ -3116,6 +3149,85 @@ function abrirAjusteFichas(){mostrarVista("ajustes");setTimeout(()=>document.get
 function abrirAjusteBilletera(id=""){mostrarVista("ajustes");setTimeout(()=>{if(id)document.getElementById("ajusteBilleteraId").value=id;document.getElementById("ajusteBilleteraMonto")?.focus()},100)}
 async function guardarAjusteFichas(){const monto=Number(val("ajusteFichasMonto")||0),signo=Number(val("ajusteFichasSigno")||0),motivo=val("ajusteFichasMotivo").trim(),usuario=val("ajusteFichasUsuario").trim();if(!monto||monto<=0||!motivo){setBox("ajusteFichasResultado",`<div class="err-box">Monto y motivo son obligatorios.</div>`);return;}const {error}=await supabaseClient.rpc("admin_registrar_fichas_movimiento",{p_session_token:requireSessionToken(),p_pc_codigo:pcOperativa,p_tipo_movimiento:signo===1?"AJUSTE_FICHAS_POSITIVO":"AJUSTE_FICHAS_NEGATIVO",p_monto:monto,p_signo:signo,p_motivo:motivo,p_origen:"PANEL_OPERATIVO_AJUSTE",p_usuario:usuario||null,p_solicitud_id:null,p_worker_job_id:null});if(error){setBox("ajusteFichasResultado",`<div class="err-box">${escapeHtml(error.message)}</div>`);return;}setBox("ajusteFichasResultado",`<div class="ok-box">Ajuste guardado.</div>`);await cargarSaldosOperativos(true);renderCentroOperativo();}
 async function guardarAjusteBilletera(){const billeteraId=Number(val("ajusteBilleteraId")||0),monto=Number(val("ajusteBilleteraMonto")||0),signo=Number(val("ajusteBilleteraSigno")||0),motivo=val("ajusteBilleteraMotivo").trim(),usuario=val("ajusteBilleteraUsuario").trim();if(!billeteraId||!monto||monto<=0||!motivo){setBox("ajusteBilleteraResultado",`<div class="err-box">Billetera, monto y motivo son obligatorios.</div>`);return;}const {error}=await supabaseClient.rpc("admin_registrar_billetera_movimiento",{p_session_token:requireSessionToken(),p_billetera_id:billeteraId,p_tipo_movimiento:signo===1?"AJUSTE_BILLETERA_POSITIVO":"AJUSTE_BILLETERA_NEGATIVO",p_monto:monto,p_signo:signo,p_motivo:motivo,p_origen:"PANEL_OPERATIVO_AJUSTE",p_usuario:usuario||null,p_solicitud_id:null,p_worker_job_id:null});if(error){setBox("ajusteBilleteraResultado",`<div class="err-box">${escapeHtml(error.message)}</div>`);return;}setBox("ajusteBilleteraResultado",`<div class="ok-box">Ajuste guardado.</div>`);await cargarSaldosOperativos(true);renderCentroOperativo();renderSelectsAjustes();}
+
+
+function parseTransferCardFromMensaje(mensaje){
+  const raw = String(mensaje || "");
+  const idx = raw.indexOf("TRANSFER_CARD:");
+  if(idx < 0) return null;
+
+  const jsonTxt = raw.slice(idx + "TRANSFER_CARD:".length).trim();
+
+  try{
+    return JSON.parse(jsonTxt);
+  }catch(e){
+    return null;
+  }
+}
+
+function mensajeEsTransferCard(mensaje){
+  return String(mensaje || "").includes("TRANSFER_CARD:");
+}
+
+function renderMensajeChatContenidoSeguro(mensaje){
+  const card = parseTransferCardFromMensaje(mensaje);
+
+  if(card){
+    return renderTransferCardChat(card);
+  }
+
+  return escapeHtml(mensaje || "").replace(/\n/g, "<br>");
+}
+
+function transferCardTextoHumano(card){
+  card = card || {};
+  const nombre = card.nombre_visible || card.NOMBRE_VISIBLE || card.nombre || "Datos para transferir";
+  const titular = card.titular || card.TITULAR || "Consultar";
+  const alias = card.alias || card.ALIAS || "Consultar";
+  const cbu = card.cbu || card.CVU_CBU || card.CBU || "Consultar";
+  const banco = card.banco || card.TIPO || card.BANCO || "Billetera";
+
+  return `💳 Datos para transferir
+
+Billetera: ${nombre}
+Titular: ${titular}
+Alias: ${alias}
+CBU/CVU: ${cbu}
+Banco: ${banco}
+
+Cuando realices la transferencia, enviá el comprobante por acá.`;
+}
+
+function renderTransferCardChat(card){
+  let w = card;
+
+  if(typeof card === "string"){
+    try{ w = JSON.parse(card || "{}"); }catch(e){ w = null; }
+  }
+
+  if(!w){
+    return `<div class="transfer-chat-card clean">
+      <div class="transfer-chat-title">💳 Datos de transferencia</div>
+      <div class="transfer-chat-row"><div class="transfer-chat-value">${escapeHtml(String(card || ""))}</div></div>
+    </div>`;
+  }
+
+  const nombre = w.nombre_visible || w.NOMBRE_VISIBLE || w.BILLETERA_NOMBRE || w.nombre || "Datos para transferir";
+  const titular = w.titular || w.TITULAR || "Consultar";
+  const alias = w.alias || w.ALIAS || "Consultar";
+  const cbu = w.cbu || w.CVU_CBU || w.CBU || "Consultar";
+  const banco = w.banco || w.TIPO || w.BANCO || "Billetera";
+  const pc = w.pc_codigo || w.PC || "";
+
+  return `<div class="transfer-chat-card clean">
+    <div class="transfer-chat-title">💳 ${escapeHtml(nombre)}</div>
+    <div class="transfer-chat-row"><div class="transfer-chat-label">Alias</div><div class="transfer-chat-value">${escapeHtml(alias)}</div></div>
+    <div class="transfer-chat-row"><div class="transfer-chat-label">CBU / CVU</div><div class="transfer-chat-value">${escapeHtml(cbu)}</div></div>
+    <div class="transfer-chat-row"><div class="transfer-chat-label">Titular</div><div class="transfer-chat-value">${escapeHtml(titular)}</div></div>
+    <div class="transfer-chat-row"><div class="transfer-chat-label">Banco</div><div class="transfer-chat-value">${escapeHtml(banco)} ${pc ? `· PC ${escapeHtml(pc)}` : ""}</div></div>
+    <div class="transfer-chat-note">Cuando realices la transferencia, enviá el comprobante por acá.</div>
+  </div>`;
+}
 
 function cerrarModal(){document.getElementById("modalOverlay").classList.add("hidden")}
 
