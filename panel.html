@@ -964,6 +964,3070 @@ table{width:100%;border-collapse:collapse}th,td{padding:11px;border-bottom:1px s
 })();
 
 </script>
+
+<script>
+const API_URL = "https://script.google.com/macros/s/AKfycbwvZGRAOxBLNIQ52mlED6ZlsOkpAd2PicOvmlZFBTKptXR5lnC_n87w-awDvowmktI8/exec";
+
+const SUPABASE_URL = "https://pjvvyvfcwjoocjqvdror.supabase.co";
+const SUPABASE_KEY = "sb_publishable_NYqRoKptTgcL90VAVF2kqA_Gl06mEUF";
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let operador=null, pcOperativa=null, panelSessionToken="";
+const LS_OPERADOR="nodo_operador_lite";
+const LS_PC="nodo_pc_operativa_lite";
+const LS_TOKEN="nodo_panel_session_token_lite";
+let solicitudes=[], billeteras=[], billeterasTodas=[], chats=[], chatMensajes=[], workerJobs=[], saldosOperativos=null;
+let timersIniciados=false;
+let lastPendientesIds=new Set(), lastChatUnread=0;
+let chatActualId="", chatImagenBase64="", chatImagenNombre="";
+
+
+function chatReadKey(id){
+  return "nodo_chat_read_" + pcOperativa + "_" + String(id || "");
+}
+
+function getChatReadCount(id){
+  return Number(localStorage.getItem(chatReadKey(id)) || 0);
+}
+
+function setChatReadCount(id, count){
+  localStorage.setItem(chatReadKey(id), String(Number(count || 0)));
+}
+
+
+window.addEventListener("load", async ()=>{
+  const token=localStorage.getItem(LS_TOKEN);
+  const pc=localStorage.getItem(LS_PC);
+
+  if(token && pc){
+    const ok = await validarSesionGuardada(token, pc);
+    if(ok) return;
+  }
+
+  localStorage.removeItem(LS_OPERADOR);
+  localStorage.removeItem(LS_PC);
+  localStorage.removeItem(LS_TOKEN);
+});
+
+async function validarSesionGuardada(token, pc){
+  const { data, error } = await supabaseClient.rpc("panel_validar_session", {
+    p_session_token: token
+  });
+
+  if(error){
+    console.warn("Sesión guardada inválida:", error.message);
+    return false;
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+
+  if(!row || row.ok !== true){
+    return false;
+  }
+
+  panelSessionToken = token;
+  operador = {
+    id: row.operador_id,
+    usuario: row.usuario,
+    nombre: row.nombre || row.usuario,
+    rol: row.rol || "OPERADOR",
+    tipo: row.tipo || "",
+    tipoOperador: row.tipo || "",
+    pc: row.pc_codigo || "",
+    PC: row.pc_codigo || "",
+    pc_codigo: row.pc_codigo || ""
+  };
+
+  pcOperativa = String(pc || row.pc_codigo || "").toUpperCase();
+
+  finalizarLogin(false);
+  return true;
+}
+
+function requireSessionToken(){
+  if(!panelSessionToken){
+    throw new Error("Sesión no iniciada. Volvé a ingresar.");
+  }
+  return panelSessionToken;
+}
+
+function money(v){return Number(v||0).toLocaleString("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0})}
+function normalizar(v){return String(v||"").trim().toUpperCase()}
+function setBox(id,html){const el=document.getElementById(id);if(el)el.innerHTML=html}
+function val(id){return document.getElementById(id)?.value||""}
+function toast(msg,type="blue"){const div=document.createElement("div");div.className="toast";div.style.background=type==="red"?"#f04438":type==="green"?"#12b76a":"#3d5afe";div.innerText=msg;document.body.appendChild(div);setTimeout(()=>div.remove(),3500)}
+function formatFecha(fechaRaw){
+
+  if(!fechaRaw) return "";
+
+  try{
+    const fecha = new Date(fechaRaw);
+
+    if(isNaN(fecha)){
+      return String(fechaRaw || "");
+    }
+
+    return fecha.toLocaleString("es-AR",{
+      timeZone:"America/Argentina/Buenos_Aires",
+      day:"2-digit",
+      month:"2-digit",
+      hour:"2-digit",
+      minute:"2-digit",
+      hour12:false
+    }).replace(",", " ·");
+
+  }catch(e){
+    return String(fechaRaw || "");
+  }
+}
+
+function formatearHoraChat(fechaRaw){
+
+  if(!fechaRaw) return "";
+
+  try{
+    const fecha = new Date(fechaRaw);
+
+    if(isNaN(fecha)){
+      return "";
+    }
+
+    return fecha.toLocaleTimeString("es-AR",{
+      timeZone:"America/Argentina/Buenos_Aires",
+      hour:"2-digit",
+      minute:"2-digit",
+      hour12:false
+    });
+
+  }catch(e){
+    return "";
+  }
+}
+
+function esPendiente(s){const e=normalizar(s.ESTADO);return e.includes("PENDIENTE")||e==="NUEVA"||e==="NUEVO"||e==="EN_REVISION"}
+function esRealizada(s){
+  const e=normalizar(s.ESTADO);
+  return ["APROBADA_MANUAL","APROBADA_MANUAL_OK","EN_PROCESO_WORKER","ACREDITADA","PAGADA","APROBADA","REQUIERE_MANUAL"].includes(e)
+}
+function estadoBadge(e){const x=normalizar(e);if(esRealizada({ESTADO:e}))return`<span class="badge badge-ok">${e}</span>`;if(["RECHAZADA","ERROR"].includes(x))return`<span class="badge badge-danger">${e}</span>`;return`<span class="badge badge-pending">${e||"-"}</span>`}
+function escapeHtml(text){return String(text||"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
+
+async function api(data){
+  const fd=new FormData();
+  Object.keys(data).forEach(k=>fd.append(k,data[k]??""));
+  const res=await fetch(API_URL,{method:"POST",body:fd});
+  const text=await res.text();
+  try{return JSON.parse(text)}catch(e){console.error(text);return{ok:false,error:"Respuesta inválida de API"}}
+}
+
+
+
+function mapSolicitudSupabase(s){
+  return {
+    ID: s.id,
+    SOLICITUD_ID: s.id,
+    FECHA_CREACION: s.created_at,
+    FECHA: s.created_at,
+    TIPO_SOLICITUD: s.tipo,
+    TIPO: s.tipo,
+    USUARIO: s.usuario,
+    USUARIO_JUGADOR: s.usuario,
+    NOMBRE_COMPLETO: s.nombre_completo,
+    TELEFONO: s.telefono,
+    DNI: s.dni || "",
+    DNI_NORMALIZADO: s.dni_normalizado || "",
+    REFERENCIA_PAGO: s.referencia_pago_visible || s.referencia_pago || "",
+    USUARIO_VALIDADO_AGENTES: !!s.usuario_validado_agentes,
+    VALIDACION_USUARIO_ID: s.validacion_usuario_id || "",
+    PC: s.pc_codigo,
+    MONTO_DECLARADO: s.monto,
+    MONTO_REAL: s.monto,
+    ESTADO: s.estado,
+    ESTADO_WORKER: s.estado_worker || "SIN_WORKER",
+    WORKER_JOB_ID: s.worker_job_id || "",
+    WORKER_ERROR: s.worker_error || "",
+    ACCION_WORKER: s.accion_worker || "",
+    RETIRO_ALIAS_CBU: s.retiro_alias_cbu || "",
+    RETIRO_TITULAR: s.retiro_titular || "",
+    CUENTA_RETIRO_ID: s.cuenta_retiro_id || "",
+    RETIRO_CUENTA_ESTADO: s.retiro_cuenta_estado || "",
+    RETIRO_REQUIERE_REVISION: !!s.retiro_requiere_revision,
+    ANTIFRAUDE_ESTADO: s.antifraude_estado || "",
+    APROBADA_POR: s.aprobada_por || "",
+    APROBADA_AT: s.aprobada_at || "",
+    BILLETERA_NOMBRE: s.billetera_nombre || "",
+    ID_BILLETERA: s.billetera_id || "",
+    CHAT_ID: s.chat_id || "",
+    OPERADOR: s.operador_usuario || s.aprobada_por || "",
+    UPDATED_AT: s.updated_at || s.update_at || "",
+    TURNO: turnoDeFecha(s.created_at)
+  };
+}
+
+async function cargarSolicitudesSupabase(){
+  try{
+    const { data, error } = await supabaseClient.rpc("panel_operativo_get_solicitudes", {
+      p_session_token: requireSessionToken(),
+      p_pc_codigo: pcOperativa,
+      p_limit: 300
+    });
+
+    if(error){
+      console.error("Error solicitudes RPC:", error);
+      return { ok:false, error:error.message || "Error cargando solicitudes" };
+    }
+
+    return {
+      ok:true,
+      solicitudes:(data || []).map(mapSolicitudSupabase)
+    };
+  }catch(e){
+    return { ok:false, error:e.message || "Sesión inválida" };
+  }
+}
+
+function workerBadge(s){
+  const estado = normalizar(s.ESTADO_WORKER || "SIN_WORKER");
+
+  if(estado === "COMPLETADO"){
+    return `<span class="badge badge-ok">Worker OK</span>`;
+  }
+
+  if(estado === "PROCESANDO" || estado === "EN_COLA_WORKER" || estado === "PREPARANDO_COLA"){
+    return `<span class="badge badge-blue">${s.ESTADO_WORKER}</span>`;
+  }
+
+  if(estado === "REQUIERE_MANUAL" || estado === "ERROR" || estado === "ERROR_WORKER"){
+    return `<span class="badge badge-danger">${s.ESTADO_WORKER}</span>`;
+  }
+
+  if(estado === "REINTENTAR"){
+    return `<span class="badge badge-pending">REINTENTAR</span>`;
+  }
+
+  return `<span class="badge badge-pending">${s.ESTADO_WORKER || "SIN_WORKER"}</span>`;
+}
+
+async function crearWorkerJobSolicitud(id){
+  // Ya no se usa en el flujo nuevo.
+  // panel_operativo_aprobar_solicitud aprueba y crea el job en una sola RPC.
+  return { ok:false, error:"Función reemplazada por panel_operativo_aprobar_solicitud." };
+}
+
+async function cargarWorkerLogs(jobId){
+  if(!jobId) return [];
+
+  const { data, error } = await supabaseClient.rpc("panel_operativo_get_worker_logs", {
+    p_session_token: requireSessionToken(),
+    p_worker_job_id: Number(jobId)
+  });
+
+  if(error){
+    console.error("Error cargando logs worker RPC:", error);
+    return [];
+  }
+
+  return data || [];
+}
+
+async function abrirWorkerLogs(jobId){
+  const logs = await cargarWorkerLogs(jobId);
+
+  const html = logs.length
+    ? logs.map(l => `
+        <div class="alert-box">
+          <b>${l.nivel || ""}</b> · ${l.paso || ""}<br>
+          ${escapeHtml(l.mensaje || "")}<br>
+          <span class="small">${formatFecha(l.created_at)}</span>
+        </div>
+      `).join("")
+    : `<div class="alert-box">Todavía no hay logs para este worker.</div>`;
+
+  abrirModal("Logs del worker", html, async()=>cerrarModal(), "Cerrar");
+}
+
+async function reintentarWorker(jobId){
+  if(!jobId){
+    alert("Esta solicitud no tiene worker_job_id.");
+    return;
+  }
+
+  const { error } = await supabaseClient.rpc("panel_operativo_reintentar_worker", {
+    p_session_token: requireSessionToken(),
+    p_worker_job_id: Number(jobId)
+  });
+
+  if(error){
+    alert("Error reintentando worker: " + error.message);
+    return;
+  }
+
+  toast("Worker enviado a reintento","green");
+  await refrescarTodo(false);
+}
+
+async function actualizarSolicitudSupabase(id, cambios){
+  // Compatibilidad mínima. Las acciones sensibles se migraron a RPC específicas.
+  console.warn("actualizarSolicitudSupabase directo deshabilitado", id, cambios);
+  return { ok:false, error:"Acción directa deshabilitada. Usá RPC de panel." };
+}
+
+async function apiPostNoCors(data){
+  await fetch(API_URL, {
+    method: "POST",
+    mode: "no-cors",
+    body: JSON.stringify(data)
+  });
+  return { ok:true };
+}
+
+function comprimirImagenChat(file, cb){
+  const img = new Image();
+  const reader = new FileReader();
+
+  reader.onload = () => {
+    img.onload = () => {
+      const max = 560;
+      let w = img.width;
+      let h = img.height;
+
+      if(w > h && w > max){
+        h = Math.round(h * max / w);
+        w = max;
+      }else if(h >= w && h > max){
+        w = Math.round(w * max / h);
+        h = max;
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, w, h);
+
+      cb(canvas.toDataURL("image/jpeg", .52));
+    };
+
+    img.src = reader.result;
+  };
+
+  reader.readAsDataURL(file);
+}
+
+async function obtenerPcsDisponiblesOperador(op){
+  const rol = normalizar(op.rol || op.ROL);
+  const tipo = normalizar(op.tipo || op.tipoOperador || "");
+  const pcRaw = String(op.pc_codigo || op.pc || op.PC || "").trim();
+
+  if(rol === "ADMIN" || rol === "ENCARGADO" || rol === "SUPERVISOR" || rol === "SUPERADMIN" || tipo === "FRANQUERO" || tipo === "FRAMQUERO"){
+    // Temporal: hasta migrar el catálogo de PCs a RPC de panel.
+    return ["P1","P2","P3","P4","P5"];
+  }
+
+  if(pcRaw){
+    return pcRaw.split(/[;,]/).map(x => x.trim().toUpperCase()).filter(Boolean);
+  }
+
+  return ["P1","P2","P3","P4","P5"];
+}
+
+async function login(){
+  const usuario = val("loginUsuario").trim();
+  const clave = val("loginClave").trim();
+
+  if(!usuario || !clave){
+    setBox("loginMsg",`<div class="alert-box">Completá usuario y clave.</div>`);
+    return;
+  }
+
+  setBox("loginMsg",`<div class="alert-box">Ingresando con sesión segura...</div>`);
+
+  const { data, error } = await supabaseClient.rpc("panel_login", {
+    p_usuario: usuario,
+    p_clave: clave,
+    p_ip: null,
+    p_user_agent: navigator.userAgent || "operativo"
+  });
+
+  if(error){
+    console.error("Error panel_login:", error);
+    setBox("loginMsg",`<div class="err-box">Error de login: ${escapeHtml(error.message || "")}</div>`);
+    return;
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+
+  if(!row || row.ok !== true){
+    setBox("loginMsg",`<div class="err-box">${escapeHtml(row?.mensaje || "Usuario o clave incorrectos")}</div>`);
+    return;
+  }
+
+  panelSessionToken = row.session_token;
+
+  operador = {
+    id: row.operador_id,
+    usuario: row.usuario,
+    nombre: row.nombre || row.usuario,
+    rol: row.rol || "OPERADOR",
+    tipo: row.tipo || "",
+    tipoOperador: row.tipo || "",
+    pc: row.pc_codigo || "",
+    PC: row.pc_codigo || "",
+    pc_codigo: row.pc_codigo || ""
+  };
+
+  const pcsDisponibles = await obtenerPcsDisponiblesOperador(operador);
+  const rol = normalizar(operador.rol);
+  const tipo = normalizar(operador.tipo || operador.tipoOperador);
+
+  if(rol === "ADMIN" || rol === "ENCARGADO" || rol === "SUPERVISOR" || rol === "SUPERADMIN" || tipo === "FRANQUERO" || tipo === "FRAMQUERO" || pcsDisponibles.length !== 1){
+    abrirSelectorPc(pcsDisponibles);
+    return;
+  }
+
+  pcOperativa = pcsDisponibles[0];
+  finalizarLogin(true);
+}
+
+function abrirSelectorPc(lista){
+  const grid=document.getElementById("pcSelectorGrid");
+  grid.innerHTML="";
+  [...new Set(lista.map(x=>String(x).trim().toUpperCase()).filter(Boolean))].forEach(pc=>{
+    grid.innerHTML+=`<button class="btn btn-primary" onclick="seleccionarPcOperativa('${pc}')">${pc}</button>`;
+  });
+  document.getElementById("selectorPcOverlay").classList.remove("hidden");
+}
+function seleccionarPcOperativa(pc){pcOperativa=pc;document.getElementById("selectorPcOverlay").classList.add("hidden");finalizarLogin(true)}
+
+function finalizarLogin(guardar=true){
+  if(guardar){
+    localStorage.setItem(LS_OPERADOR,JSON.stringify(operador));
+    localStorage.setItem(LS_PC,pcOperativa);
+    localStorage.setItem(LS_TOKEN,panelSessionToken);
+  }
+  document.getElementById("loginView").classList.add("hidden");
+  document.getElementById("appView").classList.remove("hidden");
+  setBox("operadorInfo",`
+    <b>${operador.nombre||operador.NOMBRE}</b><br>
+    <span class="badge badge-blue">Rol: ${operador.rol||operador.ROL}</span>
+    <span class="badge badge-muted">Tipo: ${operador.tipoOperador||"-"}</span>
+    <span class="badge badge-ok">PC: ${pcOperativa}</span>
+  `);
+  refrescarTodo(false);
+  iniciarRealtimeSolicitudes();
+  if(!timersIniciados){
+    timersIniciados=true;
+    setInterval(()=>cargarSolicitudes(true),2500);
+    setInterval(()=>cargarChats(true),3000);
+    setInterval(()=>cargarBilleteras(false),12000);
+    setInterval(()=>cargarSaldosOperativos(true),5000);
+    setInterval(()=>cargarWorkerJobs(false),2500);
+    setInterval(()=>{ if(chatActualId) cargarChatActual(true); },3500);
+  }
+}
+
+
+let supabaseSolicitudesChannel = null;
+
+function iniciarRealtimeSolicitudes(){
+  // Blindaje RPC:
+  // Evitamos suscripciones directas a tablas públicas.
+  // El panel se actualiza por polling con RPC de sesión.
+  return;
+}
+
+function mostrarVista(vista){
+  ["Inicio","Solicitudes","Billeteras","Chat","Worker","Ajustes"].forEach(v=>{
+    document.getElementById("view"+v)?.classList.add("hidden");
+    document.getElementById("nav"+v)?.classList.remove("active");
+  });
+  const cap=vista.charAt(0).toUpperCase()+vista.slice(1);
+  document.getElementById("view"+cap)?.classList.remove("hidden");
+  document.getElementById("nav"+cap)?.classList.add("active");
+  if(vista==="solicitudes")renderSolicitudes();
+  if(vista==="billeteras")cargarBilleteras();
+  if(vista==="chat")cargarChats();
+  if(vista==="worker")cargarWorkerJobs(false);
+  if(vista==="ajustes"){renderSelectsAjustes();renderSaldosOperativos();}
+  cerrarMenuMobile();
+}
+
+async function refrescarTodo(showToast=true){
+  await cargarSolicitudes(false);
+  await cargarBilleteras(false);
+  await cargarSaldosOperativos(true);
+  await cargarChats(false);
+  await cargarWorkerJobs(false);
+  renderInicio();
+  if(typeof renderCentroOperativo==='function')renderCentroOperativo();
+  if(showToast)toast("Panel actualizado","green");
+}
+async function cargarSolicitudes(silencioso=false){
+  const r = await cargarSolicitudesSupabase();
+
+  if(!r.ok){
+    toast(r.error || "Error solicitudes Supabase","red");
+    return;
+  }
+
+  solicitudes = (r.solicitudes || []);
+
+  renderSolicitudes();
+  renderInicio();
+  verificarSolicitudes(silencioso);
+}
+
+async function cargarSaldosOperativos(silencioso=true){
+  if(!panelSessionToken || !pcOperativa) return;
+
+  const { data, error } = await supabaseClient.rpc("panel_operativo_get_saldos_operativos", {
+    p_session_token: requireSessionToken(),
+    p_pc_codigo: pcOperativa
+  });
+
+  if(error){
+    console.warn("Saldos operativos no disponibles todavía:", error.message || error);
+    saldosOperativos = null;
+    renderSaldosOperativos();
+    return;
+  }
+
+  saldosOperativos = Array.isArray(data) ? data[0] : data;
+  renderSaldosOperativos();
+}
+
+function renderSaldosOperativos(){
+  const box = document.getElementById("saldosOperativosGrid");
+  if(!box) return;
+
+  if(!saldosOperativos || saldosOperativos.ok === false){
+    box.innerHTML = `
+      <div class="balance-card">
+        <div class="balance-title">Saldos operativos</div>
+        <div class="balance-value">Pendiente</div>
+        <div class="balance-sub">Ejecutá el SQL de movimientos para ver fichas y saldos de billeteras en tiempo operativo.</div>
+      </div>
+    `;
+    return;
+  }
+
+  const fichas = saldosOperativos.fichas || {};
+  const billeterasSaldo = saldosOperativos.billeteras || [];
+
+  let html = `
+    <div class="balance-card fichas">
+      <div class="balance-title">Fichas agente · ${escapeHtml(pcOperativa || "")}</div>
+      <div class="balance-value">${money(fichas.saldo || 0)}</div>
+      <div class="balance-sub">Carga al usuario: resta fichas · Retiro: recupera fichas</div>
+    </div>
+  `;
+
+  billeterasSaldo.forEach(b=>{
+    html += `
+      <div class="balance-card wallet">
+        <div class="balance-title">${escapeHtml(b.nombre_visible || b.nombre || "Billetera")}</div>
+        <div class="balance-value">${money(b.saldo || 0)}</div>
+        <div class="balance-sub">${escapeHtml(b.banco || b.tipo || "")} · ${escapeHtml(b.titular || "")}<br>Alias: ${escapeHtml(b.alias || "-")}</div>
+      </div>
+    `;
+  });
+
+  box.innerHTML = html;
+}
+
+function mapBilleteraSupabase(b){
+  return {
+    ID_BILLETERA: b.id,
+    BILLETERA_NOMBRE: b.nombre_visible || "",
+    NOMBRE_VISIBLE: b.nombre_visible || "",
+    TITULAR: b.titular || "",
+    ALIAS: b.alias || "",
+    CVU_CBU: b.cbu || "",
+    TIPO: b.banco || "",
+    PC: b.pc_codigo || "",
+    ACTIVA: b.activa ? "SI" : "NO",
+    SELECCIONADA_MANUAL: b.seleccionada_manual ? "SI" : "NO",
+    ESTADO: b.estado || "",
+    PRIORIDAD: b.prioridad || 0,
+    ORDEN: b.orden || 0,
+    OBSERVACIONES: b.observaciones || ""
+  };
+}
+
+async function cargarBilleteras(render=true){
+  const { data, error } = await supabaseClient.rpc("panel_operativo_get_billeteras", {
+    p_session_token: requireSessionToken(),
+    p_pc_codigo: pcOperativa
+  });
+
+  if(error){
+    console.error("Error cargando billeteras RPC:", error);
+    toast("Error billeteras: " + (error.message || ""), "red");
+    return;
+  }
+
+  billeterasTodas = (data || []).map(mapBilleteraSupabase);
+  billeteras = billeterasTodas.filter(b => String(b.PC || "") === String(pcOperativa || ""));
+
+  if(render)renderBilleteras();
+  renderWalletSelectChat();
+  renderWalletSelectWorkerManual();
+  renderInicio();
+}
+async function cargarChats(silencioso=false){
+
+  const { data: sesiones, error } = await supabaseClient.rpc("panel_operativo_get_chat_sesiones", {
+    p_session_token: requireSessionToken(),
+    p_pc_codigo: pcOperativa
+  });
+
+  if(error){
+    console.error("Error cargando chat_sesiones RPC:", error);
+    return;
+  }
+
+  const { data: mensajesData, error: errorMensajes } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes_pc", {
+    p_session_token: requireSessionToken(),
+    p_pc_codigo: pcOperativa,
+    p_limit: 1500
+  });
+
+  const mensajes = errorMensajes ? [] : (mensajesData || []);
+
+  if(errorMensajes){
+    console.error("Error cargando chat_mensajes RPC:", errorMensajes);
+  }
+
+  chats = (sesiones || []).map(c => {
+
+    const ms = mensajes.filter(m => String(m.chat_id) === String(c.chat_id));
+    const ultimo = ms.length ? ms[ms.length - 1] : null;
+
+    const userCount = ms.filter(m =>
+      String(m.tipo_emisor || "").toUpperCase() === "USUARIO"
+    ).length;
+
+    const readCount = getChatReadCount(c.chat_id);
+    const sinLeer = Math.max(0, userCount - readCount);
+
+    return {
+      ID_CHAT: c.chat_id,
+      chat_id: c.chat_id,
+      USUARIO: c.usuario || "Usuario",
+      NOMBRE_COMPLETO: c.usuario || "",
+      TELEFONO: c.telefono || "",
+      FECHA: c.created_at,
+      FECHA_ULTIMO: ultimo?.created_at || c.ultimo_mensaje || c.created_at,
+      ULTIMO_MENSAJE: resumenMensajeChatPreview(ultimo?.mensaje || "", ultimo?.imagen_url || ""),
+      SIN_LEER: sinLeer,
+      USER_COUNT: userCount,
+      SOLICITUD_ID: c.solicitud_id || "",
+      ESTADO: c.estado || "ABIERTO"
+    };
+
+  });
+
+  renderChatList();
+  verificarChats(true);
+  renderInicio();
+
+  if(!silencioso){
+    console.log("Chats cargados por RPC:", chats.length);
+  }
+}
+
+function turnoDeFecha(fechaRaw){
+  if(!fechaRaw) return "SIN TURNO";
+  const fecha = new Date(fechaRaw);
+  if(isNaN(fecha)) return "SIN TURNO";
+  const hora = Number(fecha.toLocaleString("en-US",{
+    timeZone:"America/Argentina/Buenos_Aires",
+    hour:"2-digit",
+    hour12:false
+  }));
+  if(hora >= 6 && hora < 14) return "TM";
+  if(hora >= 14 && hora < 22) return "TT";
+  return "TN";
+}
+
+function fechaBAKey(fechaRaw){
+  const fecha = fechaRaw ? new Date(fechaRaw) : new Date();
+  if(isNaN(fecha)) return "";
+  return fecha.toLocaleDateString("en-CA",{timeZone:"America/Argentina/Buenos_Aires"});
+}
+
+function esMismoDiaBA(fechaRaw){
+  return fechaBAKey(fechaRaw) === fechaBAKey(new Date());
+}
+
+function resumenTurnosOperativoHTML(lista){
+  const hoy = lista.filter(s=>esMismoDiaBA(s.FECHA_CREACION||s.FECHA));
+  const turnos = ["TM","TT","TN"];
+  let html = `<div class="table-wrap"><table><thead><tr><th>Turno</th><th>Total hoy</th><th>Pendientes</th><th>Realizadas</th><th>Retiros</th></tr></thead><tbody>`;
+  turnos.forEach(t=>{
+    const rows = hoy.filter(s=>turnoDeFecha(s.FECHA_CREACION||s.FECHA) === t);
+    html += `<tr>
+      <td><b>${t}</b></td>
+      <td>${rows.length}</td>
+      <td>${rows.filter(esPendiente).length}</td>
+      <td>${rows.filter(esRealizada).length}</td>
+      <td>${rows.filter(s=>normalizar(s.TIPO_SOLICITUD||s.TIPO)==="RETIRO").length}</td>
+    </tr>`;
+  });
+  html += `<tr>
+    <td><b>TOTAL PC ${pcOperativa || ""}</b></td>
+    <td><b>${hoy.length}</b></td>
+    <td><b>${hoy.filter(esPendiente).length}</b></td>
+    <td><b>${hoy.filter(esRealizada).length}</b></td>
+    <td><b>${hoy.filter(s=>normalizar(s.TIPO_SOLICITUD||s.TIPO)==="RETIRO").length}</b></td>
+  </tr>`;
+  html += `</tbody></table></div>`;
+  return html;
+}
+
+function renderInicio(){
+  const pendientes=solicitudes.filter(esPendiente);
+  const retiros=pendientes.filter(s=>normalizar(s.TIPO_SOLICITUD||s.TIPO)==="RETIRO");
+  const unread=chats.reduce((a,c)=>a+Number(c.SIN_LEER||0),0);
+  const bil=billeteras.find(b=>normalizar(b.SELECCIONADA_MANUAL)==="SI") || billeteras.find(b=>normalizar(b.ACTIVA)==="SI") || {};
+  const hoy = solicitudes.filter(s=>esMismoDiaBA(s.FECHA_CREACION||s.FECHA));
+  setBox("statPendientes",pendientes.length);
+  setBox("statRetiros",`Retiros: ${retiros.length}`);
+  setBox("statSolicitudesHoy",hoy.length);
+  setBox("statSolicitudesTotalPc",`Total PC: ${solicitudes.length}`);
+  setBox("statChats",unread);
+  setBox("statBilletera",bil.NOMBRE_VISIBLE||bil.BILLETERA_NOMBRE||"-");
+  setBox("statBilleteraTipo",bil.TIPO?`${bil.TIPO} · ${bil.PC||pcOperativa}`:"-");
+  setBox("alertas",`
+    ${pendientes.length?`<div class="alert-box">🔔 Hay ${pendientes.length} solicitud/es pendiente/s.</div>`:""}
+    ${unread?`<div class="alert-box">💬 Hay ${unread} mensaje/s de chat sin leer.</div>`:""}
+  `);
+  setBox("resumenTurnosOperativo",resumenTurnosOperativoHTML(solicitudes));
+  setBox("tablaSolicitudesInicio",tablaSolicitudesHTML(pendientes.slice(0,40)));
+  renderSaldosOperativos();
+}
+function renderSolicitudes(){
+  let lista=solicitudes.slice();
+  const estado=val("filtroEstado"), tipo=val("filtroTipo"), texto=normalizar(val("filtroTexto"));
+  if(estado==="PENDIENTE")lista=lista.filter(esPendiente);
+  if(estado==="REALIZADAS")lista=lista.filter(esRealizada);
+  if(estado==="RECHAZADA")lista=lista.filter(s=>normalizar(s.ESTADO)==="RECHAZADA");
+  if(tipo)lista=lista.filter(s=>normalizar(s.TIPO_SOLICITUD||s.TIPO)===tipo);
+  if(texto)lista=lista.filter(s=>normalizar(`${s.USUARIO||""} ${s.NOMBRE_COMPLETO||""} ${s.BILLETERA_NOMBRE||""} ${s.ID||""}`).includes(texto));
+  setBox("tablaSolicitudesCompleta",tablaSolicitudesHTML(lista));
+}
+function destinoRetiroHTML(s){
+  const destino = s.RETIRO_ALIAS_CBU || s.retiro_alias_cbu || "";
+  const titular = s.RETIRO_TITULAR || s.retiro_titular || "";
+  if(!destino && !titular) return `<span class="small">Destino no cargado</span>`;
+  return `<div><b>Destino:</b> ${escapeHtml(destino || "-")}</div><div class="small"><b>Titular:</b> ${escapeHtml(titular || "-")}</div>`;
+}
+
+function billeteraODestinoHTML(s){
+  const tipo = normalizar(s.TIPO_SOLICITUD||s.TIPO);
+  if(tipo === "RETIRO") return destinoRetiroHTML(s);
+  return s.BILLETERA_NOMBRE||s.NOMBRE_BILLETERA||s.ID_BILLETERA||"-";
+}
+
+function tablaSolicitudesHTML(lista){
+  if(!lista.length)return`<div class="alert-box">No hay solicitudes para mostrar.</div>`;
+
+  let html=`<div class="table-wrap"><table><thead><tr>
+    <th>Fecha</th>
+    <th>Tipo</th>
+    <th>Usuario</th>
+    <th>Billetera / Destino</th>
+    <th>Monto</th>
+    <th>Estado</th>
+    <th>Worker</th>
+    <th>Acción</th>
+  </tr></thead><tbody>`;
+
+  lista.forEach(s=>{
+    const id=s.ID||s.SOLICITUD_ID||s.ID_SOLICITUD||"";
+    const tipo=normalizar(s.TIPO_SOLICITUD||s.TIPO);
+    const estadoWorker = normalizar(s.ESTADO_WORKER || "");
+    const tieneJob = Boolean(s.WORKER_JOB_ID);
+
+    html+=`<tr>
+      <td>${formatFecha(s.FECHA_CREACION||s.FECHA)}</td>
+      <td>${tipo}</td>
+      <td>
+        <b>${s.USUARIO||s.USUARIO_JUGADOR||"-"}</b><br>
+        <span class="small">${s.NOMBRE_COMPLETO||""}</span>
+      </td>
+      <td>${billeteraODestinoHTML(s)}</td>
+      <td>${money(s.MONTO_REAL||s.MONTO_DECLARADO||s.MONTO||0)}</td>
+      <td>${estadoBadge(s.ESTADO)}</td>
+      <td>
+        ${workerMiniResumenSolicitud(s)}
+      </td>
+      <td>
+        ${esPendiente(s)?`
+          <button class="mini-btn blue" onclick="tomarSolicitud('${id}')">Tomar</button>
+          ${tipo==="RETIRO"
+            ? `<button class="mini-btn green" onclick="abrirCerrarRetiro('${id}')">Aprobar retiro</button>`
+            : `<button class="mini-btn green" onclick="abrirAprobarSolicitud('${id}')">Aprobar</button>`
+          }
+          <button class="mini-btn red" onclick="abrirRechazarSolicitud('${id}')">Rechazar</button>
+        `:`
+          ${tieneJob ? `<button class="mini-btn blue" onclick="abrirWorkerLogs('${s.WORKER_JOB_ID}')">Logs</button>` : ""}
+          ${estadoWorker==="REQUIERE_MANUAL" || estadoWorker==="ERROR" || estadoWorker==="ERROR_WORKER" || estadoWorker==="REINTENTAR"
+            ? `<button class="mini-btn green" onclick="reintentarWorker('${s.WORKER_JOB_ID}')">Reintentar</button>`
+            : ""
+          }
+        `}
+      </td>
+    </tr>`;
+  });
+
+  html+=`</tbody></table></div>`;
+  return html;
+}
+
+function renderBilleteras(){
+  if(!billeteras.length){setBox("walletsGrid",`<div class="alert-box">No hay billeteras configuradas.</div>`);return}
+  let html="";
+  billeteras.forEach(b=>{
+    const activa=normalizar(b.ACTIVA)==="SI";
+    const seleccionada=normalizar(b.SELECCIONADA_MANUAL)==="SI";
+    html+=`<div class="wallet-card ${activa?"ok":"paused"} ${seleccionada?"selected":""}">
+      <div class="wallet-name">💳 ${b.NOMBRE_VISIBLE||b.BILLETERA_NOMBRE||b.ID_BILLETERA}</div>
+      <div class="wallet-type">${b.TIPO||""} · ${b.PC||pcOperativa}</div>
+      <div style="margin-top:12px">
+        ${activa?'<span class="badge badge-ok">ACTIVA</span>':'<span class="badge badge-danger">PAUSADA</span>'}
+        ${seleccionada?'<span class="badge badge-blue">EN LANDING</span>':''}
+      </div>
+      <div class="wallet-actions">
+        <button class="mini-btn blue" onclick="seleccionarBilletera('${b.ID_BILLETERA}')">Poner en landing</button>
+        <button class="mini-btn green" onclick="cambiarEstadoBilletera('${b.ID_BILLETERA}','SI')">Activar</button>
+        <button class="mini-btn red" onclick="cambiarEstadoBilletera('${b.ID_BILLETERA}','NO')">Pausar</button>
+      </div>
+    </div>`;
+  });
+  setBox("walletsGrid",html);
+}
+
+async function tomarSolicitud(id){
+  const { data, error } = await supabaseClient.rpc("panel_operativo_tomar_solicitud", {
+    p_session_token: requireSessionToken(),
+    p_solicitud_id: Number(id)
+  });
+
+  if(error){
+    alert(error.message || "Error tomando solicitud");
+    return;
+  }
+
+  toast("Solicitud tomada","green");
+  await refrescarTodo(false);
+}
+
+function buscarBilleteraDeSolicitud(s){
+  const id = String(s.ID_BILLETERA || s.billetera_id || "").trim();
+  const nombre = normalizar(s.BILLETERA_NOMBRE || s.NOMBRE_BILLETERA || "");
+  const lista = (billeterasTodas && billeterasTodas.length) ? billeterasTodas : billeteras;
+
+  if(id){
+    const byId = lista.find(b => String(b.ID_BILLETERA || "").trim() === id);
+    if(byId) return byId;
+  }
+
+  if(nombre){
+    const byName = lista.find(b =>
+      normalizar(b.NOMBRE_VISIBLE || b.BILLETERA_NOMBRE || "") === nombre
+    );
+    if(byName) return byName;
+  }
+
+  return null;
+}
+
+
+function copiarTextoOperativo(texto, nombre="Dato"){
+  const valor = String(texto || "").trim();
+  if(!valor || valor === "-"){
+    toast(nombre + " no disponible", "red");
+    return;
+  }
+  navigator.clipboard.writeText(valor).then(()=>{
+    toast(nombre + " copiado", "green");
+  }).catch(()=>{
+    const tmp = document.createElement("textarea");
+    tmp.value = valor;
+    document.body.appendChild(tmp);
+    tmp.select();
+    document.execCommand("copy");
+    document.body.removeChild(tmp);
+    toast(nombre + " copiado", "green");
+  });
+}
+
+function verifyRow(label, value, extraClass="", copiar=false){
+  const v = value === null || value === undefined || String(value).trim() === "" ? "-" : value;
+  const btn = copiar ? `<button class="verify-copy" type="button" onclick="copiarTextoOperativo('${escapeAttr(v)}','${escapeAttr(label)}')">Copiar</button>` : "";
+  return `
+    <div class="verify-row">
+      <div class="verify-label">${escapeHtml(label)}</div>
+      <div class="verify-value ${extraClass}">${escapeHtml(v)}</div>
+      ${btn}
+    </div>
+  `;
+}
+
+function renderDatosSolicitudModal(s){
+  return `
+    <div class="verify-box good">
+      <div class="verify-title">✅ Datos de la solicitud</div>
+      <div class="verify-grid">
+        ${verifyRow("Usuario", s.USUARIO || s.USUARIO_JUGADOR || "-")}
+        ${verifyRow("Nombre completo", s.NOMBRE_COMPLETO || "-")}
+        ${verifyRow("WhatsApp", s.TELEFONO || "-")}
+        ${verifyRow("DNI", s.DNI_NORMALIZADO || s.DNI || "-")}
+        ${verifyRow("Tipo", normalizar(s.TIPO_SOLICITUD || s.TIPO))}
+        ${verifyRow("Monto solicitado", money(s.MONTO_DECLARADO || s.MONTO_REAL || 0), "big")}
+        ${verifyRow("Referencia pago", s.REFERENCIA_PAGO || "-")}
+        ${verifyRow("Validación Agentes", s.USUARIO_VALIDADO_AGENTES ? "Usuario validado ✅" : "Sin validación")}
+        ${verifyRow("Fecha", formatFecha(s.FECHA_CREACION || s.FECHA))}
+      </div>
+    </div>
+  `;
+}
+
+function renderBilleteraVerificacionModal(s){
+  const b = buscarBilleteraDeSolicitud(s);
+  const nombreLanding = s.BILLETERA_NOMBRE || s.NOMBRE_BILLETERA || s.ID_BILLETERA || "-";
+
+  if(!b){
+    return `
+      <div class="verify-box warn">
+        <div class="verify-title">💳 Billetera indicada por la landing</div>
+        <div class="alert-box">
+          No pude cruzar esta solicitud con una billetera cargada en el panel. Verificá manualmente el nombre mostrado.
+        </div>
+        <div class="verify-grid">
+          ${verifyRow("Billetera", nombreLanding)}
+          ${verifyRow("ID billetera", s.ID_BILLETERA || "-")}
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="verify-box">
+      <div class="verify-title">💳 Billetera a verificar</div>
+      <div class="verify-grid">
+        ${verifyRow("Nombre visible", b.NOMBRE_VISIBLE || b.BILLETERA_NOMBRE || nombreLanding)}
+        ${verifyRow("Titular", b.TITULAR || "-")}
+        ${verifyRow("Alias", b.ALIAS || "-")}
+        ${verifyRow("CBU / CVU", b.CVU_CBU || "-")}
+        ${verifyRow("Banco / Tipo", b.TIPO || "-")}
+        ${verifyRow("Estado", `${b.ACTIVA || "-"} · ${b.ESTADO || "-"}`)}
+      </div>
+    </div>
+  `;
+}
+
+function renderDestinoRetiroModal(s){
+  return `
+    <div class="verify-box">
+      <div class="verify-title">🏦 Destino del retiro</div>
+      <div class="verify-grid">
+        ${verifyRow("Alias / CBU / CVU destino", s.RETIRO_ALIAS_CBU || "-", "", true)}
+        ${verifyRow("Titular destino", s.RETIRO_TITULAR || "-", "", true)}
+        ${verifyRow("Monto solicitado", money(s.MONTO_DECLARADO || s.MONTO_REAL || 0), "big")}
+        ${verifyRow("Cuenta retiro", s.RETIRO_CUENTA_ESTADO || "-")}
+        ${verifyRow("Requiere revisión", s.RETIRO_REQUIERE_REVISION ? "Sí" : "No")}
+        ${verifyRow("Antifraude", s.ANTIFRAUDE_ESTADO || "-")}
+        ${verifyRow("Usuario", s.USUARIO || s.USUARIO_JUGADOR || "-")}
+      </div>
+    </div>
+  `;
+}
+
+
+function abrirAprobarSolicitud(id){
+  const s = solicitudes.find(x=>String(x.ID||x.SOLICITUD_ID)===String(id));
+
+  if(!s) return;
+
+  abrirModal("Aprobar carga",`
+    ${renderDatosSolicitudModal(s)}
+    ${renderBilleteraVerificacionModal(s)}
+
+    <div class="alert-box">
+      <b>Verificación manual:</b><br>
+      Buscá el movimiento recibido en la billetera usando titular, alias/CBU y monto solicitado. 
+      Si el importe real coincide, confirmá el monto y enviá al worker.
+    </div>
+
+    <label>Monto real a cargar</label>
+    <input id="apMonto" type="number" value="${s.MONTO_REAL||s.MONTO_DECLARADO||""}">
+
+    <label>Observaciones</label>
+    <textarea id="apObs" placeholder="Ej: comprobado en MP / titular coincide / ajuste de monto"></textarea>
+
+    <div class="alert-box">
+      Al aprobar, la solicitud NO se acredita todavía. Se enviará a la cola del worker para que el robot cargue en Agentes.
+    </div>
+  `,async()=>{
+
+    const operadorNombre = operador?.usuario || operador?.nombre || "";
+
+    const montoFinal = Number(val("apMonto") || s.MONTO_DECLARADO || 0);
+
+    if(!montoFinal || montoFinal <= 0){
+      alert("Ingresá un monto real válido antes de enviar al worker.");
+      return;
+    }
+
+    const { data, error } = await supabaseClient.rpc("panel_operativo_aprobar_solicitud", {
+      p_session_token: requireSessionToken(),
+      p_solicitud_id: Number(id),
+      p_monto: montoFinal,
+      p_observaciones: val("apObs") || "",
+      p_retiro_alias_cbu: null,
+      p_retiro_titular: null
+    });
+
+    if(error){
+      alert(error.message || "Error aprobando solicitud");
+      return;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+
+    cerrarModal();
+    toast("Carga aprobada y enviada al worker. Job #" + (row?.worker_job_id || ""), "green");
+    await refrescarTodo(false);
+
+  },"Enviar al worker");
+}
+
+
+function cuentaRetiroAccionesHtml(s){
+  if(!s.CUENTA_RETIRO_ID) return "";
+  const estado = String(s.RETIRO_CUENTA_ESTADO || "").toUpperCase();
+  const puedeVerificar = estado !== "VERIFICADA" && estado !== "BLOQUEADA";
+  const puedeBloquear = estado !== "BLOQUEADA";
+
+  return `
+    <div class="verify-box warn">
+      <div class="verify-title">🛡️ Control cuenta de retiro</div>
+      <div class="alert-box">
+        Estado actual: <b>${escapeHtml(s.RETIRO_CUENTA_ESTADO || "Sin estado")}</b><br>
+        Si los datos coinciden con el criterio operativo, podés marcar esta cuenta como verificada.
+      </div>
+      <div class="row-actions">
+        ${puedeVerificar ? `<button class="mini-btn green" type="button" onclick="verificarCuentaRetiro('${s.CUENTA_RETIRO_ID}')">Verificar cuenta</button>` : ""}
+        ${puedeBloquear ? `<button class="mini-btn red" type="button" onclick="bloquearCuentaRetiro('${s.CUENTA_RETIRO_ID}')">Bloquear cuenta</button>` : ""}
+      </div>
+    </div>
+  `;
+}
+
+async function verificarCuentaRetiro(cuentaId){
+  if(!confirm("¿Marcar esta cuenta de retiro como VERIFICADA?")) return;
+  const operadorNombre = operador?.usuario || operador?.nombre || "";
+
+  const { data, error } = await supabaseClient.rpc("panel_retiro_verificar_cuenta", {
+    p_cuenta_id: Number(cuentaId),
+    p_operador: operadorNombre
+  });
+
+  if(error){
+    alert(error.message || "No se pudo verificar la cuenta.");
+    return;
+  }
+
+  toast("Cuenta de retiro verificada", "green");
+  cerrarModal();
+  await refrescarTodo(false);
+}
+
+async function bloquearCuentaRetiro(cuentaId){
+  const motivo = prompt("Motivo del bloqueo:", "Datos no coinciden / requiere revisión");
+  if(motivo === null) return;
+
+  const operadorNombre = operador?.usuario || operador?.nombre || "";
+
+  const { data, error } = await supabaseClient.rpc("panel_retiro_bloquear_cuenta", {
+    p_cuenta_id: Number(cuentaId),
+    p_motivo: motivo,
+    p_operador: operadorNombre
+  });
+
+  if(error){
+    alert(error.message || "No se pudo bloquear la cuenta.");
+    return;
+  }
+
+  toast("Cuenta de retiro bloqueada", "red");
+  cerrarModal();
+  await refrescarTodo(false);
+}
+
+
+function abrirCerrarRetiro(id){
+  const s = solicitudes.find(x=>String(x.ID||x.SOLICITUD_ID)===String(id));
+
+  if(!s) return;
+
+  abrirModal("Aprobar retiro",`
+    ${renderDatosSolicitudModal(s)}
+    ${renderDestinoRetiroModal(s)}
+    ${cuentaRetiroAccionesHtml(s)}
+
+    <div class="alert-box">
+      <b>Datos de cuenta para pagar el retiro</b><br>
+      Revisá estos datos antes de aprobar. El worker retira fichas en Agentes; el pago al CBU/alias se realiza manualmente.
+    </div>
+
+    <label>CBU / CVU / Alias de destino</label>
+    <div class="copy-inline">
+      <input id="retDestino" value="${escapeHtml(s.RETIRO_ALIAS_CBU||"")}" placeholder="Alias o CBU/CVU">
+      <button class="copy-mini" type="button" onclick="copiarTextoOperativo(document.getElementById('retDestino').value,'Alias/CBU destino')">Copiar</button>
+    </div>
+
+    <label>Titular de la cuenta</label>
+    <div class="copy-inline">
+      <input id="retTitular" value="${escapeHtml(s.RETIRO_TITULAR||"")}" placeholder="Nombre y apellido del titular">
+      <button class="copy-mini" type="button" onclick="copiarTextoOperativo(document.getElementById('retTitular').value,'Titular destino')">Copiar</button>
+    </div>
+
+    <label>Monto final</label>
+    <input id="retMonto" type="number" value="${s.MONTO_REAL||s.MONTO_DECLARADO||""}">
+
+    <label>Observaciones</label>
+    <textarea id="retObs" placeholder="Ej: datos verificados / pago pendiente / diferencia consultada"></textarea>
+
+    <div class="alert-box">
+      Al aprobar, el retiro NO queda pagado todavía. Se enviará a la cola del worker para que el robot procese en Agentes.
+    </div>
+  `,async()=>{
+
+    const operadorNombre = operador?.usuario || operador?.nombre || "";
+
+    if(String(s.RETIRO_CUENTA_ESTADO || "").toUpperCase() === "BLOQUEADA"){
+      alert("La cuenta de retiro está BLOQUEADA. No se puede aprobar este retiro.");
+      return;
+    }
+
+    if(!val("retDestino")){
+      alert("Falta CBU/CVU o alias de destino del retiro.");
+      return;
+    }
+
+    if(!val("retTitular")){
+      alert("Falta titular de la cuenta de destino.");
+      return;
+    }
+
+    const montoFinal = Number(val("retMonto") || s.MONTO_DECLARADO || 0);
+
+    if(!montoFinal || montoFinal <= 0){
+      alert("Ingresá un monto final válido antes de enviar al worker.");
+      return;
+    }
+
+    const { data, error } = await supabaseClient.rpc("panel_operativo_aprobar_solicitud", {
+      p_session_token: requireSessionToken(),
+      p_solicitud_id: Number(id),
+      p_monto: montoFinal,
+      p_observaciones: val("retObs") || "",
+      p_retiro_alias_cbu: val("retDestino"),
+      p_retiro_titular: val("retTitular")
+    });
+
+    if(error){
+      alert(error.message || "Error aprobando retiro");
+      return;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+
+    cerrarModal();
+    toast("Retiro aprobado y enviado al worker. Job #" + (row?.worker_job_id || ""), "green");
+    await refrescarTodo(false);
+
+  },"Enviar al worker");
+}
+
+function abrirRechazarSolicitud(id){
+  abrirModal("Rechazar solicitud",`
+    <label>Motivo</label>
+    <textarea id="rechObs"></textarea>
+  `,async()=>{
+
+    const { error } = await supabaseClient.rpc("panel_operativo_rechazar_solicitud", {
+      p_session_token: requireSessionToken(),
+      p_solicitud_id: Number(id),
+      p_motivo: val("rechObs") || ""
+    });
+
+    if(error){
+      alert(error.message || "Error");
+      return;
+    }
+
+    cerrarModal();
+    toast("Solicitud rechazada","red");
+    await refrescarTodo(false);
+
+  },"Rechazar");
+}
+
+async function seleccionarBilletera(id){
+  if(!id){
+    alert("Billetera inválida.");
+    return;
+  }
+
+  if(!confirm("¿Poner esta billetera en landing para la PC actual?")) return;
+
+  const { data, error } = await supabaseClient.rpc("panel_operativo_seleccionar_billetera", {
+    p_session_token: requireSessionToken(),
+    p_billetera_id: Number(id)
+  });
+
+  if(error){
+    alert(error.message || "No se pudo seleccionar la billetera.");
+    return;
+  }
+
+  toast("Billetera puesta en landing","green");
+  await cargarBilleteras(true);
+}
+
+async function cambiarEstadoBilletera(id, activa){
+  if(!id){
+    alert("Billetera inválida.");
+    return;
+  }
+
+  const esActiva = String(activa || "").toUpperCase() === "SI" || activa === true;
+  const accion = esActiva ? "activar" : "pausar";
+
+  if(!confirm(`¿Querés ${accion} esta billetera?`)) return;
+
+  const { data, error } = await supabaseClient.rpc("panel_operativo_cambiar_estado_billetera", {
+    p_session_token: requireSessionToken(),
+    p_billetera_id: Number(id),
+    p_activa: esActiva,
+    p_estado: esActiva ? "ACTIVA" : "PAUSADA"
+  });
+
+  if(error){
+    alert(error.message || "No se pudo cambiar el estado de la billetera.");
+    return;
+  }
+
+  toast(esActiva ? "Billetera activada" : "Billetera pausada","green");
+  await cargarBilleteras(true);
+}
+
+function renderChatList(){
+  if(!chats.length){
+    setBox("chatList",`<div class="alert-box" style="margin:12px">No hay chats activos.</div>`);
+    return;
+  }
+
+  let html="";
+
+  chats.forEach(c=>{
+    const id = c.ID_CHAT || c.chat_id || "";
+    const unread=Number(c.SIN_LEER||0);
+    const usuario = c.USUARIO || "Usuario landing";
+    const preview = c.ULTIMO_MENSAJE || "";
+
+    html+=`<div class="chat-item ${String(id)===String(chatActualId)?"active":""}" onclick="abrirChat('${id}')">
+      <div class="chat-item-title">
+        <span>${escapeHtml(usuario)}</span>
+        ${unread?`<span class="chat-unread">${unread}</span>`:""}
+      </div>
+      <div class="small">${escapeHtml(c.NOMBRE_COMPLETO||"")} ${c.TELEFONO ? "· "+escapeHtml(c.TELEFONO) : ""}</div>
+      <div class="small">${formatFecha(c.FECHA_ULTIMO||c.FECHA||"")}</div>
+      <div class="chat-user-row">
+        <div class="small ${preview.startsWith("📄") ? "chat-preview-transfer" : ""}">${escapeHtml(preview)}</div>
+        <button class="chat-copy-btn" onclick="event.stopPropagation();copiarTextoOperativo('${escapeAttr(usuario)}','Usuario')">Copiar usuario</button>
+      </div>
+    </div>`;
+  });
+
+  setBox("chatList",html);
+}
+async function abrirChat(id){
+  chatActualId=id;
+  await cargarChatActual(false);
+
+  const userCount = chatMensajes.filter(m =>
+    String(m.tipo_emisor || m.TIPO_EMISOR || "").toUpperCase() === "USUARIO"
+  ).length;
+
+  setChatReadCount(id, userCount);
+
+  await cargarChats(true);
+  renderChatList();
+  renderChatMensajes();
+}
+
+const TRANSFER_CARD_PREFIX = "::TRANSFER_CARD::";
+
+function buildTransferCardMessageFromWallet(b){
+  const payload = {
+    id: b.ID_BILLETERA || "",
+    pc_codigo: b.PC || "",
+    nombre_visible: b.NOMBRE_VISIBLE || b.BILLETERA_NOMBRE || "Billetera",
+    titular: b.TITULAR || "",
+    alias: b.ALIAS || "",
+    cbu: b.CVU_CBU || "",
+    banco: b.TIPO || "",
+    observaciones: b.OBSERVACIONES || ""
+  };
+  return TRANSFER_CARD_PREFIX + JSON.stringify(payload);
+}
+
+function parseTransferCardMessage(text){
+  const raw = String(text || "").trim();
+  if(!raw.startsWith(TRANSFER_CARD_PREFIX)) return null;
+  try{return JSON.parse(raw.slice(TRANSFER_CARD_PREFIX.length));}
+  catch(e){console.warn("Tarjeta inválida", e);return null;}
+}
+
+
+function resumenMensajeChatPreview(texto, imagenUrl=""){
+  const card = parseTransferCardMessage(texto || "");
+  if(card) return "📄 Tarjeta de transferencia enviada";
+  if(texto) return texto;
+  if(imagenUrl) return "Imagen adjunta";
+  return "";
+}
+
+
+function billeterasDisponiblesChat(){
+  const all = billeterasTodas && billeterasTodas.length ? billeterasTodas : billeteras;
+
+  return (all || []).filter(b => {
+    const pcOk = String(b.PC || "").trim().toUpperCase() === String(pcOperativa || "").trim().toUpperCase();
+    const activaOk = normalizar(b.ACTIVA) === "SI" || b.activa === true;
+    const estado = normalizar(b.ESTADO || b.estado || "ACTIVA");
+    const estadoOk = !["CAIDA", "CAÍDA", "PAUSADA", "INACTIVA", "BAJA", "NO"].includes(estado);
+    const tieneDato = String(b.ALIAS || b.CVU_CBU || "").trim() !== "";
+
+    return pcOk && activaOk && estadoOk && tieneDato;
+  });
+}
+
+function renderWalletSelectChat(){
+  const sel = document.getElementById("chatWalletSelect");
+  if(!sel) return;
+
+  const disponibles = billeterasDisponiblesChat();
+
+  if(!disponibles.length){
+    sel.innerHTML = '<option value="">No hay billeteras disponibles para esta PC</option>';
+    return;
+  }
+
+  sel.innerHTML = '<option value="">Elegir billetera disponible...</option>' + disponibles.map(b=>{
+    const nombre = `${b.NOMBRE_VISIBLE || b.BILLETERA_NOMBRE || b.ID_BILLETERA} · ${b.TIPO || "Billetera"} · ${b.ALIAS || b.CVU_CBU || ""}`;
+    return `<option value="${escapeAttr(b.ID_BILLETERA)}">${escapeHtml(nombre)}</option>`;
+  }).join("");
+}
+
+function escapeAttr(text){
+  return String(text || "").replaceAll("&","&amp;").replaceAll("'","&#039;").replaceAll('"',"&quot;").replaceAll("<","&lt;").replaceAll(">","&gt;");
+}
+
+async function enviarTarjetaTransferencia(){
+  if(!chatActualId){
+    alert("Seleccioná un chat primero.");
+    return;
+  }
+
+  const id = val("chatWalletSelect");
+  const wallet = getWalletById(id);
+
+  if(!wallet){
+    alert("Seleccioná una billetera.");
+    return;
+  }
+
+  const payload = {
+    id: wallet.ID_BILLETERA || wallet.id || "",
+    pc_codigo: wallet.PC || pcOperativa || "",
+    nombre_visible: wallet.NOMBRE_VISIBLE || wallet.BILLETERA_NOMBRE || wallet.nombre_visible || "",
+    titular: wallet.TITULAR || wallet.titular || "",
+    alias: wallet.ALIAS || wallet.alias || "",
+    cbu: wallet.CVU_CBU || wallet.CBU || wallet.cbu || "",
+    banco: wallet.TIPO || wallet.BANCO || wallet.banco || "",
+    observaciones: wallet.OBSERVACIONES || wallet.observaciones || ""
+  };
+
+  const mensaje = "TRANSFER_CARD:" + JSON.stringify(payload);
+
+  const { data, error } = await supabaseClient.rpc("panel_operativo_enviar_chat", {
+    p_session_token: requireSessionToken(),
+    p_chat_id: String(chatActualId),
+    p_mensaje: mensaje,
+    p_imagen_url: null
+  });
+
+  if(error){
+    alert("Error enviando tarjeta: " + error.message);
+    return;
+  }
+
+  const r = Array.isArray(data) ? data[0] : data;
+
+  if(r && r.ok === false){
+    alert(r.error || r.mensaje || "No se pudo enviar la tarjeta.");
+    return;
+  }
+
+  toast("Tarjeta de transferencia enviada", "green");
+  await cargarChatActual(true);
+}
+
+async function cargarChatActual(){
+
+  if(!chatActualId) return;
+
+  const { data, error } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes", {
+    p_session_token: requireSessionToken(),
+    p_chat_id: chatActualId
+  });
+
+  if(error){
+    console.error("Error cargando mensajes del chat RPC:", error);
+    return;
+  }
+
+  chatMensajes = data || [];
+
+  renderChatMensajes();
+}
+
+function normalizarImagenUrl(url){
+  const u = String(url || "");
+  if(u.startsWith("data:image")) return u;
+  const m1 = u.match(/\/d\/([^/]+)/);
+  const m2 = u.match(/[?&]id=([^&]+)/);
+  const id = m1 ? m1[1] : (m2 ? m2[1] : "");
+  return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w1000` : u;
+}
+
+function renderChatMensajes(){
+  renderWalletSelectChat();
+  const chat=chats.find(c=>String(c.ID_CHAT||c.chat_id)===String(chatActualId))||{};
+
+  const usuarioChat = chat.USUARIO || "Chat landing";
+  setBox("chatTitulo",`${escapeHtml(usuarioChat)} <button class="chat-copy-btn" onclick="copiarTextoOperativo('${escapeAttr(usuarioChat)}','Usuario')">Copiar usuario</button>`);
+  setBox("chatSubtitulo",`${chat.NOMBRE_COMPLETO||""} ${chat.TELEFONO? "· "+chat.TELEFONO:""}`);
+  setBox("chatEstado",chat.SOLICITUD_ID?`Solicitud: ${chat.SOLICITUD_ID}`:"Sin solicitud");
+
+  if(!chatMensajes.length){
+    setBox("chatBody",`<div class="alert-box">Sin mensajes todavía.</div>`);
+    return;
+  }
+
+  let html="";
+
+  chatMensajes.forEach(m=>{
+    const tipo=normalizar(m.tipo_emisor || m.TIPO_EMISOR);
+    const esUser=tipo==="USUARIO";
+    const mensaje = m.mensaje || m.MENSAJE || "";
+    const imagen = m.imagen_url || m.IMAGEN_URL || "";
+    const fecha = m.created_at || m.FECHA || "";
+    const card = parseTransferCardMessage(mensaje);
+
+    html+=`<div class="chat-msg ${esUser?"user":"op"}">
+      <div class="chat-bubble">
+        ${card ? renderTransferCardChat(card) : escapeHtml(mensaje)}
+        ${imagen?`<img src="${normalizarImagenUrl(imagen)}" alt="Imagen">`:""}
+      </div>
+      <div class="chat-meta">${esUser?"Usuario":"Operador"} · ${formatFecha(fecha)}</div>
+    </div>`;
+  });
+
+  const box=document.getElementById("chatBody");
+  box.innerHTML=html;
+  box.scrollTop=box.scrollHeight;
+}
+async function enviarChat(){
+  if(!chatActualId){
+    alert("Seleccioná un chat primero.");
+    return;
+  }
+
+  const input = document.getElementById("chatInput");
+  const mensaje = input.value.trim();
+
+  if(!mensaje && !chatImagenBase64) return;
+
+  agregarMensajeLocalPanel(mensaje, chatImagenBase64 || "");
+
+  const { error } = await supabaseClient.rpc("panel_operativo_enviar_chat", {
+    p_session_token: requireSessionToken(),
+    p_chat_id: chatActualId,
+    p_mensaje: mensaje || "",
+    p_imagen_url: chatImagenBase64 || ""
+  });
+
+  if(error){
+    console.error("Error enviando mensaje operador RPC:", error);
+    alert("No se pudo enviar el mensaje.");
+    return;
+  }
+
+  input.value="";
+  quitarImagenChat();
+  marcarUltimoMensajePanelEnviado();
+
+  setTimeout(()=>cargarChatActual(),400);
+  setTimeout(()=>cargarChats(true),700);
+}
+
+function agregarMensajeLocalPanel(mensaje, imagen){
+  const box = document.getElementById("chatBody");
+  const card = parseTransferCardMessage(mensaje || "");
+  box.insertAdjacentHTML("beforeend", `
+    <div class="chat-msg op">
+      <div class="chat-bubble">
+        ${card ? renderTransferCardChat(card) : escapeHtml(mensaje || "")}
+        ${imagen ? `<img src="${imagen}" alt="Imagen">` : ""}
+      </div>
+      <div class="chat-meta">Operador · enviando...</div>
+    </div>
+  `);
+  box.scrollTop = box.scrollHeight;
+}
+function marcarUltimoMensajePanelEnviado(){
+  const metas = document.querySelectorAll("#chatBody .chat-msg.op .chat-meta");
+  const last = metas[metas.length - 1];
+  if(last && last.innerText.includes("enviando")) last.innerText = "Operador · enviado";
+}
+function tomarImagenChatFile(){
+  const file=document.getElementById("chatFile").files[0];
+  if(file)leerImagenChat(file);
+}
+function leerImagenChat(file){
+  if(!file.type.startsWith("image/")){
+    alert("Pegá o adjuntá una imagen válida.");
+    return;
+  }
+
+  comprimirImagenChat(file, base64 => {
+    chatImagenBase64 = base64;
+    chatImagenNombre = (file.name || "captura.jpg").replace(/\.[^.]+$/, ".jpg");
+    document.getElementById("chatPreviewImg").src = chatImagenBase64;
+    document.getElementById("chatPreview").classList.add("show");
+  });
+}
+function quitarImagenChat(){
+  chatImagenBase64="";
+  chatImagenNombre="";
+  document.getElementById("chatFile").value="";
+  document.getElementById("chatPreviewImg").src="";
+  document.getElementById("chatPreview").classList.remove("show");
+}
+document.addEventListener("paste",e=>{
+  const visible=!document.getElementById("viewChat").classList.contains("hidden");
+  if(!visible)return;
+  const items=e.clipboardData?.items||[];
+  let hayImagen=false;
+  for(const item of items){
+    if(item.type&&item.type.startsWith("image/")){
+      const file=item.getAsFile();
+      if(file){leerImagenChat(file);e.preventDefault();hayImagen=true;return}
+    }
+  }
+});
+document.getElementById("chatInput")?.addEventListener("keydown",e=>{
+  if(e.key==="Enter"&&!e.shiftKey){
+    e.preventDefault();
+    enviarChat();
+  }
+});
+
+function verificarSolicitudes(silencioso=false){
+  const pendientes=solicitudes.filter(esPendiente);
+  const ids=new Set(pendientes.map(s=>String(s.ID||s.SOLICITUD_ID||"")).filter(Boolean));
+  const badge=document.getElementById("badgeSolicitudes");
+  if(pendientes.length){badge.classList.remove("hidden");badge.innerText=pendientes.length}else badge.classList.add("hidden");
+  let nuevas=0;ids.forEach(id=>{if(!lastPendientesIds.has(id))nuevas++});
+  if(!silencioso||lastPendientesIds.size===0){lastPendientesIds=ids;return}
+  if(nuevas>0){toast(`🔔 ${nuevas} nueva/s solicitud/es`);sonido("solicitud")}
+  lastPendientesIds=ids;
+}
+function verificarChats(silencioso=false){
+  const unread=chats.reduce((a,c)=>a+Number(c.SIN_LEER||0),0);
+  const badge=document.getElementById("badgeChat");
+
+  if(unread){
+    badge.classList.remove("hidden");
+    badge.innerText=unread;
+  }else{
+    badge.classList.add("hidden");
+  }
+
+  if(silencioso && unread>lastChatUnread){
+    toast("💬 Nuevo mensaje de chat");
+    sonido("chat");
+  }
+
+  lastChatUnread=unread;
+}
+function sonido(tipo="msg"){
+  try{
+    const ctx=new(window.AudioContext||window.webkitAudioContext)();
+    const osc=ctx.createOscillator();
+    const gain=ctx.createGain();
+    osc.connect(gain);gain.connect(ctx.destination);
+    osc.type="sine";osc.frequency.value=tipo==="chat"?660:520;gain.gain.value=.08;
+    osc.start();setTimeout(()=>{osc.stop();ctx.close()},220);
+  }catch(e){}
+}
+
+function abrirModal(title,body,saveFn,saveText="Guardar"){
+  setBox("modalTitle",title);setBox("modalBody",body);
+  const btn=document.getElementById("modalSaveBtn");btn.innerText=saveText;btn.onclick=saveFn;
+  document.getElementById("modalOverlay").classList.remove("hidden");
+}
+
+
+function workerTieneProblema(s){
+  const ew = normalizar(s.ESTADO_WORKER || "");
+  const e = normalizar(s.ESTADO || "");
+  return ["REINTENTAR","ERROR","ERROR_WORKER","ERROR_JOB","REQUIERE_MANUAL"].includes(ew) || ["REINTENTAR","ERROR","ERROR_WORKER","ERROR_JOB","REQUIERE_MANUAL"].includes(e) || !!s.WORKER_ERROR;
+}
+
+function workerMiniResumenSolicitud(s){
+  const jobId = s.WORKER_JOB_ID || "";
+  const err = s.WORKER_ERROR || "";
+  let html = `${workerBadge(s)}`;
+  if(jobId) html += `<br><span class="small">Job #${escapeHtml(jobId)}</span>`;
+  if(err) html += `<br><span class="worker-error-chip">${escapeHtml(err)}</span>`;
+  if(jobId && workerTieneProblema(s)){
+    html += `<div class="worker-actions-inline">
+      <button class="mini-btn blue" onclick="abrirWorkerLogs('${escapeAttr(jobId)}')">Logs</button>
+      <button class="mini-btn green" onclick="workerPanelReintentarJob('${escapeAttr(jobId)}')">Reintentar</button>
+      <button class="mini-btn yellow" onclick="workerPanelManualJob('${escapeAttr(jobId)}')">Manual</button>
+      <button class="mini-btn red" onclick="workerPanelCancelarJob('${escapeAttr(jobId)}')">Cancelar</button>
+    </div>`;
+  }else if(jobId){
+    html += `<div class="worker-actions-inline"><button class="mini-btn blue" onclick="abrirWorkerLogs('${escapeAttr(jobId)}')">Logs</button></div>`;
+  }
+  return html;
+}
+
+function renderWalletSelectWorkerManual(){
+  const sel = document.getElementById("manualWorkerBilletera");
+  if(!sel) return;
+  const tipo = val("manualWorkerTipo");
+  const lista = (billeteras || []).filter(b => normalizar(b.ACTIVA)==="SI" || normalizar(b.ESTADO)==="ACTIVA" || normalizar(b.ESTADO)==="DISPONIBLE");
+  let html = `<option value="">${tipo === "VALIDAR_USUARIO" ? "No aplica para validar usuario" : "Seleccionar billetera"}</option>`;
+  lista.forEach(b=>{
+    const id = b.ID_BILLETERA || b.id || "";
+    const nombre = b.NOMBRE_VISIBLE || b.BILLETERA_NOMBRE || "Billetera";
+    html += `<option value="${escapeAttr(id)}">${escapeHtml(nombre)} · ${escapeHtml(b.TIPO || "")} · ${escapeHtml(b.TITULAR || "")}</option>`;
+  });
+  sel.innerHTML = html;
+}
+
+function getWalletById(id){
+  return (billeteras || billeterasTodas || []).find(b => String(b.ID_BILLETERA || b.id || "") === String(id || ""));
+}
+
+
+function workerEstadoBadge(e){
+  const x = normalizar(e);
+  if(x === "COMPLETADO") return `<span class="badge badge-ok">COMPLETADO</span>`;
+  if(x === "PENDIENTE") return `<span class="badge badge-pending">PENDIENTE</span>`;
+  if(x === "PROCESANDO") return `<span class="badge badge-blue">PROCESANDO</span>`;
+  if(x === "REINTENTAR") return `<span class="badge badge-pending">REINTENTAR</span>`;
+  if(x === "REQUIERE_MANUAL") return `<span class="badge badge-danger">MANUAL</span>`;
+  if(x === "ERROR" || x === "ERROR_JOB") return `<span class="badge badge-danger">${escapeHtml(e || "ERROR")}</span>`;
+  if(x === "CANCELADO") return `<span class="badge badge-muted">CANCELADO</span>`;
+  return `<span class="badge badge-muted">${escapeHtml(e || "-")}</span>`;
+}
+
+function ajustarMontoWorkerManual(){
+  const tipo = val("manualWorkerTipo");
+  const monto = document.getElementById("manualWorkerMonto");
+  const wallet = document.getElementById("manualWorkerBilletera");
+  if(monto){
+    if(tipo === "VALIDAR_USUARIO"){
+      monto.value = "0";
+      monto.disabled = true;
+    }else{
+      monto.disabled = false;
+    }
+  }
+  if(wallet){
+    wallet.disabled = tipo === "VALIDAR_USUARIO";
+    if(tipo === "VALIDAR_USUARIO") wallet.value = "";
+  }
+  renderWalletSelectWorkerManual();
+}
+
+async function crearWorkerJobManualDesdePanel(){
+  const usuario = val("manualWorkerUsuario").trim();
+  const tipo = val("manualWorkerTipo").trim();
+  const monto = Number(val("manualWorkerMonto") || 0);
+  const obs = val("manualWorkerObs").trim();
+  const billeteraId = val("manualWorkerBilletera");
+  const billetera = getWalletById(billeteraId);
+
+  if(!usuario){
+    setBox("manualWorkerResultado", `<div class="err-box">Ingresá un usuario.</div>`);
+    return;
+  }
+
+  if(tipo !== "VALIDAR_USUARIO" && (!monto || monto <= 0)){
+    setBox("manualWorkerResultado", `<div class="err-box">Ingresá un monto válido.</div>`);
+    return;
+  }
+
+  if(tipo !== "VALIDAR_USUARIO" && !billeteraId){
+    setBox("manualWorkerResultado", `<div class="err-box">Seleccioná la billetera que impacta esta operación.</div>`);
+    return;
+  }
+
+  setBox("manualWorkerResultado", `<div class="alert-box">Enviando orden al worker...</div>`);
+
+  const { data, error } = await supabaseClient.rpc("operativo_crear_worker_job_manual_v2", {
+    p_pc_codigo: pcOperativa,
+    p_usuario: usuario,
+    p_tipo_accion: tipo,
+    p_monto: tipo === "VALIDAR_USUARIO" ? 0 : monto,
+    p_origen: "PANEL_OPERATIVO",
+    p_billetera_id: billeteraId ? Number(billeteraId) : null,
+    p_observacion: [
+      obs || "",
+      billetera ? `Billetera: ${billetera.NOMBRE_VISIBLE || billetera.BILLETERA_NOMBRE || ""} (${billetera.TIPO || ""})` : "",
+      billeteraId ? `billetera_id=${billeteraId}` : ""
+    ].filter(Boolean).join(" | ")
+  });
+
+  if(error){
+    setBox("manualWorkerResultado", `<div class="err-box">Error creando job: ${escapeHtml(error.message || "")}</div>`);
+    return;
+  }
+
+  const r = Array.isArray(data) ? data[0] : data;
+
+  if(r && r.ok === false){
+    setBox("manualWorkerResultado", `<div class="err-box">${escapeHtml(r.error || "No se pudo crear el job.")}</div>`);
+    return;
+  }
+
+  setBox("manualWorkerResultado", `<div class="ok-box">Job creado correctamente. ID: <b>${escapeHtml(r?.job_id || "-")}</b></div>`);
+  toast("Orden enviada al worker", "green");
+
+  await cargarWorkerJobs(true);
+}
+
+async function cargarWorkerJobs(showToast=false){
+  if(!panelSessionToken || !pcOperativa) return;
+
+  const estado = val("workerFiltroEstado") || "";
+  const tipo = val("workerFiltroTipo") || "";
+
+  const { data, error } = await supabaseClient.rpc("admin_listar_worker_jobs", {
+    p_pc_codigo: pcOperativa,
+    p_estado: estado,
+    p_tipo: tipo,
+    p_limit: 120
+  });
+
+  if(error){
+    console.error("Error listando worker_jobs:", error);
+    setBox("tablaWorkerOperativo", `<div class="err-box">Error cargando worker: ${escapeHtml(error.message || "")}</div>`);
+    return;
+  }
+
+  workerJobs = data || [];
+  renderWorkerJobs();
+  if(typeof renderCentroOperativo==='function')renderCentroOperativo();
+
+  if(showToast) toast("Worker actualizado", "green");
+}
+
+function renderWorkerJobs(){
+  const texto = normalizar(val("workerFiltroTexto"));
+  let lista = (workerJobs || []).slice();
+
+  if(texto){
+    lista = lista.filter(j => normalizar(`${j.id || ""} ${j.usuario || ""} ${j.pc_codigo || ""} ${j.tipo_accion || ""} ${j.estado || ""} ${j.resultado || ""} ${j.error_mensaje || ""}`).includes(texto));
+  }
+
+  const activos = lista.filter(j => ["PENDIENTE","PROCESANDO","REINTENTAR","ERROR","ERROR_JOB","REQUIERE_MANUAL"].includes(normalizar(j.estado))).length;
+  const badge = document.getElementById("badgeWorker");
+  if(badge){
+    if(activos > 0){
+      badge.classList.remove("hidden");
+      badge.textContent = activos;
+    }else{
+      badge.classList.add("hidden");
+      badge.textContent = "0";
+    }
+  }
+
+  if(!lista.length){
+    setBox("tablaWorkerOperativo", `<div class="alert-box">No hay jobs para mostrar.</div>`);
+    return;
+  }
+
+  let html = `<div class="table-wrap"><table><thead><tr>
+    <th>Job</th>
+    <th>Solicitud</th>
+    <th>PC</th>
+    <th>Usuario</th>
+    <th>Tipo</th>
+    <th>Monto</th>
+    <th>Estado</th>
+    <th>Intentos</th>
+    <th>Resultado / Error</th>
+    <th>Acciones</th>
+  </tr></thead><tbody>`;
+
+  lista.forEach(j => {
+    const id = j.id;
+    const estado = normalizar(j.estado);
+    const puedeAccionar = !["COMPLETADO","CANCELADO"].includes(estado);
+
+    html += `<tr>
+      <td><b>#${escapeHtml(id)}</b><br><span class="small">${formatFecha(j.created_at || "")}</span></td>
+      <td>${escapeHtml(j.solicitud_id || "-")}</td>
+      <td>${escapeHtml(j.pc_codigo || "")}</td>
+      <td><b>${escapeHtml(j.usuario || "")}</b></td>
+      <td><span class="badge badge-blue">${escapeHtml(j.tipo_accion || "")}</span></td>
+      <td>${money(j.monto || 0)}</td>
+      <td>${workerEstadoBadge(j.estado)}</td>
+      <td>${escapeHtml(j.intentos || 0)} / ${escapeHtml(j.max_intentos || 3)}</td>
+      <td>
+        ${j.resultado ? `<div>${escapeHtml(j.resultado)}</div>` : ""}
+        ${j.error_mensaje ? `<div style="color:#ffb4b4">${escapeHtml(j.error_mensaje)}</div>` : ""}
+      </td>
+      <td>
+        <button class="mini-btn blue" onclick="abrirDetalleWorkerJob('${escapeAttr(id)}')">Ver</button>
+        ${puedeAccionar ? `
+          <button class="mini-btn green" onclick="workerPanelReintentarJob('${escapeAttr(id)}')">Reintentar</button>
+          <button class="mini-btn yellow" onclick="workerPanelManualJob('${escapeAttr(id)}')">Manual</button>
+          <button class="mini-btn red" onclick="workerPanelCancelarJob('${escapeAttr(id)}')">Cancelar</button>
+        ` : ""}
+      </td>
+    </tr>`;
+  });
+
+  html += `</tbody></table></div>`;
+  setBox("tablaWorkerOperativo", html);
+}
+
+function abrirDetalleWorkerJob(jobId){
+  const j = (workerJobs || []).find(x => String(x.id) === String(jobId));
+  if(!j){
+    alert("No encontré el job en memoria. Actualizá worker.");
+    return;
+  }
+
+  abrirModal("Detalle worker #" + jobId, `
+    <div class="verify-box">
+      <div class="verify-title">⚙️ Job del worker</div>
+      <div class="verify-grid">
+        ${verifyRow("Job", "#" + (j.id || "-"))}
+        ${verifyRow("Solicitud", j.solicitud_id || "-")}
+        ${verifyRow("PC", j.pc_codigo || "-")}
+        ${verifyRow("Usuario", j.usuario || "-", "", true)}
+        ${verifyRow("Tipo", j.tipo_accion || "-")}
+        ${verifyRow("Monto", money(j.monto || 0))}
+        ${verifyRow("Estado", j.estado || "-")}
+        ${verifyRow("Intentos", `${j.intentos || 0} / ${j.max_intentos || 3}`)}
+      </div>
+    </div>
+    <div class="verify-box">
+      <div class="verify-title">Resultado / error</div>
+      <div class="verify-row">
+        <div class="verify-label">Resultado</div>
+        <div class="verify-value">${escapeHtml(j.resultado || "-")}</div>
+      </div>
+      <div class="verify-row" style="margin-top:8px">
+        <div class="verify-label">Error</div>
+        <div class="verify-value">${escapeHtml(j.error_mensaje || "-")}</div>
+      </div>
+    </div>
+  `, async()=>cerrarModal(), "Cerrar");
+}
+
+async function workerPanelReintentarJob(jobId){
+  if(!confirm("¿Reintentar job #" + jobId + "?")) return;
+
+  const { data, error } = await supabaseClient.rpc("admin_reintentar_worker_job", {
+    p_job_id: Number(jobId)
+  });
+
+  if(error){
+    alert("Error reintentando job: " + error.message);
+    return;
+  }
+
+  const r = Array.isArray(data) ? data[0] : data;
+  if(r && r.ok === false){
+    alert(r.error || "No se pudo reintentar.");
+    return;
+  }
+
+  toast("Job enviado a PENDIENTE", "green");
+  await cargarWorkerJobs(true);
+  await cargarSolicitudes(true);
+}
+
+async function workerPanelCancelarJob(jobId){
+  const motivo = prompt("Motivo de cancelación:", "Cancelado desde panel operativo");
+  if(motivo === null) return;
+
+  const { data, error } = await supabaseClient.rpc("admin_cancelar_worker_job", {
+    p_job_id: Number(jobId),
+    p_motivo: motivo || "Cancelado desde panel operativo"
+  });
+
+  if(error){
+    alert("Error cancelando job: " + error.message);
+    return;
+  }
+
+  const r = Array.isArray(data) ? data[0] : data;
+  if(r && r.ok === false){
+    alert(r.error || "No se pudo cancelar.");
+    return;
+  }
+
+  toast("Job cancelado", "green");
+  await cargarWorkerJobs(true);
+  await cargarSolicitudes(true);
+}
+
+async function workerPanelManualJob(jobId){
+  const motivo = prompt("Motivo para revisión manual:", "Requiere revisión manual desde panel operativo");
+  if(motivo === null) return;
+
+  const { data, error } = await supabaseClient.rpc("admin_marcar_worker_manual", {
+    p_job_id: Number(jobId),
+    p_motivo: motivo || "Requiere revisión manual desde panel operativo"
+  });
+
+  if(error){
+    alert("Error marcando manual: " + error.message);
+    return;
+  }
+
+  const r = Array.isArray(data) ? data[0] : data;
+  if(r && r.ok === false){
+    alert(r.error || "No se pudo marcar manual.");
+    return;
+  }
+
+  toast("Job marcado manual", "green");
+  await cargarWorkerJobs(true);
+  await cargarSolicitudes(true);
+}
+
+
+
+
+function verSolicitudInicio(id){
+  const s = (solicitudes || []).find(x => String(x.ID || x.SOLICITUD_ID) === String(id));
+
+  if(!s){
+    alert("No encontré la solicitud.");
+    return;
+  }
+
+  abrirModal("Solicitud #" + id, `
+    ${renderDatosSolicitudModal(s)}
+    ${normalizar(s.TIPO_SOLICITUD || s.TIPO) === "RETIRO" ? renderDestinoRetiroModal(s) : renderBilleteraVerificacionModal(s)}
+    ${s.WORKER_JOB_ID ? `<div class="verify-box">
+      <div class="verify-title">Worker</div>
+      ${verifyRow("Job", "#" + s.WORKER_JOB_ID)}
+      ${verifyRow("Estado", s.ESTADO_WORKER || "-")}
+      ${verifyRow("Error", s.WORKER_ERROR || "-")}
+    </div>` : ""}
+  `, async()=>cerrarModal(), "Cerrar");
+}
+
+function solicitudInicioAccionable(row){
+  const estado = normalizar(row.estado || "");
+  return row.origen === "LANDING" && (
+    estado === "PENDIENTE" ||
+    estado === "NUEVA" ||
+    estado === "NUEVO" ||
+    estado === "EN_REVISION"
+  );
+}
+
+function renderCentroOperativo(){renderOpsKpis();renderOpsWallets();renderColaUnificada();renderWalletSelectWorkerInicio();}
+function renderOpsKpis(){
+  const pendientes=solicitudes.filter(esPendiente);
+  const activos=(workerJobs||[]).filter(j=>["PENDIENTE","PROCESANDO","REINTENTAR","ERROR","ERROR_JOB","REQUIERE_MANUAL"].includes(normalizar(j.estado)));
+  const errores=(workerJobs||[]).filter(j=>["REINTENTAR","ERROR","ERROR_JOB","REQUIERE_MANUAL"].includes(normalizar(j.estado)));
+  const unread=typeof window.updateBadgeChatLateralV8==="function"?window.updateBadgeChatLateralV8():chats.reduce((a,c)=>a+Number(c.SIN_LEER||0),0);
+  const fichas=saldosOperativos?.fichas?.saldo||0;
+  const bs=saldosOperativos?.billeteras||[];
+  const total=bs.reduce((a,b)=>a+Number(b.saldo||0),0);
+  setBox("opsKpis",`
+    <div class="ops-kpi"><div class="ops-kpi-title">Fichas agente</div><div class="ops-kpi-value">${money(fichas)}</div><div class="ops-kpi-sub">Carga resta · retiro suma</div></div>
+    <div class="ops-kpi"><div class="ops-kpi-title">Total billeteras</div><div class="ops-kpi-value">${money(total)}</div><div class="ops-kpi-sub">${bs.length} billetera/s PC ${escapeHtml(pcOperativa||"")}</div></div>
+    <div class="ops-kpi"><div class="ops-kpi-title">Pendientes landing</div><div class="ops-kpi-value">${pendientes.length}</div><div class="ops-kpi-sub">Solicitudes sin cerrar</div></div>
+    <div class="ops-kpi"><div class="ops-kpi-title">Worker activo</div><div class="ops-kpi-value">${activos.length}</div><div class="ops-kpi-sub">${errores.length} error/reintento/manual</div></div>
+    <div class="ops-kpi"><div class="ops-kpi-title">Chats sin leer</div><div class="ops-kpi-value">${unread}</div><div class="ops-kpi-sub">Consultas por landing</div></div>`);
+}
+function renderOpsWallets(){
+  const lista=saldosOperativos?.billeteras||[];
+  if(!lista.length){setBox("opsWalletStrip",`<div class="ops-wallet"><div class="ops-wallet-name">Billeteras</div><div class="ops-wallet-meta">Sin saldos cargados todavía.</div></div>`);return;}
+  setBox("opsWalletStrip",lista.map(b=>`<div class="ops-wallet"><div class="ops-wallet-name">${escapeHtml(b.nombre_visible||"Billetera")}</div><div class="ops-wallet-saldo">${money(b.saldo||0)}</div><div class="ops-wallet-meta">${escapeHtml(b.banco||"")} · ${escapeHtml(b.titular||"")}<br>Alias: ${escapeHtml(b.alias||"-")}</div><div class="ops-wallet-actions"><button class="mini-btn gray" onclick="copiarTextoOperativo('${escapeAttr(b.alias||"")}','Alias')">Alias</button><button class="mini-btn gray" onclick="copiarTextoOperativo('${escapeAttr(b.cbu||"")}','CBU/CVU')">CBU</button><button class="mini-btn yellow" onclick="abrirAjusteBilletera('${escapeAttr(b.id)}')">Ajustar</button></div></div>`).join(""));
+}
+function renderColaUnificada(){
+  const texto = normalizar(val("opsFiltroTexto"));
+  const filtro = normalizar(val("opsFiltroEstado"));
+  let rows = [];
+
+  (solicitudes || []).forEach(s => {
+    rows.push({
+      origen: "LANDING",
+      fecha: s.FECHA_CREACION || s.FECHA,
+      usuario: s.USUARIO || s.USUARIO_JUGADOR || "",
+      tipo: s.TIPO_SOLICITUD || s.TIPO || "",
+      monto: s.MONTO_DECLARADO || s.MONTO_REAL || 0,
+      estado: s.ESTADO || "",
+      worker: s.ESTADO_WORKER || "",
+      job: s.WORKER_JOB_ID || "",
+      error: s.WORKER_ERROR || "",
+      solicitudId: s.ID || s.SOLICITUD_ID || ""
+    });
+  });
+
+  (workerJobs || [])
+    .filter(j => !j.solicitud_id)
+    .forEach(j => {
+      rows.push({
+        origen: "MANUAL",
+        fecha: j.created_at || j.updated_at,
+        usuario: j.usuario || "",
+        tipo: j.tipo_accion || "",
+        monto: j.monto || 0,
+        estado: j.estado || "",
+        worker: j.estado || "",
+        job: j.id || "",
+        error: j.error_mensaje || "",
+        solicitudId: ""
+      });
+    });
+
+  rows.sort((a,b) => new Date(b.fecha || 0) - new Date(a.fecha || 0));
+
+  if(filtro){
+    rows = rows.filter(r => normalizar(`${r.estado} ${r.worker}`).includes(filtro));
+  }
+
+  if(texto){
+    rows = rows.filter(r => normalizar(`${r.usuario} ${r.tipo} ${r.estado} ${r.worker} ${r.error} ${r.job} ${r.solicitudId}`).includes(texto));
+  }
+
+  rows = rows.slice(0, 80);
+
+  if(!rows.length){
+    setBox("opsColaUnificada", `<div class="alert-box">No hay movimientos para mostrar.</div>`);
+    return;
+  }
+
+  let h = `<div class="ops-table-wrap">
+    <table class="ops-main-table">
+      <thead>
+        <tr>
+          <th>Hora</th>
+          <th>Origen</th>
+          <th>Usuario</th>
+          <th>Tipo</th>
+          <th>Monto</th>
+          <th>Estado</th>
+          <th>Worker</th>
+          <th>Error</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>`;
+
+  rows.forEach(r => {
+    const cls = r.origen === "LANDING" ? "landing" : "manual";
+    const job = r.job || "";
+    const sid = r.solicitudId || "";
+    const tipoNorm = normalizar(r.tipo || "");
+
+    let acciones = `<div class="ops-compact-actions">`;
+
+    if(r.origen === "LANDING" && sid){
+      acciones += `<button class="mini-btn blue" onclick="verSolicitudInicio('${escapeAttr(sid)}')">Ver</button>`;
+
+      if(solicitudInicioAccionable(r)){
+        if(tipoNorm === "RETIRO"){
+          acciones += `<button class="mini-btn green" onclick="abrirCerrarRetiro('${escapeAttr(sid)}')">Aprobar retiro</button>`;
+        }else{
+          acciones += `<button class="mini-btn green" onclick="abrirAprobarSolicitud('${escapeAttr(sid)}')">Aprobar</button>`;
+        }
+
+        acciones += `<button class="mini-btn red" onclick="abrirRechazarSolicitud('${escapeAttr(sid)}')">Rechazar</button>`;
+      }
+    }
+
+    if(job){
+      acciones += `<button class="mini-btn blue" onclick="abrirWorkerLogs('${escapeAttr(job)}')">Logs</button>`;
+
+      if(!["COMPLETADO","CANCELADO"].includes(normalizar(r.worker))){
+        acciones += `<button class="mini-btn green" onclick="workerPanelReintentarJob('${escapeAttr(job)}')">Reintentar</button>`;
+        acciones += `<button class="mini-btn red" onclick="workerPanelCancelarJob('${escapeAttr(job)}')">Cancelar</button>`;
+      }
+    }
+
+    acciones += `</div>`;
+
+    h += `<tr>
+      <td>${formatFecha(r.fecha)}</td>
+      <td><span class="ops-origin ${cls}">${escapeHtml(r.origen)}</span></td>
+      <td><b>${escapeHtml(r.usuario)}</b></td>
+      <td>${escapeHtml(r.tipo)}</td>
+      <td>${money(r.monto || 0)}</td>
+      <td>${estadoBadge(r.estado || "-")}</td>
+      <td>${job ? `#${escapeHtml(job)}<br>${workerEstadoBadge(r.worker)}` : workerEstadoBadge(r.worker || "SIN_WORKER")}</td>
+      <td>${r.error ? `<span class="worker-error-chip">${escapeHtml(r.error)}</span>` : `<span class="small">-</span>`}</td>
+      <td>${acciones}</td>
+    </tr>`;
+  });
+
+  h += `</tbody></table></div>`;
+  setBox("opsColaUnificada", h);
+}
+function renderWalletSelectWorkerInicio(){const sel=document.getElementById("manualWorkerBilleteraInicio");if(!sel)return;const tipo=val("manualWorkerTipoInicio");const lista=saldosOperativos?.billeteras||[];sel.innerHTML=`<option value="">${tipo==="VALIDAR_USUARIO"?"No aplica para validar":"Seleccionar billetera"}</option>`+lista.map(b=>`<option value="${escapeAttr(b.id)}">${escapeHtml(b.nombre_visible||"Billetera")} · ${escapeHtml(b.banco||"")} · ${money(b.saldo||0)}</option>`).join("");}
+function ajustarMontoWorkerManualInicio(){const tipo=val("manualWorkerTipoInicio"),m=document.getElementById("manualWorkerMontoInicio"),w=document.getElementById("manualWorkerBilleteraInicio");if(tipo==="VALIDAR_USUARIO"){if(m){m.value="0";m.disabled=true}if(w){w.value="";w.disabled=true}}else{if(m)m.disabled=false;if(w)w.disabled=false}renderWalletSelectWorkerInicio();}
+async function crearWorkerJobManualInicio(){document.getElementById("manualWorkerUsuario").value=val("manualWorkerUsuarioInicio");document.getElementById("manualWorkerTipo").value=val("manualWorkerTipoInicio");document.getElementById("manualWorkerMonto").value=val("manualWorkerMontoInicio");document.getElementById("manualWorkerBilletera").value=val("manualWorkerBilleteraInicio");document.getElementById("manualWorkerObs").value=val("manualWorkerObsInicio");await crearWorkerJobManualDesdePanel();setBox("manualWorkerResultadoInicio",document.getElementById("manualWorkerResultado")?.innerHTML||"");await refrescarTodo(false);}
+function renderSelectsAjustes(){const sel=document.getElementById("ajusteBilleteraId");if(!sel)return;sel.innerHTML=(saldosOperativos?.billeteras||[]).map(b=>`<option value="${escapeAttr(b.id)}">${escapeHtml(b.nombre_visible||"Billetera")} · ${money(b.saldo||0)}</option>`).join("");}
+function abrirAjusteFichas(){mostrarVista("ajustes");setTimeout(()=>document.getElementById("ajusteFichasMonto")?.focus(),100)}
+function abrirAjusteBilletera(id=""){mostrarVista("ajustes");setTimeout(()=>{if(id)document.getElementById("ajusteBilleteraId").value=id;document.getElementById("ajusteBilleteraMonto")?.focus()},100)}
+async function guardarAjusteFichas(){const monto=Number(val("ajusteFichasMonto")||0),signo=Number(val("ajusteFichasSigno")||0),motivo=val("ajusteFichasMotivo").trim(),usuario=val("ajusteFichasUsuario").trim();if(!monto||monto<=0||!motivo){setBox("ajusteFichasResultado",`<div class="err-box">Monto y motivo son obligatorios.</div>`);return;}const {error}=await supabaseClient.rpc("admin_registrar_fichas_movimiento",{p_session_token:requireSessionToken(),p_pc_codigo:pcOperativa,p_tipo_movimiento:signo===1?"AJUSTE_FICHAS_POSITIVO":"AJUSTE_FICHAS_NEGATIVO",p_monto:monto,p_signo:signo,p_motivo:motivo,p_origen:"PANEL_OPERATIVO_AJUSTE",p_usuario:usuario||null,p_solicitud_id:null,p_worker_job_id:null});if(error){setBox("ajusteFichasResultado",`<div class="err-box">${escapeHtml(error.message)}</div>`);return;}setBox("ajusteFichasResultado",`<div class="ok-box">Ajuste guardado.</div>`);await cargarSaldosOperativos(true);renderCentroOperativo();}
+async function guardarAjusteBilletera(){const billeteraId=Number(val("ajusteBilleteraId")||0),monto=Number(val("ajusteBilleteraMonto")||0),signo=Number(val("ajusteBilleteraSigno")||0),motivo=val("ajusteBilleteraMotivo").trim(),usuario=val("ajusteBilleteraUsuario").trim();if(!billeteraId||!monto||monto<=0||!motivo){setBox("ajusteBilleteraResultado",`<div class="err-box">Billetera, monto y motivo son obligatorios.</div>`);return;}const {error}=await supabaseClient.rpc("admin_registrar_billetera_movimiento",{p_session_token:requireSessionToken(),p_billetera_id:billeteraId,p_tipo_movimiento:signo===1?"AJUSTE_BILLETERA_POSITIVO":"AJUSTE_BILLETERA_NEGATIVO",p_monto:monto,p_signo:signo,p_motivo:motivo,p_origen:"PANEL_OPERATIVO_AJUSTE",p_usuario:usuario||null,p_solicitud_id:null,p_worker_job_id:null});if(error){setBox("ajusteBilleteraResultado",`<div class="err-box">${escapeHtml(error.message)}</div>`);return;}setBox("ajusteBilleteraResultado",`<div class="ok-box">Ajuste guardado.</div>`);await cargarSaldosOperativos(true);renderCentroOperativo();renderSelectsAjustes();}
+
+function cerrarModal(){document.getElementById("modalOverlay").classList.add("hidden")}
+
+function abrirMenuMobile(){const menu=document.getElementById("mobileMenu");menu.classList.add("open");menu.innerHTML="";const clone=document.getElementById("sidebar").cloneNode(true);clone.style.display="block";menu.appendChild(clone)}
+function cerrarMenuMobile(e){if(!e||e.target.id==="mobileMenu"){const menu=document.getElementById("mobileMenu");menu.classList.remove("open");menu.innerHTML=""}}
+async function cerrarSesion(){
+  try{
+    if(panelSessionToken){
+      await supabaseClient.rpc("panel_logout", { p_session_token: panelSessionToken });
+    }
+  }catch(e){}
+  localStorage.removeItem(LS_OPERADOR);
+  localStorage.removeItem(LS_PC);
+  localStorage.removeItem(LS_TOKEN);
+  location.reload();
+}
+
+/* =========================================================
+   OPERATIVO CHAT NOTIFY V8 · ESTABLE SIN REDECLARAR
+   - Sin let/const globales duplicados.
+   - Sin recursión en mostrarVista.
+   - Badge lateral Chat suma mensajes nuevos aunque estés en Inicio.
+   - Chat se limpia solo al abrir/clickearel chat o al responder.
+   - Carga mensajes desde RPC PC como fuente principal.
+========================================================= */
+(function(){
+  const S = window.NODO_CHAT_V8 = window.NODO_CHAT_V8 || {
+    lastUserCount: {},
+    badgeCount: {},
+    currentView: "inicio",
+    installed: false
+  };
+
+  function chatIdOf(c){
+    return String((c && (c.ID_CHAT || c.chat_id || c.id)) || "").trim();
+  }
+
+  function chatBadgeKey(chatId){
+    return "nodo_chat_badge_v8_" + String(window.pcOperativa || pcOperativa || "") + "_" + String(chatId || "");
+  }
+
+  window.getChatBadgeV8 = function(chatId){
+    const id = String(chatId || "");
+    if(S.badgeCount[id] !== undefined) return Number(S.badgeCount[id] || 0);
+    return Number(localStorage.getItem(chatBadgeKey(id)) || 0);
+  };
+
+  window.setChatBadgeV8 = function(chatId, count){
+    const id = String(chatId || "");
+    const n = Math.max(0, Number(count || 0));
+    S.badgeCount[id] = n;
+    try{ localStorage.setItem(chatBadgeKey(id), String(n)); }catch(e){}
+  };
+
+  window.clearChatBadgeV8 = function(chatId){
+    window.setChatBadgeV8(chatId, 0);
+  };
+
+  function countUserMessages(ms){
+    return (ms || []).filter(m => String(m.tipo_emisor || m.emisor || "").toUpperCase() === "USUARIO").length;
+  }
+
+  function stableKey(c){
+    return String(
+      c?.chat_id || c?.ID_CHAT || c?.id || c?.solicitud_id || c?.SOLICITUD_ID ||
+      ((c?.usuario || c?.USUARIO || "") + "|" + (c?.telefono || c?.TELEFONO || ""))
+    ).trim();
+  }
+
+  function dedupe(lista){
+    const map = new Map();
+    (lista || []).forEach(c=>{
+      const k = stableKey(c);
+      if(!k) return;
+      const old = map.get(k);
+      if(!old){
+        map.set(k,c);
+        return;
+      }
+      const od = new Date(old.FECHA_ULTIMO || old.FECHA || old.updated_at || old.created_at || 0).getTime() || 0;
+      const nd = new Date(c.FECHA_ULTIMO || c.FECHA || c.updated_at || c.created_at || 0).getTime() || 0;
+      const merged = nd >= od ? {...old,...c} : {...c,...old};
+      merged.SIN_LEER = Math.max(Number(old.SIN_LEER||0), Number(c.SIN_LEER||0));
+      merged.USER_COUNT = Math.max(Number(old.USER_COUNT||0), Number(c.USER_COUNT||0));
+      map.set(k, merged);
+    });
+    return [...map.values()];
+  }
+
+  function resumenPreview(texto, imagen){
+    if(imagen) return "📎 Imagen";
+    const t = String(texto || "").trim();
+    if(!t) return "";
+    if(t.startsWith("TRANSFER_CARD:")) return "💳 Tarjeta de transferencia enviada";
+    return t.length > 44 ? t.slice(0,44) + "..." : t;
+  }
+
+  function totalUnread(){
+    return (window.chats || chats || []).reduce((a,c)=>a + Number(window.getChatBadgeV8(chatIdOf(c)) || 0), 0);
+  }
+
+  window.updateBadgeChatLateralV8 = function(){
+    const total = totalUnread();
+    const badge = document.getElementById("badgeChat");
+    if(badge){
+      if(total > 0){
+        badge.classList.remove("hidden");
+        badge.textContent = total;
+      }else{
+        badge.classList.add("hidden");
+        badge.textContent = "0";
+      }
+    }
+    const stat = document.getElementById("statChats");
+    if(stat) stat.textContent = total;
+    return total;
+  };
+
+  function isChatVisible(){
+    const el = document.getElementById("viewChat");
+    return !!(el && !el.classList.contains("hidden"));
+  }
+
+  async function loadMensajesPc(){
+    const { data, error } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes_pc", {
+      p_session_token: requireSessionToken(),
+      p_pc_codigo: pcOperativa,
+      p_limit: 1500
+    });
+    if(error){
+      console.error("Error cargando chat_mensajes_pc:", error);
+      return [];
+    }
+    return data || [];
+  }
+
+  window.cargarChats = async function(silencioso=false){
+    const { data: sesiones, error } = await supabaseClient.rpc("panel_operativo_get_chat_sesiones", {
+      p_session_token: requireSessionToken(),
+      p_pc_codigo: pcOperativa
+    });
+
+    if(error){
+      console.error("Error cargando chat_sesiones RPC:", error);
+      return;
+    }
+
+    const mensajes = await loadMensajesPc();
+    let nuevos = 0;
+
+    const next = (sesiones || []).map(c=>{
+      const id = String(c.chat_id || c.id || "");
+      const ms = mensajes.filter(m => String(m.chat_id) === id);
+      const ultimo = ms.length ? ms[ms.length - 1] : null;
+      const userCount = countUserMessages(ms);
+
+      // Base: si ya lo vio, usa readCount. Si no, cuenta todo lo del usuario.
+      const readCount = (typeof getChatReadCount === "function") ? Number(getChatReadCount(id) || 0) : 0;
+      const prev = S.lastUserCount[id] !== undefined ? Number(S.lastUserCount[id] || 0) : readCount;
+
+      let badge = window.getChatBadgeV8(id);
+
+      if(userCount > prev){
+        const delta = userCount - prev;
+        badge += delta;
+        nuevos += delta;
+        window.setChatBadgeV8(id, badge);
+      }
+
+      S.lastUserCount[id] = userCount;
+
+      return {
+        ID_CHAT: id,
+        chat_id: id,
+        USUARIO: c.usuario || "Usuario",
+        NOMBRE_COMPLETO: c.nombre_completo || c.usuario || "",
+        TELEFONO: c.telefono || "",
+        FECHA: c.created_at,
+        FECHA_ULTIMO: ultimo?.created_at || c.ultimo_mensaje || c.updated_at || c.created_at,
+        ULTIMO_MENSAJE: resumenPreview(ultimo?.mensaje || "", ultimo?.imagen_url || ""),
+        SIN_LEER: badge,
+        USER_COUNT: userCount,
+        SOLICITUD_ID: c.solicitud_id || "",
+        ESTADO: c.estado || "ABIERTO",
+        PC: c.pc_codigo || pcOperativa
+      };
+    });
+
+    window.chats = chats = dedupe(next);
+
+    renderChatList();
+    verificarChats(true);
+    renderInicio();
+    window.updateBadgeChatLateralV8();
+
+    if(nuevos > 0 && silencioso){
+      try{
+        toast(`💬 ${nuevos} mensaje/s nuevo/s de usuario`, "blue");
+        if(typeof sonidoNotificacion === "function") sonidoNotificacion();
+      }catch(e){}
+    }
+
+    if(!silencioso) console.log("Chats cargados por RPC:", chats.length);
+  };
+
+  window.renderChatList = function(){
+    if(!chats || !chats.length){
+      setBox("chatList",`<div class="alert-box">No hay chats activos.</div>`);
+      window.updateBadgeChatLateralV8();
+      return;
+    }
+
+    chats = window.chats = dedupe(chats).sort((a,b)=>{
+      return new Date(b.FECHA_ULTIMO || b.FECHA || 0) - new Date(a.FECHA_ULTIMO || a.FECHA || 0);
+    });
+
+    let html = "";
+    chats.forEach(c=>{
+      const id = chatIdOf(c);
+      const unread = window.getChatBadgeV8(id);
+      const active = String(chatActualId || "") === id ? "active" : "";
+      html += `
+        <div class="chat-item clean-chat-item ${active}" onclick="abrirChat('${escapeAttr(id)}')">
+          <div>
+            <div class="chat-item-title" style="display:block">
+              <b>${escapeHtml(c.USUARIO || "Usuario")}</b>
+              <div class="small">${formatFecha(c.FECHA_ULTIMO || c.FECHA || "")}</div>
+            </div>
+            <div class="small">${escapeHtml(c.ULTIMO_MENSAJE || "")}</div>
+          </div>
+          ${unread ? `<span class="chat-unread">${unread}</span>` : ""}
+        </div>
+      `;
+    });
+
+    setBox("chatList", html);
+    window.updateBadgeChatLateralV8();
+  };
+
+  window.abrirChat = async function(id){
+    chatActualId = String(id || "");
+
+    const c = (chats || []).find(x => String(x.ID_CHAT || x.chat_id) === chatActualId) || {};
+
+    setBox("chatTitulo", `
+      <span>${escapeHtml(c.USUARIO || "Usuario")}</span>
+      <button class="chat-icon-btn" title="Copiar usuario" onclick="copiarTextoOperativo('${escapeAttr(c.USUARIO || "")}','Usuario')">📋</button>
+      <button class="chat-icon-btn" title="Info usuario" onclick="abrirInfoChatUsuario()">ℹ️</button>
+    `);
+    setBox("chatSubtitulo", `${formatFecha(c.FECHA_ULTIMO || c.FECHA || "")}`);
+    setBox("chatEstado", c.SOLICITUD_ID ? `Solicitud: ${escapeHtml(c.SOLICITUD_ID)}` : "-");
+
+    await cargarChatActual(true);
+
+    // Clic en chat = atendido: limpia badge.
+    const ms = (chatMensajes || []).filter(m => String(m.chat_id) === chatActualId);
+    const userCount = countUserMessages(ms);
+
+    if(typeof setChatReadCount === "function") setChatReadCount(chatActualId, userCount);
+    S.lastUserCount[chatActualId] = userCount;
+    window.clearChatBadgeV8(chatActualId);
+
+    try{
+      await supabaseClient.rpc("panel_operativo_marcar_chat_leido", {
+        p_session_token: requireSessionToken(),
+        p_chat_id: chatActualId
+      });
+    }catch(e){ console.warn("No se pudo marcar leído backend:", e); }
+
+    renderChatList();
+    verificarChats(true);
+    renderInicio();
+    window.updateBadgeChatLateralV8();
+  };
+
+  window.cargarChatActual = async function(scroll=true){
+    if(!chatActualId) return;
+
+    // Si está en Inicio u otra sección, NO cargamos/limpiamos el chat abierto anterior.
+    if(!isChatVisible()) return;
+
+    const mensajes = await loadMensajesPc();
+    let ms = mensajes.filter(m => String(m.chat_id) === String(chatActualId));
+
+    if(!ms.length){
+      const { data, error } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes", {
+        p_session_token: requireSessionToken(),
+        p_chat_id: chatActualId
+      });
+      if(error) console.error("Error cargando mensajes chat individual:", error);
+      else ms = data || [];
+    }
+
+    window.chatMensajes = chatMensajes = ms || [];
+    renderChatMensajes();
+
+    // No limpia badge automáticamente acá. Solo abrirChat o enviarChat.
+    renderChatList();
+    verificarChats(true);
+    renderInicio();
+    window.updateBadgeChatLateralV8();
+
+    if(scroll){
+      const body = document.getElementById("chatBody");
+      if(body) body.scrollTop = body.scrollHeight;
+    }
+  };
+
+  window.renderChatMensajes = function(){
+    const body = document.getElementById("chatBody");
+    if(!body) return;
+
+    if(!chatMensajes || !chatMensajes.length){
+      body.innerHTML = `<div class="alert-box">Sin mensajes todavía.</div>`;
+      return;
+    }
+
+    body.innerHTML = chatMensajes.map(m=>{
+      const tipo = String(m.tipo_emisor || m.emisor || "").toUpperCase();
+      const cls = tipo === "USUARIO" ? "user" : "op";
+      const texto = String(m.mensaje || "");
+      const imagen = m.imagen_url || "";
+      let contenido = "";
+
+      if(texto.startsWith("TRANSFER_CARD:") && typeof renderTransferCardChat === "function"){
+        contenido = renderTransferCardChat(texto.replace("TRANSFER_CARD:",""));
+      }else{
+        contenido = escapeHtml(texto);
+      }
+
+      if(imagen){
+        contenido += `<img src="${escapeAttr(imagen)}" alt="imagen chat">`;
+      }
+
+      return `
+        <div class="chat-msg ${cls}">
+          <div class="chat-bubble">${contenido}</div>
+          <div class="chat-meta">${formatearHoraChat(m.created_at || m.fecha || "")}</div>
+        </div>
+      `;
+    }).join("");
+  };
+
+  window.verificarChats = function(silencioso=true){
+    lastChatUnread = window.updateBadgeChatLateralV8();
+  };
+
+  window.renderInicio = function(){
+    const pendientes=solicitudes.filter(esPendiente);
+    const retiros=pendientes.filter(s=>normalizar(s.TIPO_SOLICITUD||s.TIPO)==="RETIRO");
+    const unread=totalUnread();
+    const bil=billeteras.find(b=>normalizar(b.SELECCIONADA_MANUAL)==="SI") || billeteras.find(b=>normalizar(b.ACTIVA)==="SI") || {};
+    const hoy = solicitudes.filter(s=>esMismoDiaBA(s.FECHA_CREACION||s.FECHA));
+
+    setBox("statPendientes",pendientes.length);
+    setBox("statRetiros",`Retiros: ${retiros.length}`);
+    setBox("statSolicitudesHoy",hoy.length);
+    setBox("statSolicitudesTotalPc",`Total PC: ${solicitudes.length}`);
+    setBox("statChats",unread);
+    setBox("statBilletera",bil.NOMBRE_VISIBLE||bil.BILLETERA_NOMBRE||"-");
+    setBox("statBilleteraTipo",bil.TIPO?`${bil.TIPO} · ${bil.PC||pcOperativa}`:"-");
+    setBox("alertas",`
+      ${pendientes.length?`<div class="alert-box">🔔 Hay ${pendientes.length} solicitud/es pendiente/s.</div>`:""}
+      ${unread?`<div class="alert-box">💬 Hay ${unread} mensaje/s de chat sin leer.</div>`:""}
+    `);
+    setBox("resumenTurnosOperativo",resumenTurnosOperativoHTML(solicitudes));
+    setBox("tablaSolicitudesInicio",tablaSolicitudesHTML(pendientes.slice(0,40)));
+  renderSaldosOperativos();
+    window.updateBadgeChatLateralV8();
+  };
+
+  window.abrirInfoChatUsuario = function(){
+    if(!chatActualId) return;
+    const c = (chats || []).find(x=>String(x.ID_CHAT || x.chat_id) === String(chatActualId)) || {};
+    const solicitud = (solicitudes || []).find(s => String(s.ID || s.SOLICITUD_ID || "") === String(c.SOLICITUD_ID || ""));
+
+    abrirModal("Info del chat", `
+      <div class="verify-box">
+        <div class="verify-title">👤 Usuario</div>
+        <div class="verify-grid">
+          ${verifyRow("Usuario", c.USUARIO || "-", "", true)}
+          ${verifyRow("Teléfono", c.TELEFONO || "-", "", true)}
+          ${verifyRow("Nombre", c.NOMBRE_COMPLETO || "-", "", false)}
+          ${verifyRow("PC", c.PC || pcOperativa || "-")}
+          ${verifyRow("Solicitud", c.SOLICITUD_ID || "-")}
+          ${verifyRow("Estado", c.ESTADO || "-")}
+        </div>
+      </div>
+      ${solicitud ? renderDatosSolicitudModal(solicitud) : ""}
+    `, async()=>cerrarModal(), "Cerrar");
+  };
+
+  if(!window.__mostrarVistaOriginalV8 && typeof window.mostrarVista === "function"){
+    window.__mostrarVistaOriginalV8 = window.mostrarVista;
+  }
+
+  window.mostrarVista = function(vista){
+    S.currentView = String(vista || "").toLowerCase();
+    if(typeof window.__mostrarVistaOriginalV8 === "function"){
+      window.__mostrarVistaOriginalV8(vista);
+    }
+    window.updateBadgeChatLateralV8();
+  };
+
+  if(!window.__enviarChatOriginalV8 && typeof window.enviarChat === "function"){
+    window.__enviarChatOriginalV8 = window.enviarChat;
+  }
+
+  window.enviarChat = async function(){
+    if(typeof window.__enviarChatOriginalV8 === "function"){
+      await window.__enviarChatOriginalV8();
+    }
+
+    // Responder = atendido, limpia badge de ese chat.
+    if(chatActualId){
+      const ms = (chatMensajes || []).filter(m => String(m.chat_id) === String(chatActualId));
+      const userCount = countUserMessages(ms);
+      if(typeof setChatReadCount === "function") setChatReadCount(chatActualId, userCount);
+      S.lastUserCount[chatActualId] = userCount;
+      window.clearChatBadgeV8(chatActualId);
+      renderChatList();
+      verificarChats(true);
+      renderInicio();
+      window.updateBadgeChatLateralV8();
+    }
+  };
+
+})();
+
+</script>
+
+<script>
+/* =========================================================
+   NODO FINAL OPERATIVO CHAT FIX V3
+   - Sesión operativa persiste hasta cierre manual.
+   - El chat abierto queda leído en cada actualización.
+   - No vuelven badges sin leer al refrescar chats.
+========================================================= */
+(function(){
+  function normTipo(v){return String(v||'').trim().toUpperCase();}
+  function readKey(id){return 'nodo_operativo_chat_read_v3_'+String(window.pcOperativa||pcOperativa||'')+'_'+String(id||'');}
+  function getRead(id){return Number(localStorage.getItem(readKey(id))||0);}
+  function setRead(id,n){localStorage.setItem(readKey(id),String(Number(n||0)));}
+  function userCount(ms){return (ms||[]).filter(m=>normTipo(m.tipo_emisor||m.TIPO_EMISOR)==='USUARIO').length;}
+  async function tryServerRead(chatId){
+    try{ await supabaseClient.rpc('panel_operativo_marcar_chat_leido',{p_session_token:requireSessionToken(),p_chat_id:chatId}); }catch(e){}
+  }
+  window.getChatReadCount=getRead;
+  window.setChatReadCount=setRead;
+
+  window.cargarChats=async function(silencioso=false){
+    const {data:sesiones,error}=await supabaseClient.rpc('panel_operativo_get_chat_sesiones',{p_session_token:requireSessionToken(),p_pc_codigo:pcOperativa});
+    if(error){console.error('Error cargando chat_sesiones RPC:',error);return;}
+    const {data:mensajesData,error:errorMensajes}=await supabaseClient.rpc('panel_operativo_get_chat_mensajes_pc',{p_session_token:requireSessionToken(),p_pc_codigo:pcOperativa,p_limit:2000});
+    if(errorMensajes)console.error('Error cargando chat_mensajes RPC:',errorMensajes);
+    const mensajes=errorMensajes?[]:(mensajesData||[]);
+    chats=(sesiones||[]).map(c=>{
+      const id=c.chat_id||c.ID_CHAT;
+      const ms=mensajes.filter(m=>String(m.chat_id||m.CHAT_ID)===String(id));
+      const ultimo=ms.length?ms[ms.length-1]:null;
+      const uc=userCount(ms);
+      if(String(id)===String(chatActualId) && uc>getRead(id)){ setRead(id,uc); tryServerRead(id); }
+      const sinLeer=Math.max(0,uc-getRead(id));
+      return {ID_CHAT:id,chat_id:id,USUARIO:c.usuario||c.USUARIO||'Usuario',NOMBRE_COMPLETO:c.nombre_completo||c.usuario||'',TELEFONO:c.telefono||'',FECHA:c.created_at||c.FECHA,FECHA_ULTIMO:ultimo?.created_at||c.ultimo_mensaje||c.created_at,ULTIMO_MENSAJE:resumenMensajeChatPreview(ultimo?.mensaje||ultimo?.MENSAJE||'',ultimo?.imagen_url||ultimo?.IMAGEN_URL||''),SIN_LEER:sinLeer,USER_COUNT:uc,SOLICITUD_ID:c.solicitud_id||'',ESTADO:c.estado||'ABIERTO'};
+    }).sort((a,b)=>new Date(b.FECHA_ULTIMO||0)-new Date(a.FECHA_ULTIMO||0));
+    renderChatList(); verificarChats(true); renderInicio();
+    if(chatActualId) renderChatMensajes();
+    if(!silencioso) console.log('Chats cargados por RPC:',chats.length);
+  };
+
+  window.abrirChat=async function(id){
+    chatActualId=id;
+    await cargarChatActual(false);
+    const uc=userCount(chatMensajes);
+    setRead(id,uc);
+    await tryServerRead(id);
+    await cargarChats(true);
+    renderChatList(); renderChatMensajes(); verificarChats(false); renderInicio();
+  };
+
+  const oldCargarChatActual=window.cargarChatActual;
+  window.cargarChatActual=async function(){
+    if(!chatActualId)return;
+    const {data,error}=await supabaseClient.rpc('panel_operativo_get_chat_mensajes',{p_session_token:requireSessionToken(),p_chat_id:chatActualId});
+    if(error){console.error('Error cargando mensajes del chat RPC:',error);return;}
+    chatMensajes=data||[];
+    const uc=userCount(chatMensajes);
+    if(uc>getRead(chatActualId)){ setRead(chatActualId,uc); await tryServerRead(chatActualId); }
+    renderChatMensajes();
+  };
+
+  window.cerrarSesion=async function(){
+    try{ if(panelSessionToken){ await supabaseClient.rpc('panel_logout',{p_session_token:panelSessionToken}); } }catch(e){}
+    try{localStorage.removeItem(LS_OPERADOR);localStorage.removeItem(LS_PC);localStorage.removeItem(LS_TOKEN);}catch(e){}
+    location.reload();
+  };
+})();
+
+/* =========================================================
+   OPERATIVO CHAT NOTIFY V8 · ESTABLE SIN REDECLARAR
+   - Sin let/const globales duplicados.
+   - Sin recursión en mostrarVista.
+   - Badge lateral Chat suma mensajes nuevos aunque estés en Inicio.
+   - Chat se limpia solo al abrir/clickearel chat o al responder.
+   - Carga mensajes desde RPC PC como fuente principal.
+========================================================= */
+(function(){
+  const S = window.NODO_CHAT_V8 = window.NODO_CHAT_V8 || {
+    lastUserCount: {},
+    badgeCount: {},
+    currentView: "inicio",
+    installed: false
+  };
+
+  function chatIdOf(c){
+    return String((c && (c.ID_CHAT || c.chat_id || c.id)) || "").trim();
+  }
+
+  function chatBadgeKey(chatId){
+    return "nodo_chat_badge_v8_" + String(window.pcOperativa || pcOperativa || "") + "_" + String(chatId || "");
+  }
+
+  window.getChatBadgeV8 = function(chatId){
+    const id = String(chatId || "");
+    if(S.badgeCount[id] !== undefined) return Number(S.badgeCount[id] || 0);
+    return Number(localStorage.getItem(chatBadgeKey(id)) || 0);
+  };
+
+  window.setChatBadgeV8 = function(chatId, count){
+    const id = String(chatId || "");
+    const n = Math.max(0, Number(count || 0));
+    S.badgeCount[id] = n;
+    try{ localStorage.setItem(chatBadgeKey(id), String(n)); }catch(e){}
+  };
+
+  window.clearChatBadgeV8 = function(chatId){
+    window.setChatBadgeV8(chatId, 0);
+  };
+
+  function countUserMessages(ms){
+    return (ms || []).filter(m => String(m.tipo_emisor || m.emisor || "").toUpperCase() === "USUARIO").length;
+  }
+
+  function stableKey(c){
+    return String(
+      c?.chat_id || c?.ID_CHAT || c?.id || c?.solicitud_id || c?.SOLICITUD_ID ||
+      ((c?.usuario || c?.USUARIO || "") + "|" + (c?.telefono || c?.TELEFONO || ""))
+    ).trim();
+  }
+
+  function dedupe(lista){
+    const map = new Map();
+    (lista || []).forEach(c=>{
+      const k = stableKey(c);
+      if(!k) return;
+      const old = map.get(k);
+      if(!old){
+        map.set(k,c);
+        return;
+      }
+      const od = new Date(old.FECHA_ULTIMO || old.FECHA || old.updated_at || old.created_at || 0).getTime() || 0;
+      const nd = new Date(c.FECHA_ULTIMO || c.FECHA || c.updated_at || c.created_at || 0).getTime() || 0;
+      const merged = nd >= od ? {...old,...c} : {...c,...old};
+      merged.SIN_LEER = Math.max(Number(old.SIN_LEER||0), Number(c.SIN_LEER||0));
+      merged.USER_COUNT = Math.max(Number(old.USER_COUNT||0), Number(c.USER_COUNT||0));
+      map.set(k, merged);
+    });
+    return [...map.values()];
+  }
+
+  function resumenPreview(texto, imagen){
+    if(imagen) return "📎 Imagen";
+    const t = String(texto || "").trim();
+    if(!t) return "";
+    if(t.startsWith("TRANSFER_CARD:")) return "💳 Tarjeta de transferencia enviada";
+    return t.length > 44 ? t.slice(0,44) + "..." : t;
+  }
+
+  function totalUnread(){
+    return (window.chats || chats || []).reduce((a,c)=>a + Number(window.getChatBadgeV8(chatIdOf(c)) || 0), 0);
+  }
+
+  window.updateBadgeChatLateralV8 = function(){
+    const total = totalUnread();
+    const badge = document.getElementById("badgeChat");
+    if(badge){
+      if(total > 0){
+        badge.classList.remove("hidden");
+        badge.textContent = total;
+      }else{
+        badge.classList.add("hidden");
+        badge.textContent = "0";
+      }
+    }
+    const stat = document.getElementById("statChats");
+    if(stat) stat.textContent = total;
+    return total;
+  };
+
+  function isChatVisible(){
+    const el = document.getElementById("viewChat");
+    return !!(el && !el.classList.contains("hidden"));
+  }
+
+  async function loadMensajesPc(){
+    const { data, error } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes_pc", {
+      p_session_token: requireSessionToken(),
+      p_pc_codigo: pcOperativa,
+      p_limit: 1500
+    });
+    if(error){
+      console.error("Error cargando chat_mensajes_pc:", error);
+      return [];
+    }
+    return data || [];
+  }
+
+  window.cargarChats = async function(silencioso=false){
+    const { data: sesiones, error } = await supabaseClient.rpc("panel_operativo_get_chat_sesiones", {
+      p_session_token: requireSessionToken(),
+      p_pc_codigo: pcOperativa
+    });
+
+    if(error){
+      console.error("Error cargando chat_sesiones RPC:", error);
+      return;
+    }
+
+    const mensajes = await loadMensajesPc();
+    let nuevos = 0;
+
+    const next = (sesiones || []).map(c=>{
+      const id = String(c.chat_id || c.id || "");
+      const ms = mensajes.filter(m => String(m.chat_id) === id);
+      const ultimo = ms.length ? ms[ms.length - 1] : null;
+      const userCount = countUserMessages(ms);
+
+      // Base: si ya lo vio, usa readCount. Si no, cuenta todo lo del usuario.
+      const readCount = (typeof getChatReadCount === "function") ? Number(getChatReadCount(id) || 0) : 0;
+      const prev = S.lastUserCount[id] !== undefined ? Number(S.lastUserCount[id] || 0) : readCount;
+
+      let badge = window.getChatBadgeV8(id);
+
+      if(userCount > prev){
+        const delta = userCount - prev;
+        badge += delta;
+        nuevos += delta;
+        window.setChatBadgeV8(id, badge);
+      }
+
+      S.lastUserCount[id] = userCount;
+
+      return {
+        ID_CHAT: id,
+        chat_id: id,
+        USUARIO: c.usuario || "Usuario",
+        NOMBRE_COMPLETO: c.nombre_completo || c.usuario || "",
+        TELEFONO: c.telefono || "",
+        FECHA: c.created_at,
+        FECHA_ULTIMO: ultimo?.created_at || c.ultimo_mensaje || c.updated_at || c.created_at,
+        ULTIMO_MENSAJE: resumenPreview(ultimo?.mensaje || "", ultimo?.imagen_url || ""),
+        SIN_LEER: badge,
+        USER_COUNT: userCount,
+        SOLICITUD_ID: c.solicitud_id || "",
+        ESTADO: c.estado || "ABIERTO",
+        PC: c.pc_codigo || pcOperativa
+      };
+    });
+
+    window.chats = chats = dedupe(next);
+
+    renderChatList();
+    verificarChats(true);
+    renderInicio();
+    window.updateBadgeChatLateralV8();
+
+    if(nuevos > 0 && silencioso){
+      try{
+        toast(`💬 ${nuevos} mensaje/s nuevo/s de usuario`, "blue");
+        if(typeof sonidoNotificacion === "function") sonidoNotificacion();
+      }catch(e){}
+    }
+
+    if(!silencioso) console.log("Chats cargados por RPC:", chats.length);
+  };
+
+  window.renderChatList = function(){
+    if(!chats || !chats.length){
+      setBox("chatList",`<div class="alert-box">No hay chats activos.</div>`);
+      window.updateBadgeChatLateralV8();
+      return;
+    }
+
+    chats = window.chats = dedupe(chats).sort((a,b)=>{
+      return new Date(b.FECHA_ULTIMO || b.FECHA || 0) - new Date(a.FECHA_ULTIMO || a.FECHA || 0);
+    });
+
+    let html = "";
+    chats.forEach(c=>{
+      const id = chatIdOf(c);
+      const unread = window.getChatBadgeV8(id);
+      const active = String(chatActualId || "") === id ? "active" : "";
+      html += `
+        <div class="chat-item clean-chat-item ${active}" onclick="abrirChat('${escapeAttr(id)}')">
+          <div>
+            <div class="chat-item-title" style="display:block">
+              <b>${escapeHtml(c.USUARIO || "Usuario")}</b>
+              <div class="small">${formatFecha(c.FECHA_ULTIMO || c.FECHA || "")}</div>
+            </div>
+            <div class="small">${escapeHtml(c.ULTIMO_MENSAJE || "")}</div>
+          </div>
+          ${unread ? `<span class="chat-unread">${unread}</span>` : ""}
+        </div>
+      `;
+    });
+
+    setBox("chatList", html);
+    window.updateBadgeChatLateralV8();
+  };
+
+  window.abrirChat = async function(id){
+    chatActualId = String(id || "");
+
+    const c = (chats || []).find(x => String(x.ID_CHAT || x.chat_id) === chatActualId) || {};
+
+    setBox("chatTitulo", `
+      <span>${escapeHtml(c.USUARIO || "Usuario")}</span>
+      <button class="chat-icon-btn" title="Copiar usuario" onclick="copiarTextoOperativo('${escapeAttr(c.USUARIO || "")}','Usuario')">📋</button>
+      <button class="chat-icon-btn" title="Info usuario" onclick="abrirInfoChatUsuario()">ℹ️</button>
+    `);
+    setBox("chatSubtitulo", `${formatFecha(c.FECHA_ULTIMO || c.FECHA || "")}`);
+    setBox("chatEstado", c.SOLICITUD_ID ? `Solicitud: ${escapeHtml(c.SOLICITUD_ID)}` : "-");
+
+    await cargarChatActual(true);
+
+    // Clic en chat = atendido: limpia badge.
+    const ms = (chatMensajes || []).filter(m => String(m.chat_id) === chatActualId);
+    const userCount = countUserMessages(ms);
+
+    if(typeof setChatReadCount === "function") setChatReadCount(chatActualId, userCount);
+    S.lastUserCount[chatActualId] = userCount;
+    window.clearChatBadgeV8(chatActualId);
+
+    try{
+      await supabaseClient.rpc("panel_operativo_marcar_chat_leido", {
+        p_session_token: requireSessionToken(),
+        p_chat_id: chatActualId
+      });
+    }catch(e){ console.warn("No se pudo marcar leído backend:", e); }
+
+    renderChatList();
+    verificarChats(true);
+    renderInicio();
+    window.updateBadgeChatLateralV8();
+  };
+
+  window.cargarChatActual = async function(scroll=true){
+    if(!chatActualId) return;
+
+    // Si está en Inicio u otra sección, NO cargamos/limpiamos el chat abierto anterior.
+    if(!isChatVisible()) return;
+
+    const mensajes = await loadMensajesPc();
+    let ms = mensajes.filter(m => String(m.chat_id) === String(chatActualId));
+
+    if(!ms.length){
+      const { data, error } = await supabaseClient.rpc("panel_operativo_get_chat_mensajes", {
+        p_session_token: requireSessionToken(),
+        p_chat_id: chatActualId
+      });
+      if(error) console.error("Error cargando mensajes chat individual:", error);
+      else ms = data || [];
+    }
+
+    window.chatMensajes = chatMensajes = ms || [];
+    renderChatMensajes();
+
+    // No limpia badge automáticamente acá. Solo abrirChat o enviarChat.
+    renderChatList();
+    verificarChats(true);
+    renderInicio();
+    window.updateBadgeChatLateralV8();
+
+    if(scroll){
+      const body = document.getElementById("chatBody");
+      if(body) body.scrollTop = body.scrollHeight;
+    }
+  };
+
+  window.renderChatMensajes = function(){
+    const body = document.getElementById("chatBody");
+    if(!body) return;
+
+    if(!chatMensajes || !chatMensajes.length){
+      body.innerHTML = `<div class="alert-box">Sin mensajes todavía.</div>`;
+      return;
+    }
+
+    body.innerHTML = chatMensajes.map(m=>{
+      const tipo = String(m.tipo_emisor || m.emisor || "").toUpperCase();
+      const cls = tipo === "USUARIO" ? "user" : "op";
+      const texto = String(m.mensaje || "");
+      const imagen = m.imagen_url || "";
+      let contenido = "";
+
+      if(texto.startsWith("TRANSFER_CARD:") && typeof renderTransferCardChat === "function"){
+        contenido = renderTransferCardChat(texto.replace("TRANSFER_CARD:",""));
+      }else{
+        contenido = escapeHtml(texto);
+      }
+
+      if(imagen){
+        contenido += `<img src="${escapeAttr(imagen)}" alt="imagen chat">`;
+      }
+
+      return `
+        <div class="chat-msg ${cls}">
+          <div class="chat-bubble">${contenido}</div>
+          <div class="chat-meta">${formatearHoraChat(m.created_at || m.fecha || "")}</div>
+        </div>
+      `;
+    }).join("");
+  };
+
+  window.verificarChats = function(silencioso=true){
+    lastChatUnread = window.updateBadgeChatLateralV8();
+  };
+
+  window.renderInicio = function(){
+    const pendientes=solicitudes.filter(esPendiente);
+    const retiros=pendientes.filter(s=>normalizar(s.TIPO_SOLICITUD||s.TIPO)==="RETIRO");
+    const unread=totalUnread();
+    const bil=billeteras.find(b=>normalizar(b.SELECCIONADA_MANUAL)==="SI") || billeteras.find(b=>normalizar(b.ACTIVA)==="SI") || {};
+    const hoy = solicitudes.filter(s=>esMismoDiaBA(s.FECHA_CREACION||s.FECHA));
+
+    setBox("statPendientes",pendientes.length);
+    setBox("statRetiros",`Retiros: ${retiros.length}`);
+    setBox("statSolicitudesHoy",hoy.length);
+    setBox("statSolicitudesTotalPc",`Total PC: ${solicitudes.length}`);
+    setBox("statChats",unread);
+    setBox("statBilletera",bil.NOMBRE_VISIBLE||bil.BILLETERA_NOMBRE||"-");
+    setBox("statBilleteraTipo",bil.TIPO?`${bil.TIPO} · ${bil.PC||pcOperativa}`:"-");
+    setBox("alertas",`
+      ${pendientes.length?`<div class="alert-box">🔔 Hay ${pendientes.length} solicitud/es pendiente/s.</div>`:""}
+      ${unread?`<div class="alert-box">💬 Hay ${unread} mensaje/s de chat sin leer.</div>`:""}
+    `);
+    setBox("resumenTurnosOperativo",resumenTurnosOperativoHTML(solicitudes));
+    setBox("tablaSolicitudesInicio",tablaSolicitudesHTML(pendientes.slice(0,40)));
+  renderSaldosOperativos();
+    window.updateBadgeChatLateralV8();
+  };
+
+  window.abrirInfoChatUsuario = function(){
+    if(!chatActualId) return;
+    const c = (chats || []).find(x=>String(x.ID_CHAT || x.chat_id) === String(chatActualId)) || {};
+    const solicitud = (solicitudes || []).find(s => String(s.ID || s.SOLICITUD_ID || "") === String(c.SOLICITUD_ID || ""));
+
+    abrirModal("Info del chat", `
+      <div class="verify-box">
+        <div class="verify-title">👤 Usuario</div>
+        <div class="verify-grid">
+          ${verifyRow("Usuario", c.USUARIO || "-", "", true)}
+          ${verifyRow("Teléfono", c.TELEFONO || "-", "", true)}
+          ${verifyRow("Nombre", c.NOMBRE_COMPLETO || "-", "", false)}
+          ${verifyRow("PC", c.PC || pcOperativa || "-")}
+          ${verifyRow("Solicitud", c.SOLICITUD_ID || "-")}
+          ${verifyRow("Estado", c.ESTADO || "-")}
+        </div>
+      </div>
+      ${solicitud ? renderDatosSolicitudModal(solicitud) : ""}
+    `, async()=>cerrarModal(), "Cerrar");
+  };
+
+  if(!window.__mostrarVistaOriginalV8 && typeof window.mostrarVista === "function"){
+    window.__mostrarVistaOriginalV8 = window.mostrarVista;
+  }
+
+  window.mostrarVista = function(vista){
+    S.currentView = String(vista || "").toLowerCase();
+    if(typeof window.__mostrarVistaOriginalV8 === "function"){
+      window.__mostrarVistaOriginalV8(vista);
+    }
+    window.updateBadgeChatLateralV8();
+  };
+
+  if(!window.__enviarChatOriginalV8 && typeof window.enviarChat === "function"){
+    window.__enviarChatOriginalV8 = window.enviarChat;
+  }
+
+  window.enviarChat = async function(){
+    if(typeof window.__enviarChatOriginalV8 === "function"){
+      await window.__enviarChatOriginalV8();
+    }
+
+    // Responder = atendido, limpia badge de ese chat.
+    if(chatActualId){
+      const ms = (chatMensajes || []).filter(m => String(m.chat_id) === String(chatActualId));
+      const userCount = countUserMessages(ms);
+      if(typeof setChatReadCount === "function") setChatReadCount(chatActualId, userCount);
+      S.lastUserCount[chatActualId] = userCount;
+      window.clearChatBadgeV8(chatActualId);
+      renderChatList();
+      verificarChats(true);
+      renderInicio();
+      window.updateBadgeChatLateralV8();
+    }
+  };
+
+})();
+
+</script>
+
+
 </body>
 </html>
-
