@@ -223,6 +223,7 @@ table{width:100%;border-collapse:collapse}th,td{padding:11px;border-bottom:1px s
       <button id="navSolicitudes" class="nav-btn" onclick="mostrarVista('solicitudes')">📋 Solicitudes <span id="badgeSolicitudes" class="badge-alert hidden">0</span></button>
       <button id="navBilleteras" class="nav-btn" onclick="mostrarVista('billeteras')">💳 Billeteras</button>
       <button id="navChat" class="nav-btn" onclick="mostrarVista('chat')">💬 Chat <span id="badgeChat" class="badge-alert badge-chat hidden">0</span></button>
+      <button id="navWorker" class="nav-btn" onclick="mostrarVista('worker')">⚙️ Worker <span id="badgeWorker" class="badge-alert hidden">0</span></button>
 
       <button class="nav-btn" onclick="cerrarSesion()">🚪 Cerrar sesión</button>
     </aside>
@@ -343,6 +344,75 @@ table{width:100%;border-collapse:collapse}th,td{padding:11px;border-bottom:1px s
               <div class="small" style="text-align:center;margin-top:8px">Ctrl + V admite texto e imagen del portapapeles.</div>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section id="viewWorker" class="hidden">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+          <div>
+            <h1 style="font-size:26px">Worker operativo</h1>
+            <div class="small">Cola de trabajo de la PC actual y acciones manuales al worker.</div>
+          </div>
+          <button class="mini-btn blue" onclick="cargarWorkerJobs(true)">🔄 Actualizar worker</button>
+        </div>
+
+        <div class="card">
+          <h2 class="card-title">⚡ Acción manual al worker</h2>
+          <div class="alert-box">
+            Usá esto cuando el operador ya revisó el caso y necesita generar una carga/retiro/validación sin que el usuario lo inicie desde la landing.
+          </div>
+
+          <div class="filters">
+            <div>
+              <label>Usuario</label>
+              <input id="manualWorkerUsuario" placeholder="ej: pruebasan">
+            </div>
+            <div>
+              <label>Tipo de acción</label>
+              <select id="manualWorkerTipo" onchange="ajustarMontoWorkerManual()">
+                <option value="VALIDAR_USUARIO">Validar usuario</option>
+                <option value="CARGAR_FICHAS">Cargar fichas</option>
+                <option value="PROCESAR_RETIRO">Retirar fichas</option>
+              </select>
+            </div>
+            <div>
+              <label>Monto</label>
+              <input id="manualWorkerMonto" type="number" min="0" step="1" placeholder="ej: 2000">
+            </div>
+            <div>
+              <label>Observación</label>
+              <input id="manualWorkerObs" placeholder="opcional">
+            </div>
+          </div>
+
+          <button class="btn btn-green" onclick="crearWorkerJobManualDesdePanel()">Enviar al worker</button>
+          <div id="manualWorkerResultado" style="margin-top:12px"></div>
+        </div>
+
+        <div class="card">
+          <h2 class="card-title">📌 Cola del worker · PC actual</h2>
+          <div class="filters">
+            <input id="workerFiltroTexto" placeholder="Buscar job, usuario, error..." oninput="renderWorkerJobs()">
+            <select id="workerFiltroEstado" onchange="renderWorkerJobs()">
+              <option value="">Todos los estados</option>
+              <option value="PENDIENTE">Pendiente</option>
+              <option value="PROCESANDO">Procesando</option>
+              <option value="REINTENTAR">Reintentar</option>
+              <option value="COMPLETADO">Completado</option>
+              <option value="ERROR">Error</option>
+              <option value="REQUIERE_MANUAL">Requiere manual</option>
+              <option value="CANCELADO">Cancelado</option>
+            </select>
+            <select id="workerFiltroTipo" onchange="renderWorkerJobs()">
+              <option value="">Todos los tipos</option>
+              <option value="VALIDAR_USUARIO">Validar usuario</option>
+              <option value="CARGAR_FICHAS">Cargar fichas</option>
+              <option value="PROCESAR_RETIRO">Retiro</option>
+            </select>
+            <button class="mini-btn blue" onclick="cargarWorkerJobs(true)">Filtrar / actualizar</button>
+          </div>
+
+          <div id="tablaWorkerOperativo"></div>
         </div>
       </section>
     </main>
@@ -795,7 +865,7 @@ let operador=null, pcOperativa=null, panelSessionToken="";
 const LS_OPERADOR="nodo_operador_lite";
 const LS_PC="nodo_pc_operativa_lite";
 const LS_TOKEN="nodo_panel_session_token_lite";
-let solicitudes=[], billeteras=[], billeterasTodas=[], chats=[], chatMensajes=[];
+let solicitudes=[], billeteras=[], billeterasTodas=[], chats=[], chatMensajes=[], workerJobs=[];
 let timersIniciados=false;
 let lastPendientesIds=new Set(), lastChatUnread=0;
 let chatActualId="", chatImagenBase64="", chatImagenNombre="";
@@ -1240,6 +1310,7 @@ function finalizarLogin(guardar=true){
     setInterval(()=>cargarSolicitudes(true),4500);
     setInterval(()=>cargarChats(true),4500);
     setInterval(()=>cargarBilleteras(false),20000);
+    setInterval(()=>cargarWorkerJobs(false),6000);
     setInterval(()=>{ if(chatActualId) cargarChatActual(true); },3500);
   }
 }
@@ -1255,7 +1326,7 @@ function iniciarRealtimeSolicitudes(){
 }
 
 function mostrarVista(vista){
-  ["Inicio","Solicitudes","Billeteras","Chat"].forEach(v=>{
+  ["Inicio","Solicitudes","Billeteras","Chat","Worker"].forEach(v=>{
     document.getElementById("view"+v)?.classList.add("hidden");
     document.getElementById("nav"+v)?.classList.remove("active");
   });
@@ -1265,6 +1336,7 @@ function mostrarVista(vista){
   if(vista==="solicitudes")renderSolicitudes();
   if(vista==="billeteras")cargarBilleteras();
   if(vista==="chat")cargarChats();
+  if(vista==="worker")cargarWorkerJobs(false);
   cerrarMenuMobile();
 }
 
@@ -1272,6 +1344,7 @@ async function refrescarTodo(showToast=true){
   await cargarSolicitudes(false);
   await cargarBilleteras(false);
   await cargarChats(false);
+  await cargarWorkerJobs(false);
   renderInicio();
   if(showToast)toast("Panel actualizado","green");
 }
@@ -2336,6 +2409,281 @@ function abrirModal(title,body,saveFn,saveText="Guardar"){
   const btn=document.getElementById("modalSaveBtn");btn.innerText=saveText;btn.onclick=saveFn;
   document.getElementById("modalOverlay").classList.remove("hidden");
 }
+
+function workerEstadoBadge(e){
+  const x = normalizar(e);
+  if(x === "COMPLETADO") return `<span class="badge badge-ok">COMPLETADO</span>`;
+  if(x === "PENDIENTE") return `<span class="badge badge-pending">PENDIENTE</span>`;
+  if(x === "PROCESANDO") return `<span class="badge badge-blue">PROCESANDO</span>`;
+  if(x === "REINTENTAR") return `<span class="badge badge-pending">REINTENTAR</span>`;
+  if(x === "REQUIERE_MANUAL") return `<span class="badge badge-danger">MANUAL</span>`;
+  if(x === "ERROR" || x === "ERROR_JOB") return `<span class="badge badge-danger">${escapeHtml(e || "ERROR")}</span>`;
+  if(x === "CANCELADO") return `<span class="badge badge-muted">CANCELADO</span>`;
+  return `<span class="badge badge-muted">${escapeHtml(e || "-")}</span>`;
+}
+
+function ajustarMontoWorkerManual(){
+  const tipo = val("manualWorkerTipo");
+  const monto = document.getElementById("manualWorkerMonto");
+  if(!monto) return;
+  if(tipo === "VALIDAR_USUARIO"){
+    monto.value = "0";
+    monto.disabled = true;
+  }else{
+    monto.disabled = false;
+  }
+}
+
+async function crearWorkerJobManualDesdePanel(){
+  const usuario = val("manualWorkerUsuario").trim();
+  const tipo = val("manualWorkerTipo").trim();
+  const monto = Number(val("manualWorkerMonto") || 0);
+  const obs = val("manualWorkerObs").trim();
+
+  if(!usuario){
+    setBox("manualWorkerResultado", `<div class="err-box">Ingresá un usuario.</div>`);
+    return;
+  }
+
+  if(tipo !== "VALIDAR_USUARIO" && (!monto || monto <= 0)){
+    setBox("manualWorkerResultado", `<div class="err-box">Ingresá un monto válido.</div>`);
+    return;
+  }
+
+  setBox("manualWorkerResultado", `<div class="alert-box">Enviando orden al worker...</div>`);
+
+  const { data, error } = await supabaseClient.rpc("operativo_crear_worker_job_manual", {
+    p_pc_codigo: pcOperativa,
+    p_usuario: usuario,
+    p_tipo_accion: tipo,
+    p_monto: tipo === "VALIDAR_USUARIO" ? 0 : monto,
+    p_origen: "PANEL_OPERATIVO",
+    p_observacion: obs
+  });
+
+  if(error){
+    setBox("manualWorkerResultado", `<div class="err-box">Error creando job: ${escapeHtml(error.message || "")}</div>`);
+    return;
+  }
+
+  const r = Array.isArray(data) ? data[0] : data;
+
+  if(r && r.ok === false){
+    setBox("manualWorkerResultado", `<div class="err-box">${escapeHtml(r.error || "No se pudo crear el job.")}</div>`);
+    return;
+  }
+
+  setBox("manualWorkerResultado", `<div class="ok-box">Job creado correctamente. ID: <b>${escapeHtml(r?.job_id || "-")}</b></div>`);
+  toast("Orden enviada al worker", "green");
+
+  await cargarWorkerJobs(true);
+}
+
+async function cargarWorkerJobs(showToast=false){
+  if(!panelSessionToken || !pcOperativa) return;
+
+  const estado = val("workerFiltroEstado") || "";
+  const tipo = val("workerFiltroTipo") || "";
+
+  const { data, error } = await supabaseClient.rpc("admin_listar_worker_jobs", {
+    p_pc_codigo: pcOperativa,
+    p_estado: estado,
+    p_tipo: tipo,
+    p_limit: 120
+  });
+
+  if(error){
+    console.error("Error listando worker_jobs:", error);
+    setBox("tablaWorkerOperativo", `<div class="err-box">Error cargando worker: ${escapeHtml(error.message || "")}</div>`);
+    return;
+  }
+
+  workerJobs = data || [];
+  renderWorkerJobs();
+
+  if(showToast) toast("Worker actualizado", "green");
+}
+
+function renderWorkerJobs(){
+  const texto = normalizar(val("workerFiltroTexto"));
+  let lista = (workerJobs || []).slice();
+
+  if(texto){
+    lista = lista.filter(j => normalizar(`${j.id || ""} ${j.usuario || ""} ${j.pc_codigo || ""} ${j.tipo_accion || ""} ${j.estado || ""} ${j.resultado || ""} ${j.error_mensaje || ""}`).includes(texto));
+  }
+
+  const activos = lista.filter(j => ["PENDIENTE","PROCESANDO","REINTENTAR","ERROR","ERROR_JOB","REQUIERE_MANUAL"].includes(normalizar(j.estado))).length;
+  const badge = document.getElementById("badgeWorker");
+  if(badge){
+    if(activos > 0){
+      badge.classList.remove("hidden");
+      badge.textContent = activos;
+    }else{
+      badge.classList.add("hidden");
+      badge.textContent = "0";
+    }
+  }
+
+  if(!lista.length){
+    setBox("tablaWorkerOperativo", `<div class="alert-box">No hay jobs para mostrar.</div>`);
+    return;
+  }
+
+  let html = `<div class="table-wrap"><table><thead><tr>
+    <th>Job</th>
+    <th>Solicitud</th>
+    <th>PC</th>
+    <th>Usuario</th>
+    <th>Tipo</th>
+    <th>Monto</th>
+    <th>Estado</th>
+    <th>Intentos</th>
+    <th>Resultado / Error</th>
+    <th>Acciones</th>
+  </tr></thead><tbody>`;
+
+  lista.forEach(j => {
+    const id = j.id;
+    const estado = normalizar(j.estado);
+    const puedeAccionar = !["COMPLETADO","CANCELADO"].includes(estado);
+
+    html += `<tr>
+      <td><b>#${escapeHtml(id)}</b><br><span class="small">${formatFecha(j.created_at || "")}</span></td>
+      <td>${escapeHtml(j.solicitud_id || "-")}</td>
+      <td>${escapeHtml(j.pc_codigo || "")}</td>
+      <td><b>${escapeHtml(j.usuario || "")}</b></td>
+      <td><span class="badge badge-blue">${escapeHtml(j.tipo_accion || "")}</span></td>
+      <td>${money(j.monto || 0)}</td>
+      <td>${workerEstadoBadge(j.estado)}</td>
+      <td>${escapeHtml(j.intentos || 0)} / ${escapeHtml(j.max_intentos || 3)}</td>
+      <td>
+        ${j.resultado ? `<div>${escapeHtml(j.resultado)}</div>` : ""}
+        ${j.error_mensaje ? `<div style="color:#ffb4b4">${escapeHtml(j.error_mensaje)}</div>` : ""}
+      </td>
+      <td>
+        <button class="mini-btn blue" onclick="abrirDetalleWorkerJob('${escapeAttr(id)}')">Ver</button>
+        ${puedeAccionar ? `
+          <button class="mini-btn green" onclick="workerPanelReintentarJob('${escapeAttr(id)}')">Reintentar</button>
+          <button class="mini-btn yellow" onclick="workerPanelManualJob('${escapeAttr(id)}')">Manual</button>
+          <button class="mini-btn red" onclick="workerPanelCancelarJob('${escapeAttr(id)}')">Cancelar</button>
+        ` : ""}
+      </td>
+    </tr>`;
+  });
+
+  html += `</tbody></table></div>`;
+  setBox("tablaWorkerOperativo", html);
+}
+
+function abrirDetalleWorkerJob(jobId){
+  const j = (workerJobs || []).find(x => String(x.id) === String(jobId));
+  if(!j){
+    alert("No encontré el job en memoria. Actualizá worker.");
+    return;
+  }
+
+  abrirModal("Detalle worker #" + jobId, `
+    <div class="verify-box">
+      <div class="verify-title">⚙️ Job del worker</div>
+      <div class="verify-grid">
+        ${verifyRow("Job", "#" + (j.id || "-"))}
+        ${verifyRow("Solicitud", j.solicitud_id || "-")}
+        ${verifyRow("PC", j.pc_codigo || "-")}
+        ${verifyRow("Usuario", j.usuario || "-", "", true)}
+        ${verifyRow("Tipo", j.tipo_accion || "-")}
+        ${verifyRow("Monto", money(j.monto || 0))}
+        ${verifyRow("Estado", j.estado || "-")}
+        ${verifyRow("Intentos", `${j.intentos || 0} / ${j.max_intentos || 3}`)}
+      </div>
+    </div>
+    <div class="verify-box">
+      <div class="verify-title">Resultado / error</div>
+      <div class="verify-row">
+        <div class="verify-label">Resultado</div>
+        <div class="verify-value">${escapeHtml(j.resultado || "-")}</div>
+      </div>
+      <div class="verify-row" style="margin-top:8px">
+        <div class="verify-label">Error</div>
+        <div class="verify-value">${escapeHtml(j.error_mensaje || "-")}</div>
+      </div>
+    </div>
+  `, async()=>cerrarModal(), "Cerrar");
+}
+
+async function workerPanelReintentarJob(jobId){
+  if(!confirm("¿Reintentar job #" + jobId + "?")) return;
+
+  const { data, error } = await supabaseClient.rpc("admin_reintentar_worker_job", {
+    p_job_id: Number(jobId)
+  });
+
+  if(error){
+    alert("Error reintentando job: " + error.message);
+    return;
+  }
+
+  const r = Array.isArray(data) ? data[0] : data;
+  if(r && r.ok === false){
+    alert(r.error || "No se pudo reintentar.");
+    return;
+  }
+
+  toast("Job enviado a PENDIENTE", "green");
+  await cargarWorkerJobs(true);
+  await cargarSolicitudes(true);
+}
+
+async function workerPanelCancelarJob(jobId){
+  const motivo = prompt("Motivo de cancelación:", "Cancelado desde panel operativo");
+  if(motivo === null) return;
+
+  const { data, error } = await supabaseClient.rpc("admin_cancelar_worker_job", {
+    p_job_id: Number(jobId),
+    p_motivo: motivo || "Cancelado desde panel operativo"
+  });
+
+  if(error){
+    alert("Error cancelando job: " + error.message);
+    return;
+  }
+
+  const r = Array.isArray(data) ? data[0] : data;
+  if(r && r.ok === false){
+    alert(r.error || "No se pudo cancelar.");
+    return;
+  }
+
+  toast("Job cancelado", "green");
+  await cargarWorkerJobs(true);
+  await cargarSolicitudes(true);
+}
+
+async function workerPanelManualJob(jobId){
+  const motivo = prompt("Motivo para revisión manual:", "Requiere revisión manual desde panel operativo");
+  if(motivo === null) return;
+
+  const { data, error } = await supabaseClient.rpc("admin_marcar_worker_manual", {
+    p_job_id: Number(jobId),
+    p_motivo: motivo || "Requiere revisión manual desde panel operativo"
+  });
+
+  if(error){
+    alert("Error marcando manual: " + error.message);
+    return;
+  }
+
+  const r = Array.isArray(data) ? data[0] : data;
+  if(r && r.ok === false){
+    alert(r.error || "No se pudo marcar manual.");
+    return;
+  }
+
+  toast("Job marcado manual", "green");
+  await cargarWorkerJobs(true);
+  await cargarSolicitudes(true);
+}
+
+
 function cerrarModal(){document.getElementById("modalOverlay").classList.add("hidden")}
 
 function abrirMenuMobile(){const menu=document.getElementById("mobileMenu");menu.classList.add("open");menu.innerHTML="";const clone=document.getElementById("sidebar").cloneNode(true);clone.style.display="block";menu.appendChild(clone)}
